@@ -106,17 +106,26 @@ class ColorPrinter:
     }
 
 
-    def __init__(self, config: Dict[str, Union[bool, str]] = None, colorprinter_variables: Dict[str, List[str]] = None, styles: Dict [str, TextStyle] = None) -> None:
+    def __init__(self, config: Dict[str, Union[bool, str]] = None, color_map: Dict[str, str] = None,
+                 styles: Dict [str, TextStyle] = None, colorprinter_variables: Dict[str, List[str]] = None) -> None:
         """
-        Initialize the ColorPrinter with a default color code.
-        :param color_code: The default ANSI color code.
+        Initialize the ColorPrinter with args to any of these optional parameters.
+        :param config: enable or disable various functionalities of this class. Default is the ColorPrinter.CONFIG dictionary above
+        :param color_map: supply your own color_map dictionary. Default is the ColorPrinter.COLOR_MAP dictionary above
+        :param styles: supply your own styles dictionary. Default is the ColorPrinter.STYLES dictionary above
+        :param colorprinter_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         """
         if not config:
             config = ColorPrinter.CONFIG
         self.config: Dict[str, Union[bool, str, int]] = config
+        if not color_map:
+            color_map = ColorPrinter.COLOR_MAP
+        self.color_map: Dict[str, str] = color_map
 
-        self.color_map: Dict[str, str] = ColorPrinter.COLOR_MAP
+        #  Set the reset code to the default value in self.color_map
         self.reset = self.color_map['default']
+
+        # Compute self.bg_color_map from self.color_map
         self.bg_color_map: Dict[str, str] = {
             color: self.compute_bg_color_map(code) for color, code in self.color_map.items()
         }
