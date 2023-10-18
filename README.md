@@ -26,6 +26,41 @@ Though **prints_charming** is replete with features tailored for Linux terminals
 
 To get started, install the package and add it to your project.
 
+### Option 1: Using pip
+
+```bash
+pip install prints-charming
+```
+
+### Option 2: Cloning from GitHub
+
+Alternatively, you can clone the repository directly from GitHub to access the latest features and updates that might not yet be published on PyPI:
+
+1. Open a terminal window.
+
+2. Navigate to the directory where you want to clone the repository.
+
+3. Run the following command to clone the repository:
+
+```bash
+git clone https://github.com/deefifofun/prints_charming.git
+```
+
+4. Navigate into the cloned directory:
+
+```bash
+cd prints-charming
+```
+
+5. Install the package using:
+
+```bash
+pip install .
+```
+
+This will install the package from the source code.
+
+
 ### Here's a simple example:
 
 ```python
@@ -236,6 +271,7 @@ class ColorPrinterLogHandler(logging.Handler):
 
         # Create the final styled message
         timestamped_message = f"{styled_timestamp}: {formatted_timestamp} {styled_level} - {styled_text}"
+        
         
         print(timestamped_message)
 
