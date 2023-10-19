@@ -1,5 +1,7 @@
 # 🎉 prints_charming v1.0.0: The Ultimate Terminal Text Coloring and Styling Solution 🎉
 
+![Project Illustration](./images/prints_charming-illustration-scaled2.png)
+
 ## 🚀 Introduction
 
 Announcing the first public release of **prints_charming**! Initially created in March of this year, this Python package has become an indispensable part of my development workflow. It has seen extensive use in 100+ of my own Python modules across various private projects I have been working on over the last eight months. "prints_charming" is more than just another color printing library; it's crafted to elevate your development experience by providing a swift and streamlined way to color and style terminal outputs—be it for standard printing, logging, debugging, or tracing—all without becoming an obstruction in your development process. While the library serves as a robust tool for making terminal outputs more readable, visually appealing, and informative, its true power lies in its versatility—enhancing the entire terminal and programming experience.
