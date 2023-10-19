@@ -67,8 +67,12 @@ This will install the package from the source code.
 # Import the ColorPrinter class from the prints_charming module
 from prints_charming import ColorPrinter
 
-# Create an instance of the ColorPrinter class
+# Create an instance of the ColorPrinter class with default args
 cp = ColorPrinter()
+
+# Print all the styles in the styles dictionary
+for style in cp.styles:
+    cp.print("######################################################################", style=style)
 
 # Basic printing with ColorPrinter
 # 'vgreen' specifies a very bright green color
@@ -123,6 +127,8 @@ vars_and_styles_dict = {
     "username": ("John", "blue")
 }
 cp.print_variables(vars_and_styles_dict, "Hello {username}, your balance is {balance} USD.", text_style="yellow")
+
+cp.print_bg('red', length=80)
 
 # Using Lists with print_variables method
 vars_and_styles_list = ([1000, "John"], ["green", "blue"])
