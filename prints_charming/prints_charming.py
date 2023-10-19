@@ -194,6 +194,7 @@ class ColorPrinter:
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
+
     def remove_variable(self, variable: str) -> None:
         if variable in self.word_map:
             del self.word_map[variable]
@@ -215,6 +216,17 @@ class ColorPrinter:
                 self.add_variables(variables, style_name)
             else:
                 print(f"Style {style_name} not found in styles dictionary.")
+
+
+    def conceal_text(self, text_to_conceal, replace=False):
+        if replace:
+            style_code = self.style_codes['vyellow']
+            concealed_text = f"{style_code}***concealed_api_key***{self.reset}"
+        else:
+            style_code = self.style_codes['conceal']
+            concealed_text = f"{style_code}{text_to_conceal}{self.reset}"
+
+        return concealed_text
 
 
     def print_var(self, text, var, tstyle, vstyle):
@@ -264,67 +276,6 @@ class ColorPrinter:
                 text = text.replace(f"var{i + 1}", sub)
 
         self.print(text, style=text_style)
-
-    def add_word(self, word: str, style_name: str) -> None:
-        if style_name in self.styles:
-            style_code = self.style_codes[style_name]
-            styled_word = f"{style_code}{word}{self.reset}"
-            self.word_map[str(word)] = {"style": style_name, "styled": styled_word}
-
-    def remove_word(self, word: str) -> None:
-        if word in self.word_map:
-            del self.word_map[word]
-
-    def add_words(self, words: List[str], style_name: str) -> None:
-        if style_name in self.styles and style_name in self.style_codes:
-            style_code = self.style_codes[style_name]
-            self.word_map.update({
-                word: {"style": style_name, "styled": f"{style_code}{word}{self.reset}"}
-                for word in words
-            })
-
-    def add_words_from_dict(self, style_words_dict: Dict[str, List[str]]) -> None:
-        for style_name, words in style_words_dict.items():
-            if style_name in self.styles:
-                self.add_words(words, style_name)
-            else:
-                print(f"Style {style_name} not found in styles dictionary.")
-
-
-    def add_phrase(self, phrase: str, style_name: str) -> None:
-        if style_name in self.styles and style_name in self.style_codes:
-            style_code = self.style_codes[style_name]
-            styled_phrase = f"{style_code}{phrase}{self.reset}"
-            self.phrase_map[str(phrase)] = {"style": style_name, "styled": styled_phrase}
-
-    def remove_phrase(self, phrase: str) -> None:
-        if phrase in self.phrase_map:
-            del self.phrase_map[phrase]
-
-    def add_phrases(self, phrases: List[str], style_name: str) -> None:
-        if style_name in self.styles and style_name in self.style_codes:
-            style_code = self.style_codes[style_name]
-            self.phrase_map.update({
-                phrase: {"style": style_name, "styled": f"{style_code}{phrase}{self.reset}"}
-                for phrase in phrases
-            })
-
-    def add_phrases_from_dict(self, style_phrases_dict: Dict[str, List[str]]) -> None:
-        for style_name, phrases in style_phrases_dict.items():
-            if style_name in self.styles:
-                self.add_phrases(phrases, style_name)
-            else:
-                print(f"Style {style_name} not found in styles dictionary.")
-
-    def conceal_text(self, text_to_conceal, replace=False):
-        if replace:
-            style_code = self.style_codes['vyellow']
-            concealed_text = f"{style_code}***concealed_api_key***{self.reset}"
-        else:
-            style_code = self.style_codes['conceal']
-            concealed_text = f"{style_code}{text_to_conceal}{self.reset}"
-
-        return concealed_text
 
 
     def create_style_code(self, style: Union[TextStyle, Dict[str, Any]]):
