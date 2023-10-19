@@ -199,6 +199,8 @@ class ColorPrinter:
             del self.word_map[variable]
         if variable in self.phrase_map:
             del self.phrase_map[variable]
+        if variable in self.conceal_map[variable]:
+            del self.conceal_map[variable]
 
 
     def add_variables(self, variables: List[str], style_name: str) -> None:
