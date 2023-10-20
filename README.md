@@ -1,6 +1,6 @@
 # 🎉 prints_charming v1.0.0: The Ultimate Terminal Text Coloring and Styling Solution 🎉
 
-![Project Illustration](./images/prints_charming-illustration-full-scaled2.png)
+![Project Illustration](./images/prints_charming_illustration.png)
 
 ## 🚀 Introduction
 
