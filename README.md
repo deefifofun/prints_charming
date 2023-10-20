@@ -77,7 +77,7 @@ for style in cp.styles:
     cp.print("######################################################################", style=style)
 
 # Basic printing with ColorPrinter
-# 'vgreen' specifies a very bright green color
+# 'vgreen' specifies vibrant green color
 cp.print("Hello, world!", color="vgreen")
 
 # Using a predefined style called 'task' for printing
