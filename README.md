@@ -32,7 +32,7 @@ To get started, install the package and add it to your project.
 ### Option 1: Using pip
 
 ```bash
-pip install prints-charming
+pip install prints_charming
 ```
 
 ### Option 2: Cloning from GitHub
