@@ -13,7 +13,7 @@ For my current needs, this package does everything I require. It's particularly 
 
 ## 🛠 Future Enhancements
 
-Though **prints_charming** is replete with features tailored for Linux terminals, the door is always open for additional community-driven enhancements. While my current commitments across multiple projects may limit my immediate involvement in further development, your contributions can play a pivotal role in expanding this package's capabilities. For those interested in broadening the library's reach, I welcome contributions that extend support to Windows Command Prompt and PowerShell, as this is currently outside the scope of my planned updates.
+Though **prints_charming** is replete with features tailored for Linux terminals, the fairy tale isn't over, and the door is always open for additional community-driven enhancements. While my current commitments across multiple projects may limit my immediate involvement in further development, your contributions could add new chapters to the prints_charming story. For those interested in broadening the library's reach, I welcome contributions that extend support to Windows Command Prompt and PowerShell, as this is currently outside the scope of my planned updates.
 
 ## 🌟 Key Features
 
