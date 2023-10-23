@@ -122,7 +122,7 @@ colorprinter_variables = {
 cp = ColorPrinter(config=config, styles=styles)
 
 # Print all the foreground colors in the color map with it's name to the right of it.
-# You can supply your own color_map as an arg in the init method.
+# You can optionally supply your own color_map as an arg in the init method.
 # For styling of the first cp.print statement we will add 'Name:' to the word map.
 cp.print("##############################################################################################", color="yellow")
 cp.print("#### Print all the foreground colors in the color map each with it's name to the right of it.", color="yellow")
@@ -135,7 +135,7 @@ for color_name, color_code in cp.color_map.items():
 
 # Print all the styles in the styles dictionary with it's name to the right of it.
 # As you can see most of the styles are named after the foreground color, but you can edit the styles and name them whatever you want!
-# You can supply your own styles dictionary as an arg in the init method as I have done here, but if you don't this is also the default.
+# You can optionally supply your own styles dictionary as an arg in the init method as I have done here, but if you don't this is also the default.
 cp.print("##############################################################################################", color="yellow")
 cp.print("#### Print all the styles in the styles dictionary each with it's name to the right of it.", color="yellow")
 cp.print("#### As you can see most of the styles in this example are named after the foreground color.", color="yellow")
