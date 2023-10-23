@@ -578,6 +578,79 @@ class ColorPrinter:
             print(f"{closing_brace},")
 
 
+    def print_table(self, table_data: List[List[Any]],
+                    table_style: str = "default",
+                    border_style: Optional[str] = None,
+                    header_style: Optional[str] = None,
+                    col_alignments: Optional[List[str]] = None,
+                    column_styles: Optional[Dict[str, str]] = None,
+                    cell_style: Optional[str] = None):
+        """
+        Prints a table with optional styling and alignment.
+
+        :param table_data: A list of lists representing the rows of the table.
+        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
+        :param cell_style: Style name for the table cells.
+        :param header_style: Style name for the header row.
+        :param border_style: Style name for the table borders.
+        """
+        # 1. Automatic Column Sizing
+        max_col_lengths = [0] * len(table_data[0])
+        for row in table_data:
+            for i, cell in enumerate(row):
+                cell_length = len(str(cell))
+                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
+
+        # 2. Column Alignment
+        table_output = []
+        for row_idx, row in enumerate(table_data):
+            aligned_row = []
+            for i, cell in enumerate(row):
+                cell_str = str(cell)
+                max_length = max_col_lengths[i]
+
+                # Determine the alignment for this cell
+                alignment = 'left'  # Default
+                if col_alignments and i < len(col_alignments):
+                    alignment = col_alignments[i]
+                elif isinstance(cell, (int, float)):
+                    alignment = 'right'
+
+                # Apply the alignment
+                if alignment == 'left':
+                    aligned_cell = cell_str.ljust(max_length)
+                elif alignment == 'center':
+                    aligned_cell = cell_str.center(max_length)
+                elif alignment == 'right':
+                    aligned_cell = cell_str.rjust(max_length)
+
+                # Apply the style
+                if row_idx == 0 and header_style:
+                    aligned_cell = self.apply_style(header_style, aligned_cell)
+                elif cell_style:
+                    aligned_cell = self.apply_style(cell_style, aligned_cell)
+
+                # Add aligned and styled cell to the row
+                aligned_row.append(aligned_cell)
+
+            # Create a row string and add to table output
+            row_str = " | ".join(aligned_row)
+            table_output.append(row_str)
+
+        # 3. Print Borders and Rows
+        if border_style:
+            border_line = self.apply_style(border_style, "-" * (sum(max_col_lengths) + len(max_col_lengths) * 3 - 1))
+            print(border_line)
+
+        for i, row in enumerate(table_output):
+            print(row)
+            if i == 0 and header_style and border_style:
+                print(border_line)
+
+        if border_style:
+            print(border_line)
+
+
 
 
 
