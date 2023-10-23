@@ -17,6 +17,7 @@ Though **prints_charming** is replete with features tailored for Linux terminals
 
 ## 🌟 Key Features
 
+- **No Dependencies**: Works with the standard Python libraries
 - **Efficiency by Design**: With prints_charming, styling your terminal outputs is as simple as adding a keyword argument. Spend less time fiddling with string concatenation and more time writing great code.
 - **Rich Text Styling**: Apply foreground and background colors, bold, italic, underlined, and more to your text.
 - **Flexible and Customizable**: Use predefined styles or define your own.
