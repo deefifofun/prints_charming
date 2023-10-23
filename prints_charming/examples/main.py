@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from prints_charming import TextStyle, ColorPrinter
+from ..prints_charming import TextStyle, ColorPrinter
 
 config = {
     "color_text"          : True,
