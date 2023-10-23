@@ -221,13 +221,13 @@ cp.print(f"Let's try, New Message! Let's try, True and 1 and | and Failed! File 
 # Using Dictionary with print_variables method
 vars_and_styles_dict = {
     "balance" : (1000, "green"),
-    "username": ("John", "blue")
+    "username": ("Prince Charming", "blue")
 }
 cp.print_variables(vars_and_styles_dict, "Hello {username}, your balance is {balance} USD.", text_style="yellow")
 
 
 # Using Lists with print_variables method
-vars_and_styles_list = ([1000, "John"], ["green", "blue"])
+vars_and_styles_list = ([1000, "Cinderella"], ["green", "blue"])
 cp.print_variables(vars_and_styles_list, "Hello var2, your balance is var1 USD.", text_style="yellow")
 
 # Print word map
