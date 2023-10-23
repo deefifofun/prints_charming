@@ -1,4 +1,4 @@
-# 🎉 prints_charming v1.0.0: The Ultimate Terminal Text Coloring and Styling Solution 🎉
+# 🎉 prints_charming: The Ultimate Terminal Text Coloring and Styling Solution 🎉
 
 ![Project Illustration](./images/prints_charming_illustration.png)
 I couldn't get chatGPT to spell Python correctly and include all the other important details lol had to settle for this after accepting it wasn't going to happen after 68 images.
