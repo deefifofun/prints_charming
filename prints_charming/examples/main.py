@@ -2,6 +2,9 @@
 
 from ..prints_charming import TextStyle, ColorPrinter
 
+# To run this script as a module inside the package. Navigate to the top-level directory and run
+# python -m prints_charming.examples.main
+
 config = {
     "color_text"          : True,
     "args_to_strings"     : True,
@@ -235,3 +238,16 @@ cp.pretty_print_cp_map(cp.phrase_map, style_name="default")
 
 # Print conceal map
 cp.pretty_print_cp_map(cp.conceal_map, style_name="default")
+
+# Sample table data
+table_data = [
+    ["Name", "Age", "Occupation"],
+    ["Prince Charming", 27, "Prince"],
+    ["Cinderella", 21, "Princess"],
+    ["Anastasia", 24, "Socialite"],
+    ["Drizella", 22, "Socialite"]
+]
+
+# Print a table
+cp.print_table(table_data, header_style="magenta", border_style="green")
+
