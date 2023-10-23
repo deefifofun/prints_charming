@@ -52,7 +52,7 @@ git clone https://github.com/deefifofun/prints_charming.git
 4. Navigate into the cloned directory:
 
 ```bash
-cd prints-charming
+cd prints_charming
 ```
 
 5. Install the package using:
