@@ -200,7 +200,7 @@ class ColorPrinter:
             del self.word_map[variable]
         if variable in self.phrase_map:
             del self.phrase_map[variable]
-        if variable in self.conceal_map[variable]:
+        elif variable in self.conceal_map[variable]:
             del self.conceal_map[variable]
 
 
@@ -228,38 +228,6 @@ class ColorPrinter:
 
         return concealed_text
 
-
-    def print_var(self, text, var, tstyle, vstyle):
-        variable = str(var)
-        var_style_code = self.style_codes[vstyle]
-        text = text.replace('var', f"{var_style_code}{variable}{self.reset}")
-        self.print(text, style=tstyle)
-
-    def print_variable(self, variable, var_style, text=None, text_style=None, add_var_to_map=False):
-
-        variable = str(variable)
-        var_style_code = self.style_codes[var_style]
-
-        if not text:
-            self.print(variable, style=var_style)
-        else:
-            sub = variable
-            text = text.replace('var', f"{var_style_code}{sub}{self.reset}")
-            self.print(text, style=text_style)
-
-        if add_var_to_map:
-            styled_string = f"{var_style_code}{variable}{self.reset}"
-            contains_inner_space = ' ' in variable.strip()
-            if contains_inner_space:
-                self.phrase_map[variable] = {
-                    "style": var_style,
-                    "styled": styled_string
-                }
-            else:
-                self.word_map[variable] = {
-                    'style': var_style,
-                    'styled': styled_string
-                }
 
     def print_variables(self, vars_and_styles: Union[Dict[str, Tuple[Any, str]], Tuple[List[Any], List[str]]], text: str, text_style: str = None):
         if isinstance(vars_and_styles, dict):  # Approach 1: Using Dictionary
@@ -358,12 +326,28 @@ class ColorPrinter:
         return "".join(styled_text)
 
 
-    def print(self, *args: Any, style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None, color: str = None,
-              bg_color: str = None, bold: bool = False, italic: bool = False, overlined: bool = False, underlined: bool = False,
-              strikethrough: bool = False, reversed: bool = False, blink: bool = False, conceal: bool = False, header: bool = False,
-              sep: str =' ', end: str ='\n', **kwargs: Any) -> None:
+    def print(self, *args: Any, text: str = None, var: Any = None, tstyle: str = None, vstyle: str = None,
+              style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None, color: str = None,
+              bg_color: str = None, bold: bool = False, italic: bool = False, overlined: bool = False,
+              underlined: bool = False, strikethrough: bool = False, reversed: bool = False, blink: bool = False,
+              conceal: bool = False, header: bool = False, sep: str =' ', end: str ='\n', **kwargs: Any) -> None:
+
+        # Handle variable replacement
+        if var is not None:
+            variable = str(var)
+            var_style_code = self.style_codes[vstyle]
+            if text != None:
+                text = text.replace('var', f"{var_style_code}{variable}{self.reset}")
+                style = tstyle
+            else:
+                text = f"{var_style_code}{variable}{self.reset}"
 
         converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
+
+        # If text was modified, it takes precedence
+        if text is not None:
+            converted_args = [text] + converted_args
+
         text = sep.join(converted_args)
 
 
@@ -374,9 +358,9 @@ class ColorPrinter:
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
-            print(text, end=end)
+            #print(text, end=end)
 
-            return
+            #return
 
         if self.config["kwargs"] and kwargs:
             text = self.apply_kwargs_placeholders(text, kwargs)
@@ -565,7 +549,7 @@ class ColorPrinter:
         print(f"{bg_color_code}{' ' * length}\033[0m")
 
 
-    def pretty_print_dict(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
+    def pretty_print_cp_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
         style_code = self.style_codes[style_name]
         value_style = self.style_codes.get('default', self.style_codes['default'])
 
@@ -581,7 +565,7 @@ class ColorPrinter:
 
             if isinstance(value, dict):
                 print(f"{indented_key}: ", end="")
-                self.pretty_print_dict(value, style_name, indent + 4, current_item == total_items)
+                self.pretty_print_cp_map(value, style_name, indent + 4, current_item == total_items)
             else:
                 separator = "," if current_item < total_items else ""
                 sep2 = "\n"
