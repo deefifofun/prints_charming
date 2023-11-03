@@ -43,7 +43,7 @@ class ColorPrinter:
         "color_text"          : True,
         "args_to_strings"     : True,
         "style_names"         : True,
-        "style_words_by_index": False,
+        "style_words_by_index": True,
         "kwargs"              : False,
         "conceal"             : True,
         "width"               : 80,
