@@ -32,6 +32,7 @@ share/python-wheels/
 scratch.py
 tags-backup.txt
 ref-tags-backup.txt
+log-backup.txt
 
 # PyCharm IDE
 .idea/
