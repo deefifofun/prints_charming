@@ -302,17 +302,17 @@ class ColorPrinter:
 
     def style_words_by_index(self, text: str, style_mapping: Dict[Union[int, Tuple[int, int]], str]) -> str:
         words = text.split()
-        for i, word in enumerate(words):
+        for i, word in enumerate(words, start=1):  # Start indexing from 1
             for key in style_mapping:
                 style_name = style_mapping[key]
                 style_code = self.style_codes[style_name]
                 if isinstance(key, tuple):
                     start, end = key
-                    if start <= i < end and style_name in self.styles:
-                        words[i] = f"{style_code}{word}{self.reset}"
+                    if start <= i <= end and style_name in self.styles:  # Inclusive end
+                        words[i - 1] = f"{style_code}{word}{self.reset}"
                 elif isinstance(key, int):
                     if key == i and style_name in self.styles:
-                        words[i] = f"{style_code}{word}{self.reset}"
+                        words[i - 1] = f"{style_code}{word}{self.reset}"
         return " ".join(words)
 
 

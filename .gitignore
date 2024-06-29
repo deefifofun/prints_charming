@@ -28,6 +28,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 
+# Scratch
+scratch.py
+
 # PyCharm IDE
 .idea/
 
