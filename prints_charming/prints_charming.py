@@ -106,10 +106,19 @@ class ColorPrinter:
     }
 
 
-    def __init__(self, config: Dict[str, Union[bool, str]] = None, color_map: Dict[str, str] = None,
-                 styles: Dict [str, TextStyle] = None, colorprinter_variables: Dict[str, List[str]] = None) -> None:
+    def __init__(
+            self,
+            config: Dict[str, Union[bool, str]] = None,
+            color_map: Dict[str, str] = None,
+            bg_color_map: Dict[str, str] = None,
+            effect_map: Dict[str, str] = None,
+            styles: Dict[str, TextStyle] = None,
+            reset_color: str = None,
+            colorprinter_variables: Dict[str, List[str]] = None
+    ) -> None:
         """
         Initialize the ColorPrinter with args to any of these optional parameters.
+
         :param config: enable or disable various functionalities of this class. Default is the ColorPrinter.CONFIG dictionary above
         :param color_map: supply your own color_map dictionary. Default is the ColorPrinter.COLOR_MAP dictionary above
         :param styles: supply your own styles dictionary. Default is the ColorPrinter.STYLES dictionary above
@@ -118,25 +127,34 @@ class ColorPrinter:
         if not config:
             config = ColorPrinter.CONFIG
         self.config: Dict[str, Union[bool, str, int]] = config
+
         if not color_map:
             color_map = ColorPrinter.COLOR_MAP
         self.color_map: Dict[str, str] = color_map
 
-        #  Set the reset code to the default value in self.color_map
-        self.reset = self.color_map['default']
+        if not bg_color_map:
+            bg_color_map: Dict[str, str] = {
+                color: self.compute_bg_color_map(code) for color, code in self.color_map.items()
+            }
+        self.bg_color_map = bg_color_map
 
-        # Compute self.bg_color_map from self.color_map
-        self.bg_color_map: Dict[str, str] = {
-            color: self.compute_bg_color_map(code) for color, code in self.color_map.items()
-        }
-        self.effect_map: Dict[str, str] = ColorPrinter.EFFECT_MAP
+        if not effect_map:
+            effect_map = ColorPrinter.EFFECT_MAP
+        self.effect_map: Dict[str, str] = effect_map
 
         if not styles:
             styles = ColorPrinter.STYLES
-        self.styles: Dict [str, TextStyle] = styles
+        self.styles: Dict[str, TextStyle] = styles
+
         self.style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
         }
+
+        #  Set the printer reset code to the default value in self.color_map or user supplied value
+        if not reset_color:
+            reset_color = self.color_map['default']
+        self.reset = reset_color
+
         self.variable_map: Dict[str, str] = {}
         self.word_map: Dict[str, Dict[str, str]] = {}
         self.phrase_map: Dict[str, Dict[str, str]] = {}
