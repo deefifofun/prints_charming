@@ -108,7 +108,7 @@ class ColorPrinter:
 
     def __init__(
             self,
-            config: Dict[str, Union[bool, str]] = None,
+            config: Dict[str, Union[bool, str, int]] = None,
             color_map: Dict[str, str] = None,
             bg_color_map: Dict[str, str] = None,
             effect_map: Dict[str, str] = None,
@@ -116,35 +116,40 @@ class ColorPrinter:
             reset_color: str = None,
             colorprinter_variables: Dict[str, List[str]] = None
     ) -> None:
+
         """
         Initialize the ColorPrinter with args to any of these optional parameters.
 
         :param config: enable or disable various functionalities of this class. Default is the ColorPrinter.CONFIG dictionary above
         :param color_map: supply your own color_map dictionary. Default is the ColorPrinter.COLOR_MAP dictionary above
+        :param bg_color_map: supply your own bg_color_map dictionary. Default is computed from color_map dictionary
+        :param effect_map: supply your own effect_map dictionary. Default is the ColorPrinter.EFFECT_MAP dictionary above
         :param styles: supply your own styles dictionary. Default is the ColorPrinter.STYLES dictionary above
+        :param reset_color: supply your own from the color_map dictionary. Default is 'default' from the color_map dictionary
         :param colorprinter_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         """
+
         if not config:
             config = ColorPrinter.CONFIG
-        self.config: Dict[str, Union[bool, str, int]] = config
+        self.config = config
 
         if not color_map:
             color_map = ColorPrinter.COLOR_MAP
-        self.color_map: Dict[str, str] = color_map
+        self.color_map = color_map
 
         if not bg_color_map:
-            bg_color_map: Dict[str, str] = {
+            bg_color_map = {
                 color: self.compute_bg_color_map(code) for color, code in self.color_map.items()
             }
         self.bg_color_map = bg_color_map
 
         if not effect_map:
             effect_map = ColorPrinter.EFFECT_MAP
-        self.effect_map: Dict[str, str] = effect_map
+        self.effect_map = effect_map
 
         if not styles:
             styles = ColorPrinter.STYLES
-        self.styles: Dict[str, TextStyle] = styles
+        self.styles = styles
 
         self.style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
@@ -164,6 +169,7 @@ class ColorPrinter:
             self.add_variables_from_dict(colorprinter_variables)
 
 
+
     def compute_bg_color_map(self, code):
         if '[38' in code:
             bg_code = code.replace('[38', '[48')  # Change to background color for 256-color codes
@@ -174,94 +180,30 @@ class ColorPrinter:
 
         return bg_code
 
-    def add_style(self, name: str, style: TextStyle):
-        self.styles[name] = style
-        if self.styles[name].color in self.color_map:
-            style_code = self.create_style_code(self.styles[name])
-            self.style_codes[name] = style_code
-
-
-    def add_variable(self, variable: str, style_name: str) -> None:
-
+    def print_bg(self, color_name: str, length: int = 10) -> None:
         """
-        Adds a variable with a specific style.
-    
-        :param variable: The variable to be styled.
-        :param style_name: The name of the style to apply.
+        Prints a "block" of background color.
+
+        :param color_name: The name of the color as per self.color_map.
+        :param length: The length of the color block in terms of spaces.
         """
+        color_code = self.color_map.get(color_name)
+        if not color_code:
+            print(f"Color '{color_name}' not found in color map.")
+            return
 
-        variable = str(variable)
-        if style_name in self.styles:
-            styled_string = f"{self.style_codes[style_name]}{variable}{self.reset}"
-            if style_name == 'conceal':
-                self.conceal_map[variable] = {
-                    "style": style_name,
-                    "styled": styled_string
-                }
-            contains_inner_space = ' ' in variable.strip()
-            if contains_inner_space:
-                self.phrase_map[variable] = {
-                    "style" : style_name,
-                    "styled": styled_string
-                }
-            else:
-                self.word_map[variable] = {
-                    "style" : style_name,
-                    "styled": styled_string
-                }
+        # Extract the foreground color code and convert it to a background color code
+        if '[38' in color_code:
+            bg_color_code = color_code.replace('[38', '[48')  # Change to background color for 256-color codes
+        elif '[9' in color_code:
+            bg_color_code = color_code.replace('[9', '[10')  # Special handling for white, which starts with 9
         else:
-            print(f"Style {style_name} not found in styles dictionary.")
+            # Basic ANSI colors: convert foreground color to background color
+            bg_color_code = color_code.replace('[3', '[4')
 
+        # Print the color block
+        print(f"{bg_color_code}{' ' * length}\033[0m")
 
-    def remove_variable(self, variable: str) -> None:
-        if variable in self.word_map:
-            del self.word_map[variable]
-        if variable in self.phrase_map:
-            del self.phrase_map[variable]
-        elif variable in self.conceal_map[variable]:
-            del self.conceal_map[variable]
-
-
-    def add_variables(self, variables: List[str], style_name: str) -> None:
-        if style_name in self.styles:
-            style_code = self.style_codes[style_name]
-            for variable in variables:
-                self.add_variable(variable, style_name)
-
-    def add_variables_from_dict(self, style_variables_dict: Dict[str, List[str]]) -> None:
-        for style_name, variables in style_variables_dict.items():
-            if style_name in self.styles:
-                self.add_variables(variables, style_name)
-            else:
-                print(f"Style {style_name} not found in styles dictionary.")
-
-
-    def conceal_text(self, text_to_conceal, replace=False):
-        if replace:
-            style_code = self.style_codes['vyellow']
-            concealed_text = f"{style_code}***concealed_api_key***{self.reset}"
-        else:
-            style_code = self.style_codes['conceal']
-            concealed_text = f"{style_code}{text_to_conceal}{self.reset}"
-
-        return concealed_text
-
-
-    def print_variables(self, vars_and_styles: Union[Dict[str, Tuple[Any, str]], Tuple[List[Any], List[str]]], text: str, text_style: str = None):
-        if isinstance(vars_and_styles, dict):  # Approach 1: Using Dictionary
-            for placeholder, (variable, var_style) in vars_and_styles.items():
-                styled_var_code = self.style_codes[var_style]
-                sub = f"{styled_var_code}{str(variable)}{self.reset}"
-                text = text.replace(f"{{{placeholder}}}", sub)
-
-        elif isinstance(vars_and_styles, tuple) and len(vars_and_styles) == 2:  # Approach 2: Using Lists
-            variables, styles = vars_and_styles
-            for i, (variable, var_style) in enumerate(zip(variables, styles)):
-                styled_var_code = self.style_codes[var_style]
-                sub = f"{styled_var_code}{str(variable)}{self.reset}"
-                text = text.replace(f"var{i + 1}", sub)
-
-        self.print(text, style=text_style)
 
 
     def create_style_code(self, style: Union[TextStyle, Dict[str, Any]]):
@@ -296,10 +238,111 @@ class ColorPrinter:
                     style_codes.append(ansi_code)
 
         return "".join(style_codes)
-    
+
+    def add_style(self, name: str, style: TextStyle):
+        self.styles[name] = style
+        if self.styles[name].color in self.color_map:
+            style_code = self.create_style_code(self.styles[name])
+            self.style_codes[name] = style_code
 
     def get_style_code(self, style_name):
         return self.style_codes.get(style_name, self.style_codes['default'])
+
+    def apply_style(self, style_name, text):
+
+        style_code = self.style_codes[style_name]
+
+        # Append the style code at the beginning of the text and the reset code at the end
+        styled_text = f"{style_code}{text}{self.reset}"
+
+        return "".join(styled_text)
+
+
+    def add_variable(self, variable: str, style_name: str) -> None:
+
+        """
+        Adds a variable with a specific style.
+    
+        :param variable: The variable to be styled.
+        :param style_name: The name of the style to apply.
+        """
+
+        variable = str(variable)
+        if style_name in self.styles:
+            styled_string = f"{self.style_codes[style_name]}{variable}{self.reset}"
+            if style_name == 'conceal':
+                self.conceal_map[variable] = {
+                    "style": style_name,
+                    "styled": styled_string
+                }
+            contains_inner_space = ' ' in variable.strip()
+            if contains_inner_space:
+                self.phrase_map[variable] = {
+                    "style" : style_name,
+                    "styled": styled_string
+                }
+            else:
+                self.word_map[variable] = {
+                    "style" : style_name,
+                    "styled": styled_string
+                }
+        else:
+            print(f"Style {style_name} not found in styles dictionary.")
+
+    def add_variables(self, variables: List[str], style_name: str) -> None:
+        if style_name in self.styles:
+            style_code = self.style_codes[style_name]
+            for variable in variables:
+                self.add_variable(variable, style_name)
+
+    def add_variables_from_dict(self, style_variables_dict: Dict[str, List[str]]) -> None:
+        for style_name, variables in style_variables_dict.items():
+            if style_name in self.styles:
+                self.add_variables(variables, style_name)
+            else:
+                print(f"Style {style_name} not found in styles dictionary.")
+
+    def remove_variable(self, variable: str) -> None:
+        if variable in self.word_map:
+            del self.word_map[variable]
+        if variable in self.phrase_map:
+            del self.phrase_map[variable]
+        elif variable in self.conceal_map[variable]:
+            del self.conceal_map[variable]
+
+
+    def conceal_text(self, text_to_conceal, replace=False):
+        if replace:
+            style_code = self.style_codes['vyellow']
+            concealed_text = f"{style_code}***concealed_api_key***{self.reset}"
+        else:
+            style_code = self.style_codes['conceal']
+            concealed_text = f"{style_code}{text_to_conceal}{self.reset}"
+
+        return concealed_text
+
+
+    def print_variables(
+            self,
+            vars_and_styles: Union[Dict[str, Tuple[Any, str]], Tuple[List[Any], List[str]]],
+            text: str,
+            text_style: str = None
+    ) -> None:
+
+        if isinstance(vars_and_styles, dict):  # Approach 1: Using Dictionary
+            for placeholder, (variable, var_style) in vars_and_styles.items():
+                styled_var_code = self.style_codes[var_style]
+                sub = f"{styled_var_code}{str(variable)}{self.reset}"
+                text = text.replace(f"{{{placeholder}}}", sub)
+
+        elif isinstance(vars_and_styles, tuple) and len(vars_and_styles) == 2:  # Approach 2: Using Lists
+            variables, styles = vars_and_styles
+            for i, (variable, var_style) in enumerate(zip(variables, styles)):
+                styled_var_code = self.style_codes[var_style]
+                sub = f"{styled_var_code}{str(variable)}{self.reset}"
+                text = text.replace(f"var{i + 1}", sub)
+
+        self.print(text, style=text_style)
 
 
     def apply_kwargs_placeholders(self, text: str, kwargs: Dict[str, Any]) -> str:
@@ -334,21 +377,29 @@ class ColorPrinter:
         return " ".join(words)
 
 
-    def apply_style(self, style_name, text):
-
-        style_code = self.style_codes[style_name]
-
-        # Append the style code at the beginning of the text and the reset code at the end
-        styled_text = f"{style_code}{text}{self.reset}"
-
-        return "".join(styled_text)
-
-
-    def print(self, *args: Any, text: str = None, var: Any = None, tstyle: str = None, vstyle: str = None,
-              style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None, color: str = None,
-              bg_color: str = None, bold: bool = False, italic: bool = False, overlined: bool = False,
-              underlined: bool = False, strikethrough: bool = False, reversed: bool = False, blink: bool = False,
-              conceal: bool = False, header: bool = False, sep: str =' ', end: str ='\n', **kwargs: Any) -> None:
+    def print(
+            self,
+            *args: Any,
+            text: str = None,
+            var: Any = None,
+            tstyle: str = None,
+            vstyle: str = None,
+            style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None,
+            color: str = None,
+            bg_color: str = None,
+            bold: bool = False,
+            italic: bool = False,
+            overlined: bool = False,
+            underlined: bool = False,
+            strikethrough: bool = False,
+            reversed: bool = False,
+            blink: bool = False,
+            conceal: bool = False,
+            header: bool = False,
+            sep: str = ' ',
+            end: str = '\n',
+            **kwargs: Any
+    ) -> None:
 
         # Handle variable replacement
         if var is not None:
@@ -368,7 +419,6 @@ class ColorPrinter:
 
         text = sep.join(converted_args)
 
-
         if not self.config["color_text"]:
             print(sep.join(args), end=end)
 
@@ -376,9 +426,6 @@ class ColorPrinter:
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
-            #print(text, end=end)
-
-            #return
 
         if self.config["kwargs"] and kwargs:
             text = self.apply_kwargs_placeholders(text, kwargs)
@@ -414,7 +461,6 @@ class ColorPrinter:
                 effective_style_code = self.style_codes[style]
             else:
                 effective_style_code = self.style_codes['default']
-
 
         # Count leading and trailing spaces
         leading_spaces = len(text) - len(text.lstrip())
@@ -475,8 +521,115 @@ class ColorPrinter:
         styled_text = ' ' * leading_spaces + styled_text + ' ' * trailing_spaces
 
         print(styled_text, end=end)
+
         return
 
+
+    def print_table(
+            self,
+            table_data: List[List[Any]],
+            table_style: str = "default",
+            border_style: Optional[str] = None,
+            header_style: Optional[str] = None,
+            col_alignments: Optional[List[str]] = None,
+            column_styles: Optional[Dict[str, str]] = None,
+            cell_style: Optional[str] = None
+    ) -> None:
+
+        """
+        Prints a table with optional styling and alignment.
+
+        :param table_data: A list of lists representing the rows of the table.
+        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
+        :param cell_style: Style name for the table cells.
+        :param header_style: Style name for the header row.
+        :param border_style: Style name for the table borders.
+        """
+
+        # 1. Automatic Column Sizing
+        max_col_lengths = [0] * len(table_data[0])
+        for row in table_data:
+            for i, cell in enumerate(row):
+                cell_length = len(str(cell))
+                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
+
+        # 2. Column Alignment
+        table_output = []
+        for row_idx, row in enumerate(table_data):
+            aligned_row = []
+            for i, cell in enumerate(row):
+                cell_str = str(cell)
+                max_length = max_col_lengths[i]
+
+                # Determine the alignment for this cell
+                alignment = 'left'  # Default
+                if col_alignments and i < len(col_alignments):
+                    alignment = col_alignments[i]
+                elif isinstance(cell, (int, float)):
+                    alignment = 'right'
+
+                # Apply the alignment
+                if alignment == 'left':
+                    aligned_cell = cell_str.ljust(max_length)
+                elif alignment == 'center':
+                    aligned_cell = cell_str.center(max_length)
+                elif alignment == 'right':
+                    aligned_cell = cell_str.rjust(max_length)
+
+                # Apply the style
+                if row_idx == 0 and header_style:
+                    aligned_cell = self.apply_style(header_style, aligned_cell)
+                elif cell_style:
+                    aligned_cell = self.apply_style(cell_style, aligned_cell)
+
+                # Add aligned and styled cell to the row
+                aligned_row.append(aligned_cell)
+
+            # Create a row string and add to table output
+            row_str = " | ".join(aligned_row)
+            table_output.append(row_str)
+
+        # 3. Print Borders and Rows
+        if border_style:
+            border_line = self.apply_style(border_style, "-" * (sum(max_col_lengths) + len(max_col_lengths) * 3 - 1))
+            print(border_line)
+
+        for i, row in enumerate(table_output):
+            print(row)
+            if i == 0 and header_style and border_style:
+                print(border_line)
+
+        if border_style:
+            print(border_line)
+
+
+    def pretty_print_cp_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
+        style_code = self.style_codes[style_name]
+        value_style = self.style_codes.get('default', self.style_codes['default'])
+
+        print(' ' * indent + '{')
+
+        total_items = len(d)
+        current_item = 0
+
+        for key, value in d.items():
+            current_item += 1
+            indented_key = ' ' * (indent + 4) + style_code + repr(key) +  self.reset
+            indented_value = value_style + repr(value) + self.reset
+
+            if isinstance(value, dict):
+                print(f"{indented_key}: ", end="")
+                self.pretty_print_cp_map(value, style_name, indent + 4, current_item == total_items)
+            else:
+                separator = "," if current_item < total_items else ""
+                sep2 = "\n"
+                print(f"{indented_key}{style_code}{value}{self.reset}{separator}{sep2}")
+
+        closing_brace = ' ' * indent + '}'
+        if is_last_item:
+            print(closing_brace)
+        else:
+            print(f"{closing_brace},")
 
     def print_header_1(self, text: str, text_style: str, header_lines: int = 7, width: int = 80, vertical_padding: int = 0,
                      horizontal_padding: int = 5, symbol: str = "#", symbol_style: str = None) -> None:
@@ -540,133 +693,6 @@ class ColorPrinter:
         # Print bottom solid lines
         for _ in range(bottom_lines):
             print(self.apply_style(symbol_style, symbol * width))
-
-
-    def print_bg(self, color_name: str, length: int = 10) -> None:
-        """
-        Prints a "block" of background color.
-
-        :param color_name: The name of the color as per self.color_map.
-        :param length: The length of the color block in terms of spaces.
-        """
-        color_code = self.color_map.get(color_name)
-        if not color_code:
-            print(f"Color '{color_name}' not found in color map.")
-            return
-
-        # Extract the foreground color code and convert it to a background color code
-        if '[38' in color_code:
-            bg_color_code = color_code.replace('[38', '[48')  # Change to background color for 256-color codes
-        elif '[9' in color_code:
-            bg_color_code = color_code.replace('[9', '[10')  # Special handling for white, which starts with 9
-        else:
-            # Basic ANSI colors: convert foreground color to background color
-            bg_color_code = color_code.replace('[3', '[4')
-
-        # Print the color block
-        print(f"{bg_color_code}{' ' * length}\033[0m")
-
-
-    def pretty_print_cp_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
-        style_code = self.style_codes[style_name]
-        value_style = self.style_codes.get('default', self.style_codes['default'])
-
-        print(' ' * indent + '{')
-
-        total_items = len(d)
-        current_item = 0
-
-        for key, value in d.items():
-            current_item += 1
-            indented_key = ' ' * (indent + 4) + style_code + repr(key) +  self.reset
-            indented_value = value_style + repr(value) + self.reset
-
-            if isinstance(value, dict):
-                print(f"{indented_key}: ", end="")
-                self.pretty_print_cp_map(value, style_name, indent + 4, current_item == total_items)
-            else:
-                separator = "," if current_item < total_items else ""
-                sep2 = "\n"
-                print(f"{indented_key}{style_code}{value}{self.reset}{separator}{sep2}")
-
-        closing_brace = ' ' * indent + '}'
-        if is_last_item:
-            print(closing_brace)
-        else:
-            print(f"{closing_brace},")
-
-
-    def print_table(self, table_data: List[List[Any]],
-                    table_style: str = "default",
-                    border_style: Optional[str] = None,
-                    header_style: Optional[str] = None,
-                    col_alignments: Optional[List[str]] = None,
-                    column_styles: Optional[Dict[str, str]] = None,
-                    cell_style: Optional[str] = None):
-        """
-        Prints a table with optional styling and alignment.
-
-        :param table_data: A list of lists representing the rows of the table.
-        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
-        :param cell_style: Style name for the table cells.
-        :param header_style: Style name for the header row.
-        :param border_style: Style name for the table borders.
-        """
-        # 1. Automatic Column Sizing
-        max_col_lengths = [0] * len(table_data[0])
-        for row in table_data:
-            for i, cell in enumerate(row):
-                cell_length = len(str(cell))
-                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
-
-        # 2. Column Alignment
-        table_output = []
-        for row_idx, row in enumerate(table_data):
-            aligned_row = []
-            for i, cell in enumerate(row):
-                cell_str = str(cell)
-                max_length = max_col_lengths[i]
-
-                # Determine the alignment for this cell
-                alignment = 'left'  # Default
-                if col_alignments and i < len(col_alignments):
-                    alignment = col_alignments[i]
-                elif isinstance(cell, (int, float)):
-                    alignment = 'right'
-
-                # Apply the alignment
-                if alignment == 'left':
-                    aligned_cell = cell_str.ljust(max_length)
-                elif alignment == 'center':
-                    aligned_cell = cell_str.center(max_length)
-                elif alignment == 'right':
-                    aligned_cell = cell_str.rjust(max_length)
-
-                # Apply the style
-                if row_idx == 0 and header_style:
-                    aligned_cell = self.apply_style(header_style, aligned_cell)
-                elif cell_style:
-                    aligned_cell = self.apply_style(cell_style, aligned_cell)
-
-                # Add aligned and styled cell to the row
-                aligned_row.append(aligned_cell)
-
-            # Create a row string and add to table output
-            row_str = " | ".join(aligned_row)
-            table_output.append(row_str)
-
-        # 3. Print Borders and Rows
-        if border_style:
-            border_line = self.apply_style(border_style, "-" * (sum(max_col_lengths) + len(max_col_lengths) * 3 - 1))
-            print(border_line)
-
-        for i, row in enumerate(table_output):
-            print(row)
-            if i == 0 and header_style and border_style:
-                print(border_line)
-
-        if border_style:
-            print(border_line)
 
 
 
