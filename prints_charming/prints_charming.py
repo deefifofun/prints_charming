@@ -187,22 +187,14 @@ class ColorPrinter:
         :param color_name: The name of the color as per self.color_map.
         :param length: The length of the color block in terms of spaces.
         """
-        color_code = self.color_map.get(color_name)
-        if not color_code:
-            print(f"Color '{color_name}' not found in color map.")
+
+        bg_color_code = self.bg_color_map.get(color_name)
+        if not bg_color_code:
+            print(f"Background color for '{color_name}' not found in background color map.")
             return
 
-        # Extract the foreground color code and convert it to a background color code
-        if '[38' in color_code:
-            bg_color_code = color_code.replace('[38', '[48')  # Change to background color for 256-color codes
-        elif '[9' in color_code:
-            bg_color_code = color_code.replace('[9', '[10')  # Special handling for white, which starts with 9
-        else:
-            # Basic ANSI colors: convert foreground color to background color
-            bg_color_code = color_code.replace('[3', '[4')
-
         # Print the color block
-        print(f"{bg_color_code}{' ' * length}\033[0m")
+        print(f"{bg_color_code}{' ' * length}{self.reset}")
 
 
 
