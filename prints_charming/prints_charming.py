@@ -1,8 +1,19 @@
 # prints_charming.py
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+import sys
+import traceback
+import re
 
+
+
+def get_all_subclass_names(cls, trailing_char=None):
+    subclasses = set(cls.__subclasses__())
+    result = {subclass.__name__ + (trailing_char or '') for subclass in subclasses}
+    for subclass in subclasses.copy():
+        result.update(get_all_subclass_names(subclass, trailing_char))
+    return result
 
 
 @dataclass
@@ -87,7 +98,7 @@ class ColorPrinter:
         "green"        : TextStyle(color="green", underlined=True),
         "vgreen"       : TextStyle(color="vgreen"),
         "red"          : TextStyle(color="red"),
-        "vred"         : TextStyle(color="vred"),
+        "vred"         : TextStyle(color="vred", bold=True),
         "blue"         : TextStyle(color="blue"),
         "yellow"       : TextStyle(color="yellow"),
         "vyellow"      : TextStyle(color="vyellow"),
@@ -186,12 +197,20 @@ class ColorPrinter:
 
         :param color_name: The name of the color as per self.color_map.
         :param length: The length of the color block in terms of spaces.
+        :raises ColorNotFoundError: If the background color is not found in the background color map.
+        :raises InvalidLengthError: If the length is not valid.
         """
+
+        if length <= 0:
+            message = f"Invalid length '{length}'. Length must be positive."
+            styled_message = self.apply_style('vred', message)
+            raise InvalidLengthError(styled_message, self, self.apply_style)
 
         bg_color_code = self.bg_color_map.get(color_name)
         if not bg_color_code:
-            print(f"Background color for '{color_name}' not found in background color map.")
-            return
+            message = f"Key '{color_name}' not found in the 'self.bg_color_map' dictionary."
+            styled_message = self.apply_style('vred', message)
+            raise ColorNotFoundError(styled_message, self, self.apply_style, format_specific_exception=True)
 
         # Print the color block
         print(f"{bg_color_code}{' ' * length}{self.reset}")
@@ -347,6 +366,7 @@ class ColorPrinter:
                 style_name = self.variable_map[key]
                 style_code = self.style_codes[style_name]
                 styled_value = f"{style_code}{styled_value}{self.reset}"  # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{value}\033[0m"
+                styled_value_ascii = f"{style_code}{styled_value}{self.reset}"
 
             text = text.replace(f"{{{key}}}", styled_value)
 
@@ -595,7 +615,7 @@ class ColorPrinter:
             print(border_line)
 
 
-    def pretty_print_cp_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
+    def ugly_print_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
         style_code = self.style_codes[style_name]
         value_style = self.style_codes.get('default', self.style_codes['default'])
 
@@ -611,7 +631,7 @@ class ColorPrinter:
 
             if isinstance(value, dict):
                 print(f"{indented_key}: ", end="")
-                self.pretty_print_cp_map(value, style_name, indent + 4, current_item == total_items)
+                self.ugly_print_map(value, style_name, indent + 4, current_item == total_items)
             else:
                 separator = "," if current_item < total_items else ""
                 sep2 = "\n"
@@ -623,69 +643,156 @@ class ColorPrinter:
         else:
             print(f"{closing_brace},")
 
-    def print_header_1(self, text: str, text_style: str, header_lines: int = 7, width: int = 80, vertical_padding: int = 0,
-                     horizontal_padding: int = 5, symbol: str = "#", symbol_style: str = None) -> None:
 
-        # Calculate the actual number of lines with symbols
-        symbol_lines = header_lines - vertical_padding * 2
-        # Calculate the styled symbol
-        styled_symbol = self.apply_style(symbol_style, symbol * (width // len(symbol)))
+class ColorPrinterError(Exception):
+    """Base class for exceptions in this module."""
 
-        # Print the top padding lines
-        for _ in range(vertical_padding):
-            print(styled_symbol)
+    def __init__(
+            self,
+            message: str,
+            cp: 'ColorPrinter',
+            apply_style: Callable[[str, str], str],
+            tb_style_name: str = 'default',
+            format_specific_exception: bool = False
+    ) -> None:
 
-        # Print the symbol lines and the text
-        for i in range(symbol_lines):
-            if i == symbol_lines // 2:
-                # Calculate left and right padding for the text
-                left_padding = (width - len(text) - 2 * horizontal_padding) // 2
-                right_padding = width - len(text) - 2 * horizontal_padding - left_padding
+        super().__init__(message)
+        self.message = message
+        self.cp = cp
+        self.apply_style = apply_style
+        self.tb_style_name = tb_style_name
+        self.format_specific_exception = format_specific_exception
 
-                # Create the line with the text
-                line_with_text = self.apply_style(symbol_style, symbol * left_padding) + self.apply_style(text_style, ' ' * horizontal_padding + text + ' ' * horizontal_padding) + self.apply_style(symbol_style, symbol * right_padding)
-                print(line_with_text)
+    def __str__(self):
+        return self.message
+
+    def format_traceback(self, tb):
+        return self.apply_style(self.tb_style_name, tb)
+
+    def print_error(self):
+        print(self.message)
+        print()
+
+    def stylize_traceback(self, tb_lines):
+
+        styled_lines = []
+        file_line_regex = re.compile(r'(File ")(.*?)(/[^/]+)(", line )(\d+)(, )(in )(.*)')
+        subclass_names_with_colon = list(get_all_subclass_names(ColorPrinterError, trailing_char=':'))
+
+        for line in tb_lines:
+            leading_whitespace = re.match(r"^\s*", line).group()
+            if line.startswith("Traceback"):
+                styled_line = self.apply_style('header', line)
+                styled_lines.append(' ')
+                styled_lines.append(styled_line)
+                styled_lines.append(' ')
+            elif line.strip().startswith("File"):
+                match = file_line_regex.search(line)
+                if match:
+                    section1 = match.group(1) + match.group(2)  # File path excluding last part
+                    section2 = match.group(3)  # Last part of the path (filename)
+                    section3 = match.group(4)  # ", line "
+                    section4 = match.group(5)  # Line number
+                    section5 = match.group(6)  # ", "
+                    section6 = match.group(7)  # in
+                    section7 = match.group(8)  # Function name
+
+                    # Apply styles to each section
+                    styled_section1 = self.apply_style('path', section1)
+                    styled_section2 = self.apply_style('filename', section2)
+                    styled_section3 = self.apply_style('line_info', section3)
+                    styled_section4 = self.apply_style('line_number', section4)
+                    styled_section5 = self.apply_style('path', section5)
+                    styled_section6 = self.apply_style('path', section6)
+                    styled_section7 = self.apply_style('function_name', section7)
+
+                    # Combine the styled sections
+                    styled_line = f"{styled_section1}{styled_section2}{styled_section3}{styled_section4}{styled_section5}{styled_section6}{styled_section7}"
+                    styled_lines.append(f"{leading_whitespace}{styled_line}")
+                else:
+                    # If regex matching fails, style the whole line as fallback
+                    styled_line = self.apply_style('blue', line)
+                    styled_lines.append(f"{leading_whitespace}{styled_line}")
+
+            elif line.strip().startswith("raise") or line.strip().startswith("ValueError"):
+                styled_line = self.apply_style('red', line)
+                styled_lines.append(' ')
+                styled_lines.append(styled_line)
+                styled_lines.append(' ')
+
             else:
-                print(styled_symbol)
+                for name in subclass_names_with_colon:
+                    if name in line:
+                        start_index = line.find(name)
+                        before_name = line[:start_index]
+                        subclass_name = line[start_index:start_index + len(name)]
+                        after_name = line[start_index + len(name):]
 
-        # Print the bottom padding lines
-        for _ in range(vertical_padding):
-            self.print(styled_symbol)
+                        # Apply styles
+                        styled_before_name = self.apply_style('gray', before_name)
+                        styled_subclass_name = self.apply_style('vyellow', subclass_name)
+                        styled_after_name = self.apply_style('default', after_name)
+
+                        # Combine the styled parts
+                        styled_line = f"{styled_before_name}{styled_subclass_name}{styled_after_name}"
+                        styled_lines.append(' ')
+                        styled_lines.append(f"{leading_whitespace}{styled_line}")
+                        styled_lines.append(' ')
+                        break
+
+                else:
+                    styled_line = self.apply_style('default', line)
+                    styled_lines.append(styled_line)
+                    styled_lines.append(' ')
+
+        return styled_lines
 
 
-    def print_header_2(self, text: str, text_style: str, header_lines: int = 7, width: int = 80, vertical_padding: int = 0,
-                     horizontal_padding: int = 5, symbol: str = "#", symbol_style: str = None) -> None:
+    def handle_exception(self):
+        self.print_error()
 
-        # Calculate the width of the text and the symbol area on either side of the text
-        text_width = len(text)
-        symbol_area_width = (width - text_width - 2 * horizontal_padding) // 2
+        if self.format_specific_exception:
+            tb = ''.join(traceback.format_exception(None, self, self.__traceback__))
+        else:
+            tb = traceback.format_exc()
 
-        # Calculate the number of lines for the top and bottom sections
-        top_lines = (header_lines - vertical_padding * 2 - 1) // 2
-        bottom_lines = header_lines - vertical_padding * 2 - top_lines - 1
+        tb_lines = tb.split('\n')
 
-        # Generate the tapered padding line
-        tapered_padding_line = self.apply_style(symbol_style, symbol * (symbol_area_width + 1)) + ' ' * (text_width + 2 * horizontal_padding) + self.apply_style(symbol_style, symbol * (symbol_area_width + 1))
+        # Stylize the traceback
+        styled_tb_lines = self.stylize_traceback(tb_lines)
 
-        # Print top solid lines
-        for _ in range(top_lines):
-            print(self.apply_style(symbol_style, symbol * width))
+        # Print the stylized traceback
+        for line in styled_tb_lines:
+            print(line, file=sys.stderr)
 
-        # Print top tapered padding lines
-        for _ in range(vertical_padding):
-            print(tapered_padding_line)
+        print()
 
-        # Print the main header line with text
-        print(self.apply_style(symbol_style, symbol * symbol_area_width) + ' ' * horizontal_padding + self.apply_style(text_style, text) + ' ' * horizontal_padding + self.apply_style(symbol_style, symbol * symbol_area_width))
 
-        # Print bottom tapered padding lines
-        for _ in range(vertical_padding):
-            print(tapered_padding_line)
+class ColorNotFoundError(ColorPrinterError):
+    """Exception raised when a color is not found in the color map."""
+    pass
 
-        # Print bottom solid lines
-        for _ in range(bottom_lines):
-            print(self.apply_style(symbol_style, symbol * width))
 
+class InvalidLengthError(ColorPrinterError):
+    """Exception raised when an invalid length is provided."""
+    pass
+
+
+class UnsupportedEffectError(ColorPrinterError):
+    """Exception raised when an unsupported effect is requested."""
+    pass
+
+
+# Define the global exception hook
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, ColorPrinterError):
+        exc_value.handle_exception()
+    else:
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
+# Set the custom exception hook
+sys.excepthook = custom_excepthook
 
 
 
