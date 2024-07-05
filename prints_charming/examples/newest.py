@@ -35,12 +35,11 @@ styles = {
     "vyellow": TextStyle(color="vyellow"),
     "cyan": TextStyle(color="cyan"),
     "vcyan": TextStyle(color="vcyan"),
-    "magenta": TextStyle(color="magenta", bold=True, underlined=True),
+    "magenta": TextStyle(color="magenta", bold=True),
     "pink": TextStyle(color="pink"),
     "purple": TextStyle(color="purple"),
     "orange": TextStyle(color="orange"),
     "header_text": TextStyle(color="white", bg_color="purple", bold=True, reversed=True),
-    "header_symbol": TextStyle(color="magenta", bold=True, overlined=True, strikethrough=True),
     "task": TextStyle(color="blue", bold=True),
     "header"       : TextStyle(color="vcyan"),
     "path"         : TextStyle(color="blue"),
@@ -48,7 +47,7 @@ styles = {
     "line_info"    : TextStyle(color="yellow", bold=True),
     "line_number"  : TextStyle(color="yellow", bold=True),
     "function_name": TextStyle(color="yellow", italic=True),
-    "error_message": TextStyle(color="vred", bg_color="vyellow"),
+    "error_message": TextStyle(color="vred", bg_color="vyellow", bold=True),
     "code"         : TextStyle(color="yellow"),
     "conceal": TextStyle(conceal=True),
 }
@@ -138,7 +137,6 @@ class CustomError(ColorPrinterError):
 
 
 def print_foreground_colors():
-    #cp.add_variable("Name:", style_name="default")
     for color_name in cp.color_map.keys():
         fg_vert_border_left = builder.cp.apply_color(color_name, builder.vert_border) + builder.vert_padding
         fg_vert_border_right = builder.vert_padding + builder.cp.apply_color(color_name, builder.vert_border)
@@ -147,8 +145,8 @@ def print_foreground_colors():
         print()
 
         fg_text = f"This is one of the prints_charming foreground colors in the color map # Name: {color_name}"
-        fg_text_left_aligned = builder.cp.apply_color(color_name, builder.align_text(fg_text, fg_available_width, 'center'))
-        print(f'{fg_vert_border_left}{fg_text_left_aligned}{fg_vert_border_right}')
+        fg_text_center_aligned = builder.cp.apply_color(color_name, builder.align_text(fg_text, fg_available_width, 'center'))
+        print(f'{fg_vert_border_left}{fg_text_center_aligned}{fg_vert_border_right}')
 
 
         #cp.print(f"This is one of the prints_charming foreground colors in the color map. ### Name: {color_name}", color=color_name)
@@ -163,7 +161,7 @@ def print_background_colors():
         print()
 
         bg_bar_strip = cp.return_bg(color, length=bg_available_width)
-        bg_bar_center_aligned = builder.align_text(bg_bar_strip, bg_available_width, 'left')
+        bg_bar_center_aligned = builder.align_text(bg_bar_strip, bg_available_width, 'center')
         print(f"{bg_vert_border_left}{bg_bar_center_aligned}{bg_vert_border_right}")
     print()
 
@@ -369,22 +367,8 @@ if __name__ == "__main__":
     builder3 = FormattedTextBox(cp=cp, horiz_width=90, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     builder.print_simple_border_boxed_text("Prints Charming", subtitle="Hope you find the user guide helpful!", align='center')
-    print()
 
-    builder.print_border_boxed_text('Prints Charming',
-                                    text_style='vgreen',
-                                    text_align='left',
-                                    subtext='Hope you find the user guide helpful!',
-                                    subtext_style='white',
-                                    subtext_align='center',
-                                    horiz_border_top_style='purple',
-                                    horiz_border_bottom_style='orange',
-                                    text_vert_border_l_style='orange',
-                                    text_vert_border_r_style='purple',
-                                    subtext_vert_border_l_style='orange',
-                                    subtext_vert_border_r_style='purple')
 
-    print()
     texts = []
     blank_line1 = 'invisible_text'
     title_border_top = '#' * builder.get_available_width()
@@ -395,8 +379,7 @@ if __name__ == "__main__":
     subtitle3 = 'invisible_text'
     subtitle4 = 'invisible_text'
     texts.extend([blank_line1, title_border_top, blank_line2, title, subtitle, subtitle2, subtitle3, subtitle4])
-
-    text_styles = ['default', 'vblue', 'default', 'vgreen', 'white', 'vblue', 'default', 'default']
+    text_styles = ['default', 'purple', 'default', 'vgreen', 'white', 'orange', 'default', 'default']
     alignments = ['center', 'center', 'center', 'center', 'center', 'center', 'center', 'center']
 
 
@@ -404,10 +387,12 @@ if __name__ == "__main__":
                                      horiz_border_top_style='purple', horiz_border_bottom_style='orange',
                                      vert_border_l_style='orange', vert_border_r_style='purple')
 
+    print()
+
     fg_text = """
         Print all the foreground colors in the color map dictionary.
         """
-    print()
+
     builder.print_border_boxed_text(fg_text, text_align='center', horiz_border_bottom=False, horiz_border_top=False, text_style='vcyan', text_vert_border_l_style='cyan', text_vert_border_r_style='cyan')
     print()
     print_foreground_colors()
@@ -462,7 +447,7 @@ if __name__ == "__main__":
     print()
 
     print("""
-        More border box examples of different ways to use them. It is less complicated than this. 
+        More border box examples of different ways to use them. It is less complicated than this.
         I was under time constraints, but wanted to get examples of the new updates out there anyway!""")
 
 
@@ -603,3 +588,4 @@ if __name__ == "__main__":
     my_custom_error()
     print()
     print()
+
