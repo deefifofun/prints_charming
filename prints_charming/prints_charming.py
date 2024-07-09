@@ -286,6 +286,9 @@ class ColorPrinter:
 
         return "".join(styled_text)
 
+    def get_color_code(self, color_name):
+        return self.color_map.get(color_name, self.color_map['default'])
+
     def apply_color(self, color_name, text):
         color_code = self.color_map[color_name]
         colored_text = f"{color_code}{text}{self.reset}"
@@ -820,6 +823,7 @@ class FormattedTextBox:
 
 
     def build_border_box(self, horiz_border_top=True, horiz_border_top_style=None, horiz_border_bottom=True, horiz_border_bottom_style=None, vert_border_left=True, vert_border_left_style=None, vert_border_right=True, vert_border_right_style=None):
+
         if horiz_border_top:
             horiz_border_top = self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border)
         else:
@@ -839,6 +843,23 @@ class FormattedTextBox:
             horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style, self.horiz_border)
         else:
             horiz_border_bottom = None
+
+        return horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom
+
+    def build_border_box(self, horiz_border_top=True, horiz_border_top_style=None, horiz_border_bottom=True, horiz_border_bottom_style=None, vert_border_left=True, vert_border_left_style=None, vert_border_right=True, vert_border_right_style=None):
+
+        horiz_border_top = (self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border)) if horiz_border_top else None
+
+        horiz_border_top = self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border) if horiz_border_top else None
+
+
+        horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style,
+                                                                                                          self.horiz_border) if horiz_border_bottom else None
+
+        vert_border_left = (self.vert_border if not vert_border_left_style else self.cp.apply_style(vert_border_left_style,
+                                                                                                    self.vert_border)) + self.vert_padding if vert_border_left else self.vert_padding
+        vert_border_right = self.vert_padding + (
+            self.vert_border if not vert_border_right_style else self.cp.apply_style(vert_border_right_style, self.vert_border)) if vert_border_right else self.vert_padding
 
         return horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom
 
