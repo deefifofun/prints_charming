@@ -424,13 +424,11 @@ class ColorPrinter:
     def apply_kwargs_placeholders(self, text: str, kwargs: Dict[str, Any]) -> str:
         # Replace placeholders with actual values and apply colors
         for key, value in kwargs.items():
-            # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{value}\033[0m"
             styled_value = str(value)
             if key in self.variable_cat_map:
-                # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{str(value)}\033[0m"  # use str() here
                 style_name = self.variable_cat_map[key]
                 style_code = self.style_codes[style_name]
-                styled_value = f"{style_code}{styled_value}{self.reset}"  # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{value}\033[0m"
+                styled_value = f"{style_code}{styled_value}{self.reset}"
 
             text = text.replace(f"{{{key}}}", styled_value)
 
