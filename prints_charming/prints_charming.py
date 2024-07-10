@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import sys
 import traceback
 import re
+import logging
 
 
 
@@ -1128,8 +1129,22 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
-# Set the custom exception hook
-sys.excepthook = custom_excepthook
+def custom_excepthook_with_logging(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, ColorPrinterError):
+        exc_value.handle_exception()
+    else:
+        logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+def set_custom_excepthook():
+    sys.excepthook = custom_excepthook
+
+
+def set_custom_excepthook_with_logging():
+    sys.excepthook = custom_excepthook_with_logging
+
+
+
 
 
 
