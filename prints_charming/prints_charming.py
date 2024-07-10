@@ -884,22 +884,7 @@ class FormattedTextBox:
 
         return horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom
 
-    def build_border_box(self, horiz_border_top=True, horiz_border_top_style=None, horiz_border_bottom=True, horiz_border_bottom_style=None, vert_border_left=True, vert_border_left_style=None, vert_border_right=True, vert_border_right_style=None):
 
-        horiz_border_top = (self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border)) if horiz_border_top else None
-
-        horiz_border_top = self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border) if horiz_border_top else None
-
-
-        horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style,
-                                                                                                          self.horiz_border) if horiz_border_bottom else None
-
-        vert_border_left = (self.vert_border if not vert_border_left_style else self.cp.apply_style(vert_border_left_style,
-                                                                                                    self.vert_border)) + self.vert_padding if vert_border_left else self.vert_padding
-        vert_border_right = self.vert_padding + (
-            self.vert_border if not vert_border_right_style else self.cp.apply_style(vert_border_right_style, self.vert_border)) if vert_border_right else self.vert_padding
-
-        return horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom
 
     def print_border_boxed_text(self, text, text_style=None, text_align='center', subtext='', subtext_style=None, subtext_align='center', horiz_border_top=True, horiz_border_top_style=None, horiz_border_bottom=True, horiz_border_bottom_style=None, text_vert_border_l_style=None, text_vert_border_r_style=None, subtext_vert_border_l_style=None, subtext_vert_border_r_style=None, first_line_blank=False):
 
