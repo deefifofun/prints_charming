@@ -112,20 +112,22 @@ class ColorPrinter:
         "header_text"  : TextStyle(color="white", bg_color="purple", bold=True),
         "header_symbol": TextStyle(color="magenta", bold=True, overlined=True, strikethrough=True),
         "task"         : TextStyle(color="blue", bold=True),
+        "label"        : TextStyle(bold=True),
         "conceal"      : TextStyle(conceal=True),
     }
 
 
-    def __init__(
-            self,
-            config: Dict[str, Union[bool, str, int]] = None,
-            color_map: Dict[str, str] = None,
-            bg_color_map: Dict[str, str] = None,
-            effect_map: Dict[str, str] = None,
-            styles: Dict[str, TextStyle] = None,
-            reset_color: str = None,
-            colorprinter_variables: Dict[str, List[str]] = None
-    ) -> None:
+    def __init__(self,
+                 config: Optional[Dict[str, Union[bool, str, int]]] = None,
+                 color_map: Optional[Dict[str, str]] = None,
+                 bg_color_map: Optional[Dict[str, str]] = None,
+                 effect_map: Optional[Dict[str, str]] = None,
+                 styles: Optional[Dict[str, TextStyle]] = None,
+                 reset_color: Optional[str] = None,
+                 colorprinter_variables: Optional[Dict[str, List[str]]] = None,
+                 style_conditions: Optional[Any] = None,
+                 variable_cat_map: Optional[Dict[str, str]] = None
+                 ) -> None:
 
         """
         Initialize the ColorPrinter with args to any of these optional parameters.
@@ -137,6 +139,8 @@ class ColorPrinter:
         :param styles: supply your own styles dictionary. Default is the ColorPrinter.STYLES dictionary above
         :param reset_color: supply your own from the color_map dictionary. Default is 'default' from the color_map dictionary
         :param colorprinter_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
+        :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
+        :param variable_cat_map: a category map such that each key is a category of variables where every variable in that category will map to a certain style.
         """
 
         if not config:
@@ -174,10 +178,47 @@ class ColorPrinter:
         self.word_map: Dict[str, Dict[str, str]] = {}
         self.phrase_map: Dict[str, Dict[str, str]] = {}
         self.conceal_map: Dict[str, Dict[str, str]] = {}
+        self.variable_cat_map: Dict[str, str] = variable_cat_map if variable_cat_map else {}
 
         if colorprinter_variables:
             self.add_variables_from_dict(colorprinter_variables)
 
+        self.style_conditions = style_conditions
+        self.style_conditions_map = {}
+        if style_conditions:
+            self.style_conditions_map = style_conditions.map
+
+
+    def replace_and_style_placeholders(self, text: str, kwargs: Dict[str, Any], enable_label_style: bool = True, label_delimiter: str = ':') -> str:
+        """Replace placeholders with actual values and apply colors."""
+        label_style_code = self.get_style_code('label') if enable_label_style else ''
+        lines = text.split('\n')
+
+        # Style labels directly in the text
+        if enable_label_style:
+            for i, line in enumerate(lines):
+                # Handle standalone labels that end with ':'
+                if line.strip().endswith(label_delimiter):
+                    label, _, rest = line.partition(label_delimiter)
+                    lines[i] = f"{label_style_code}{label}{label_delimiter}{self.reset}{rest}"
+                # Handle inline labels followed by placeholders
+                elif label_delimiter in line:
+                    label, delimiter, rest = line.partition(label_delimiter)
+                    if '{' in rest:
+                        lines[i] = f"{label_style_code}{label}{delimiter}{self.reset}{rest}"
+
+        styled_text = '\n'.join(lines)
+
+        # Replace placeholders with actual values and apply styles
+        for key, value in kwargs.items():
+            styled_value = str(value)
+            if key in self.style_conditions_map:
+                style_name = self.style_conditions_map[key](value)
+                style_code = self.get_style_code(style_name)
+                styled_value = f"{style_code}{styled_value}{self.reset}"
+            styled_text = styled_text.replace(f"{{{key}}}", styled_value)
+
+        return styled_text
 
 
     def compute_bg_color_map(self, code):
@@ -284,7 +325,7 @@ class ColorPrinter:
         # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset}"
 
-        return "".join(styled_text)
+        return styled_text
 
     def get_color_code(self, color_name):
         return self.color_map.get(color_name, self.color_map['default'])
@@ -360,12 +401,8 @@ class ColorPrinter:
         return concealed_text
 
 
-    def print_variables(
-            self,
-            vars_and_styles: Union[Dict[str, Tuple[Any, str]], Tuple[List[Any], List[str]]],
-            text: str,
-            text_style: str = None
-    ) -> None:
+    def print_variables(self, vars_and_styles: Union[Dict[str, Tuple[Any, str]], Tuple[List[Any], List[str]]],
+                        text: str, text_style: str = None) -> None:
 
         if isinstance(vars_and_styles, dict):  # Approach 1: Using Dictionary
             for placeholder, (variable, var_style) in vars_and_styles.items():
@@ -388,12 +425,11 @@ class ColorPrinter:
         for key, value in kwargs.items():
             # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{value}\033[0m"
             styled_value = str(value)
-            if key in self.variable_map:
+            if key in self.variable_cat_map:
                 # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{str(value)}\033[0m"  # use str() here
-                style_name = self.variable_map[key]
+                style_name = self.variable_cat_map[key]
                 style_code = self.style_codes[style_name]
                 styled_value = f"{style_code}{styled_value}{self.reset}"  # colored_value = f"\033[1;{self.color_map[self.variable_map[key]]}{value}\033[0m"
-                styled_value_ascii = f"{style_code}{styled_value}{self.reset}"
 
             text = text.replace(f"{{{key}}}", styled_value)
 
@@ -433,7 +469,6 @@ class ColorPrinter:
               reversed: bool = False,
               blink: bool = False,
               conceal: bool = False,
-              header: bool = False,
               sep: str = ' ',
               end: str = '\n',
               **kwargs: Any) -> None:
@@ -454,6 +489,7 @@ class ColorPrinter:
         if text is not None:
             converted_args = [text] + converted_args
 
+
         text = sep.join(converted_args)
 
         if not self.config["color_text"]:
@@ -465,7 +501,8 @@ class ColorPrinter:
             text = self.style_words_by_index(text, style)
 
         if self.config["kwargs"] and kwargs:
-            text = self.apply_kwargs_placeholders(text, kwargs)
+            #text = self.apply_kwargs_placeholders(text, kwargs)
+            text = self.replace_and_style_placeholders(text, kwargs)
             print(text, end=end)
 
             return
@@ -502,6 +539,7 @@ class ColorPrinter:
         # Count leading and trailing spaces
         leading_spaces = len(text) - len(text.lstrip())
         trailing_spaces = len(text) - len(text.rstrip())
+
 
         # Convert the text to a list of words and spaces
         words = text.split()
