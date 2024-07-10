@@ -5,4 +5,5 @@ from .prints_charming import (
     ColorPrinterError,
     ColorNotFoundError,
     InvalidLengthError,
+    set_custom_excepthook,
 )
