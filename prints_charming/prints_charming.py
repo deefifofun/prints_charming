@@ -1056,7 +1056,7 @@ class FormattedTextBox:
 
 
 
-    def build_border_box(self, horiz_border_top=True, horiz_border_top_style=None,
+    def build_styled_border_box(self, horiz_border_top=True, horiz_border_top_style=None,
                          horiz_border_bottom=True, horiz_border_bottom_style=None,
                          vert_border_left=True, vert_border_left_style=None,
                          vert_border_right=True, vert_border_right_style=None):
@@ -1096,6 +1096,22 @@ class FormattedTextBox:
 
 
         return horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom
+
+
+    def construct_text(self, vert_border_left, vert_border_right, aligned_text):
+        # Define a dictionary mapping conditions to their corresponding text constructions
+        construction_map = {
+            (True, True): lambda: f"{vert_border_left}{aligned_text}{vert_border_right}",
+            (True, False): lambda: f"{vert_border_left}{aligned_text}",
+            (False, True): lambda: f"{aligned_text}{vert_border_right}",
+            (False, False): lambda: aligned_text
+        }
+
+        # Determine the key based on the presence of the borders
+        key = (bool(vert_border_left), bool(vert_border_right))
+
+        # Construct and return the text based on the mapped lambda function
+        return construction_map[key]()
 
 
 
@@ -1151,70 +1167,7 @@ class FormattedTextBox:
 
 
 
-    def print_border_boxed_text2(self, texts, text_styles=None, alignments=None,
-                                 horiz_border_top=True, horiz_border_bottom=True,
-                                 horiz_border_top_style=None, horiz_border_bottom_style=None,
-                                 vert_border_l_style=None, vert_border_r_style=None,  vert_borders=True):
 
-        # Set default values for parameters if not provided
-        if not text_styles:
-            text_styles = ['default'] * len(texts)
-        if isinstance(text_styles, str):
-            text_styles = [text_styles] * len(texts)
-
-        if not alignments:
-            alignments = ['center'] * len(texts)
-        if isinstance(alignments, str):
-            alignments = [alignments] * len(texts)
-
-        available_width = self.get_available_width()
-        lines_list = [self.split_text_to_lines(text, available_width) for text in texts]
-
-
-        horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = self.build_border_box(
-            horiz_border_top=horiz_border_top,
-            horiz_border_top_style=horiz_border_top_style,
-            horiz_border_bottom=horiz_border_bottom,
-            horiz_border_bottom_style=horiz_border_bottom_style,
-            vert_border_left=vert_borders,
-            vert_border_left_style=vert_border_l_style,
-            vert_border_right=vert_borders,
-            vert_border_right_style=vert_border_r_style
-        )
-
-        if horiz_border_top:
-            print(horiz_border_top)
-
-        for lines, text_style, text_align in zip(lines_list, text_styles, alignments):
-            for line in lines:
-                if line == 'invisible_text' or line == '':
-                    line = ' '
-                    aligned_text = self.align_text(line, available_width, text_align)
-                else:
-                    aligned_text = self.cp.apply_style(text_style, self.align_text(line, available_width, text_align))
-
-                print(f"{vert_border_left}{aligned_text}{vert_border_right}")
-
-
-        if horiz_border_bottom:
-            print(horiz_border_bottom)
-
-
-
-    def construct_text(self, vert_border_left, vert_border_right, aligned_text):
-        # Define a dictionary mapping conditions to their corresponding text constructions
-        construction_map = {
-            (True, True): lambda: f"{vert_border_left}{aligned_text}{vert_border_right}",
-            (True, False): lambda: f"{vert_border_left}{aligned_text}",
-            (False, True): lambda: f"{aligned_text}{vert_border_right}",
-            (False, False): lambda: aligned_text
-        }
-
-        # Determine the key based on the presence of the borders
-        key = (bool(vert_border_left), bool(vert_border_right))
-
-        # Construct and return the text based on the mapped lambda function
-        return construction_map[key]()
 
 
     def print_border_boxed_text3(self, texts, text_styles=None, alignments=None,
@@ -1261,9 +1214,10 @@ class FormattedTextBox:
                                  table_strs=None, table_strs_alignments=None,
                                  table_strs_horiz_border_top=False,
                                  table_strs_horiz_border_bottom=False,
-                                 table_strs_vert_border_left=False,
-                                 table_strs_vert_border_right=False,
-                                 default_table_alignment='center'):
+                                 table_strs_vert_border_left=True,
+                                 table_strs_vert_border_right=True,
+                                 default_table_alignment='center',
+                                 horiz_border_double=False):
 
         # Set default values for parameters if not provided
         if not text_styles:
@@ -1280,7 +1234,7 @@ class FormattedTextBox:
         lines_list = [self.split_text_to_lines(text, available_width) for text in texts]
 
         if horiz_border_top:
-            print(horiz_border_top)
+            print(horiz_border_top * 2) if horiz_border_double else print(horiz_border_top)
 
         for lines, text_style, text_align in zip(lines_list, text_styles, text_alignments):
             for line in lines:
@@ -1295,11 +1249,9 @@ class FormattedTextBox:
                 print(final_text)
 
         if horiz_border_bottom:
-            print(horiz_border_bottom)
-            blank_text = ' '
-            print(blank_text.center(self.horiz_width))
-
-
+            print(horiz_border_bottom * 2) if horiz_border_double else print(horiz_border_bottom)
+            blank_text = ' '.center(available_width)
+            print(f'{vert_border_left}{blank_text}{vert_border_right}')
 
 
         if table_strs:
@@ -1398,6 +1350,7 @@ class FormattedTextBox:
                                   text_style=None,
                                   text_align='center',
                                   alignments=None):
+
         available_width = self.get_available_width()
         table_lines_list = [table_str.split("\n") for table_str in table_strs]
 
@@ -1470,6 +1423,7 @@ class FormattedTextBox:
                                   table_alignments=None,
                                   table_style=None,
                                   text_style=None):
+
         available_width = self.get_available_width()
         num_tables = len(table_strs)
         section_width = (available_width - (num_tables - 1)) // num_tables
@@ -1549,9 +1503,6 @@ class FormattedTextBox:
             row_length = len(self.strip_ansi_escape_sequences(row))
             padding_needed = available_width - row_length
             print(f"{vert_border_left}{row.ljust(available_width)}{vert_border_right}")
-
-
-
 
 
 
