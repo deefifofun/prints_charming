@@ -2,11 +2,18 @@
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+import os
 import sys
 import traceback
 import re
 import logging
+from time import perf_counter
 
+
+
+def get_terminal_width():
+    terminal_size = os.get_terminal_size()
+    return terminal_size.columns
 
 
 def get_all_subclass_names(cls, trailing_char=None):
@@ -42,6 +49,7 @@ class TextStyle:
 
 
 class ColorPrinter:
+    reset = "\033[0m"
     
     """
     This module provides a ColorPrinter class for handling colored text printing tasks.
@@ -56,30 +64,51 @@ class ColorPrinter:
         "args_to_strings"     : True,
         "style_names"         : True,
         "style_words_by_index": True,
-        "kwargs"              : False,
+        "kwargs"              : True,
         "conceal"             : True,
     }
 
     COLOR_MAP: Dict[str, str] = {
         "default" : "\033[0m",
         "white"   : "\033[97m",
+        "gray"    : "\033[38;5;248m",
+        "dgray"   : "\033[38;5;8m",
         "black"   : "\033[30m",
         "green"   : "\033[32m",
         "vgreen"  : "\033[38;5;46m",
+        "lime"    : "\033[38;5;118m",
+        "forest"  : "\033[38;5;28m",
+        "aqua"    : "\033[38;5;122m",
+        "turq"    : "\033[38;5;80m",
         "red"     : "\033[31m",
         "vred"    : "\033[38;5;196m",
-        "blue"    : "\033[34m",
-        "vblue"   : "\033[38;5;21m",
+        "maroon"  : "\033[38;5;124m",
         "yellow"  : "\033[33m",
         "vyellow" : "\033[38;5;226m",
+        "blue"    : "\033[34m",
+        "dblue"   : "\033[38;5;21m",
+        "vblue"   : "\033[38;5;27m",
+        "navy"    : "\033[38;5;17m",
+        "sky"     : "\033[38;5;117m",
+        "vsky"    : "\033[38;5;39m",
         "magenta" : "\033[35m",
         "vmagenta": "\033[38;5;201m",
         "cyan"    : "\033[36m",
         "vcyan"   : "\033[38;5;51m",
         "orange"  : "\033[38;5;208m",
-        "gray"    : "\033[38;5;252m",
+        "vorange" : "\033[38;5;202m",
+        "rorange" : "\033[38;5;203m",
         "pink"    : "\033[38;5;200m",
+        "lpink"   : "\033[38;5;218m",
         "purple"  : "\033[38;5;129m",
+        "lpurple" : "\033[38;5;147m",
+        "indigo"  : "\033[38;5;63m",
+        "violet" : "\033[38;5;69m",
+        "lav"     : "\033[38;5;183m",
+        "brown"   : "\033[38;5;94m",
+        "gold"    : "\033[38;5;220m",
+        "sand"    : "\033[38;5;215m",
+        "copper"  : "\033[38;5;166m"
     }
 
     EFFECT_MAP: Dict[str, str] = {
@@ -95,11 +124,19 @@ class ColorPrinter:
 
     STYLES: Dict[str, TextStyle] = {
         "default"      : TextStyle(),
-        "green"        : TextStyle(color="green", underlined=True),
-        "vgreen"       : TextStyle(color="vgreen"),
+        "default_bg"   : TextStyle(bg_color="black"),
+        "white"        : TextStyle(color="white"),
+        "gray"         : TextStyle(color="gray"),
+        "dgray"        : TextStyle(color="dgray"),
+        "black"        : TextStyle(color="black"),
+        "green"        : TextStyle(color="green"),
+        "vgreen"       : TextStyle(color="vgreen", bold=True),
+        "forest"       : TextStyle(color="forest", bold=True),
         "red"          : TextStyle(color="red"),
         "vred"         : TextStyle(color="vred", bold=True),
         "blue"         : TextStyle(color="blue"),
+        "dblue"        : TextStyle(color="dblue"),
+        "vblue"        : TextStyle(color="vblue"),
         "yellow"       : TextStyle(color="yellow"),
         "vyellow"      : TextStyle(color="vyellow"),
         "magenta"      : TextStyle(color="magenta", bold=True),
@@ -109,13 +146,27 @@ class ColorPrinter:
         "cyan"         : TextStyle(color="cyan"),
         "vcyan"        : TextStyle(color="vcyan"),
         "orange"       : TextStyle(color="orange"),
-        "gray"         : TextStyle(color="gray"),
-        "header_text"  : TextStyle(color="white", bg_color="purple", bold=True),
+        "copper"       : TextStyle(color="copper"),
+        "brown"        : TextStyle(color="brown"),
+        "sand"         : TextStyle(color="sand"),
+        "lav"          : TextStyle(color="lav"),
+        "lpurple"      : TextStyle(color="lpurple"),
+        "header"       : TextStyle(color="vcyan"),
+        "header_text"  : TextStyle(color="purple", bg_color="gray", bold=True, italic=True),
+        "header_text2" : TextStyle(color="gray", bg_color="purple", bold=True),
         "header_symbol": TextStyle(color="magenta", bold=True, overlined=True, strikethrough=True),
         "task"         : TextStyle(color="blue", bold=True),
-        "label"        : TextStyle(bold=True),
+        "path"         : TextStyle(color="blue"),
+        "filename"     : TextStyle(color="yellow"),
+        "line_info"    : TextStyle(color="yellow", bold=True),
+        "line_number"  : TextStyle(color="yellow", bold=True),
+        "function_name": TextStyle(color="yellow", italic=True),
+        "error_message": TextStyle(color="vred", bg_color="vyellow", bold=True),
+        "code"         : TextStyle(color="yellow"),
+        "label"        : TextStyle(bold=True, italic=True),
         "conceal"      : TextStyle(conceal=True),
     }
+
 
 
     def __init__(self,
@@ -124,10 +175,8 @@ class ColorPrinter:
                  bg_color_map: Optional[Dict[str, str]] = None,
                  effect_map: Optional[Dict[str, str]] = None,
                  styles: Optional[Dict[str, TextStyle]] = None,
-                 reset_color: Optional[str] = None,
                  colorprinter_variables: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
-                 variable_cat_map: Optional[Dict[str, str]] = None
                  ) -> None:
 
         """
@@ -138,18 +187,16 @@ class ColorPrinter:
         :param bg_color_map: supply your own bg_color_map dictionary. Default is computed from color_map dictionary
         :param effect_map: supply your own effect_map dictionary. Default is the ColorPrinter.EFFECT_MAP dictionary above
         :param styles: supply your own styles dictionary. Default is the ColorPrinter.STYLES dictionary above
-        :param reset_color: supply your own from the color_map dictionary. Default is 'default' from the color_map dictionary
         :param colorprinter_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
-        :param variable_cat_map: a category map such that each key is a category of variables where every variable in that category will map to a certain style.
         """
 
         if not config:
-            config = ColorPrinter.CONFIG
+            config = ColorPrinter.CONFIG.copy()
         self.config = config
 
         if not color_map:
-            color_map = ColorPrinter.COLOR_MAP
+            color_map = ColorPrinter.COLOR_MAP.copy()
         self.color_map = color_map
 
         if not bg_color_map:
@@ -159,27 +206,25 @@ class ColorPrinter:
         self.bg_color_map = bg_color_map
 
         if not effect_map:
-            effect_map = ColorPrinter.EFFECT_MAP
+            effect_map = ColorPrinter.EFFECT_MAP.copy()
         self.effect_map = effect_map
 
+
         if not styles:
-            styles = ColorPrinter.STYLES
+            styles = ColorPrinter.STYLES.copy()
         self.styles = styles
 
         self.style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
         }
 
-        #  Set the printer reset code to the default value in self.color_map or user supplied value
-        if not reset_color:
-            reset_color = self.color_map['default']
-        self.reset = reset_color
+        self.reset = ColorPrinter.reset
+
 
         self.variable_map: Dict[str, str] = {}
         self.word_map: Dict[str, Dict[str, str]] = {}
         self.phrase_map: Dict[str, Dict[str, str]] = {}
         self.conceal_map: Dict[str, Dict[str, str]] = {}
-        self.variable_cat_map: Dict[str, str] = variable_cat_map if variable_cat_map else {}
 
         if colorprinter_variables:
             self.add_variables_from_dict(colorprinter_variables)
@@ -232,7 +277,7 @@ class ColorPrinter:
 
         return bg_code
 
-    def print_bg(self, color_name: str, length: int = 10) -> None:
+    def print_bg(self, color_name: str, length: int = 1) -> None:
         """
         Prints a "block" of background color.
 
@@ -270,7 +315,14 @@ class ColorPrinter:
             styled_message = self.apply_style('vred', message)
             raise ColorNotFoundError(styled_message, self, self.apply_style, format_specific_exception=True)
 
-        # Print the color block
+        # style the color block
+        bg_bar_strip = f"{bg_color_code}{' ' * length}{self.reset}"
+
+        return bg_bar_strip
+
+
+    def get_bg_bar_strip(self, color_name: str, length: int = 1) -> str:
+        bg_color_code = self.bg_color_map.get(color_name)
         bg_bar_strip = f"{bg_color_code}{' ' * length}{self.reset}"
 
         return bg_bar_strip
@@ -321,12 +373,22 @@ class ColorPrinter:
 
     def apply_style(self, style_name, text):
 
-        style_code = self.style_codes[style_name]
+        if text.isspace():
+            style_code = self.bg_color_map.get(
+                style_name,
+                self.bg_color_map.get(
+                    self.styles.get(style_name, 'default_bg').bg_color
+                )
+            )
+
+        else:
+            style_code = self.style_codes[style_name]
 
         # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset}"
 
         return styled_text
+
 
     def get_color_code(self, color_name):
         return self.color_map.get(color_name, self.color_map['default'])
@@ -336,6 +398,17 @@ class ColorPrinter:
         colored_text = f"{color_code}{text}{self.reset}"
 
         return colored_text
+
+
+    def get_bg_color_code(self, color_name):
+        return self.bg_color_map.get(color_name)
+
+
+    def apply_bg_color(self, color_name, text):
+        bg_color_code = self.bg_color_map.get(color_name)
+        bg_color_block = f"{bg_color_code}{text}{self.reset}"
+
+        return bg_color_block
 
 
     def add_variable(self, variable: str, style_name: str) -> None:
@@ -418,21 +491,7 @@ class ColorPrinter:
                 sub = f"{styled_var_code}{str(variable)}{self.reset}"
                 text = text.replace(f"var{i + 1}", sub)
 
-        self.print(text, style=text_style)
-
-
-    def apply_kwargs_placeholders(self, text: str, kwargs: Dict[str, Any]) -> str:
-        # Replace placeholders with actual values and apply colors
-        for key, value in kwargs.items():
-            styled_value = str(value)
-            if key in self.variable_cat_map:
-                style_name = self.variable_cat_map[key]
-                style_code = self.style_codes[style_name]
-                styled_value = f"{style_code}{styled_value}{self.reset}"
-
-            text = text.replace(f"{{{key}}}", styled_value)
-
-        return text
+        self.print(text, style=text_style, skip_ansi_check=True)
 
 
     def style_words_by_index(self, text: str, style_mapping: Dict[Union[int, Tuple[int, int]], str]) -> str:
@@ -449,6 +508,10 @@ class ColorPrinter:
                     if key == i and style_name in self.styles:
                         words[i - 1] = f"{style_code}{word}{self.reset}"
         return " ".join(words)
+
+    @staticmethod
+    def contains_ansi_codes(s: str) -> bool:
+        return '\033' in s
 
 
     def print(self,
@@ -470,7 +533,33 @@ class ColorPrinter:
               conceal: bool = False,
               sep: str = ' ',
               end: str = '\n',
+              filename: str = None,
+              skip_ansi_check: bool = False,
               **kwargs: Any) -> None:
+
+        converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
+
+        # Handle not colored text
+        if not self.config["color_text"]:
+            output = sep.join(converted_args)
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(output + end)
+            else:
+                print(output, end=end)
+            return
+
+        # Check for ANSI codes in converted_args
+        if not skip_ansi_check and any(self.contains_ansi_codes(arg) for arg in converted_args):
+            # Handle ANSI styled text if any ANSI codes are found
+            output = sep.join(converted_args)
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(output + end)
+            else:
+                print(output, end=end)
+            return
+
 
         # Handle variable replacement
         if var is not None:
@@ -482,28 +571,22 @@ class ColorPrinter:
             else:
                 text = f"{var_style_code}{variable}{self.reset}"
 
-        converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
-
         # If text was modified, it takes precedence
         if text is not None:
             converted_args = [text] + converted_args
 
-
         text = sep.join(converted_args)
-
-        if not self.config["color_text"]:
-            print(sep.join(args), end=end)
-
-            return
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
 
         if self.config["kwargs"] and kwargs:
-            #text = self.apply_kwargs_placeholders(text, kwargs)
             text = self.replace_and_style_placeholders(text, kwargs)
-            print(text, end=end)
-
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(text + end)
+            else:
+                print(text, end=end)
             return
 
         if any([color, bg_color, bold, italic, underlined, overlined, strikethrough, reversed, blink, conceal]):
@@ -594,87 +677,16 @@ class ColorPrinter:
         # Add back the leading and trailing spaces
         styled_text = ' ' * leading_spaces + styled_text + ' ' * trailing_spaces
 
-        print(styled_text, end=end)
+        # Print or write to file
+        if filename:
+            with open(filename, 'a') as file:
+                file.write(styled_text + end)
+        else:
+            print(styled_text, end=end)
+
 
         return
 
-
-    def print_table(
-            self,
-            table_data: List[List[Any]],
-            table_style: str = "default",
-            border_style: Optional[str] = None,
-            header_style: Optional[str] = None,
-            col_alignments: Optional[List[str]] = None,
-            column_styles: Optional[Dict[str, str]] = None,
-            cell_style: Optional[str] = None
-    ) -> None:
-
-        """
-        Prints a table with optional styling and alignment.
-
-        :param table_data: A list of lists representing the rows of the table.
-        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
-        :param cell_style: Style name for the table cells.
-        :param header_style: Style name for the header row.
-        :param border_style: Style name for the table borders.
-        """
-
-        # 1. Automatic Column Sizing
-        max_col_lengths = [0] * len(table_data[0])
-        for row in table_data:
-            for i, cell in enumerate(row):
-                cell_length = len(str(cell))
-                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
-
-        # 2. Column Alignment
-        table_output = []
-        for row_idx, row in enumerate(table_data):
-            aligned_row = []
-            for i, cell in enumerate(row):
-                cell_str = str(cell)
-                max_length = max_col_lengths[i]
-
-                # Determine the alignment for this cell
-                alignment = 'left'  # Default
-                if col_alignments and i < len(col_alignments):
-                    alignment = col_alignments[i]
-                elif isinstance(cell, (int, float)):
-                    alignment = 'right'
-
-                # Apply the alignment
-                if alignment == 'left':
-                    aligned_cell = cell_str.ljust(max_length)
-                elif alignment == 'center':
-                    aligned_cell = cell_str.center(max_length)
-                elif alignment == 'right':
-                    aligned_cell = cell_str.rjust(max_length)
-
-                # Apply the style
-                if row_idx == 0 and header_style:
-                    aligned_cell = self.apply_style(header_style, aligned_cell)
-                elif cell_style:
-                    aligned_cell = self.apply_style(cell_style, aligned_cell)
-
-                # Add aligned and styled cell to the row
-                aligned_row.append(aligned_cell)
-
-            # Create a row string and add to table output
-            row_str = " | ".join(aligned_row)
-            table_output.append(row_str)
-
-        # 3. Print Borders and Rows
-        if border_style:
-            border_line = self.apply_style(border_style, "-" * (sum(max_col_lengths) + len(max_col_lengths) * 3 - 1))
-            print(border_line)
-
-        for i, row in enumerate(table_output):
-            print(row)
-            if i == 0 and header_style and border_style:
-                print(border_line)
-
-        if border_style:
-            print(border_line)
 
 
     def ugly_print_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
@@ -706,12 +718,194 @@ class ColorPrinter:
             print(f"{closing_brace},")
 
 
-class FormattedTextBox:
-    def __init__(self, cp=None, horiz_width=60, horiz_char="|", vert_width=None, vert_padding=0, vert_char='|'):
+
+
+class TableManager:
+    def __init__(self, cp: ColorPrinter = None, style_themes: dict = None, conditional_styles: dict = None):
         self.cp = cp if cp else ColorPrinter()
-        self.horiz_width = horiz_width
+        self.style_themes = style_themes
+        self.conditional_styles = conditional_styles
+        self.tables = {}
+
+        self.border_char = "-"
+        self.col_sep = " | "
+        self.title_style = "header_text"
+
+
+    def generate_table(self,
+                       table_data: List[List[Any]],
+                       table_name: str = None,
+                       show_table_name: bool = False,
+                       table_style: str = "default",
+                       border_char: str = "-",
+                       col_sep: str = " | ",
+                       border_style: Optional[str] = None,
+                       col_sep_style: Optional[str] = None,
+                       header_style: Optional[str] = None,
+                       header_column_styles: Optional[Dict[int, str]] = None,
+                       col_alignments: Optional[List[str]] = None,
+                       column_styles: Optional[Dict[int, str]] = None,
+                       cell_style: Optional[str or list] = None,
+                       target_text_box: bool = False,
+                       conditional_styles: Optional[Dict[str, List[Dict[str, Union[str, int]]]]] = None,
+                       double_space: bool = False
+                       ) -> str:
+
+        """
+        Generates a table with optional styling and alignment as a string.
+
+        :param table_data: A list of lists representing the rows of the table.
+        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
+        :param cell_style: Style name for the table cells.
+        :param header_style: Style name for the header row.
+        :param header_column_styles: A dictionary mapping column indices to style names for the header row.
+        :param border_style: Style name for the table borders.
+        :param column_styles: A dictionary mapping column indices to style names.
+        :param conditional_styles: A dictionary defining conditional styles based on cell values.
+        :return: A string representing the formatted table.
+        """
+
+        styled_col_sep = self.cp.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
+
+        # 1. Automatic Column Sizing
+        max_col_lengths = [0] * len(table_data[0])
+        for row in table_data:
+            for i, cell in enumerate(row):
+                cell_length = len(str(cell))
+                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
+
+        # 2. Column Alignment
+        table_output = []
+        header = table_data[0]
+
+        for row_idx, row in enumerate(table_data):
+            aligned_row = []
+            for i, cell in enumerate(row):
+                cell_str = str(cell)
+                max_length = max_col_lengths[i]
+
+                # Determine the alignment for this cell
+                alignment = 'left'  # Default
+                if col_alignments and i < len(col_alignments):
+                    alignment = col_alignments[i]
+                elif isinstance(cell, (int, float)):
+                    alignment = 'right'
+
+                # Apply the alignment
+                if alignment == 'left':
+                    aligned_cell = cell_str.ljust(max_length)
+                elif alignment == 'center':
+                    aligned_cell = cell_str.center(max_length)
+                elif alignment == 'right':
+                    aligned_cell = cell_str.rjust(max_length)
+                else:
+                    aligned_cell = cell_str.ljust(max_length)  # Fallback
+
+                # Apply the style
+                if row_idx == 0:
+                    # Apply header styles
+                    if header_column_styles and i in header_column_styles:
+                        aligned_cell = self.cp.apply_style(header_column_styles[i], aligned_cell)
+                    elif header_style:
+                        aligned_cell = self.cp.apply_style(header_style, aligned_cell)
+                else:
+                    if header[i] == 'Color Name':
+                        aligned_cell = self.cp.apply_color(cell_str, aligned_cell)
+                    elif header[i] == 'Foreground Text':
+                        color_name = row[0]  # Assuming the first column is the color name
+                        aligned_cell = self.cp.apply_color(color_name, aligned_cell)
+                    elif header[i] == 'Background Block':
+                        color_name = row[0]  # Assuming the first column is the color name
+                        aligned_cell = self.cp.return_bg(color_name, length=max_length)
+
+                    # Apply conditional styles if provided
+                    elif conditional_styles and header[i] in conditional_styles:
+                        for condition in conditional_styles[header[i]]:
+                            if condition["type"] == "below" and isinstance(cell, (int, float)) and cell < condition["value"]:
+                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                            elif condition["type"] == "above_or_equal" and isinstance(cell, (int, float)) and cell >= condition["value"]:
+                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                            elif condition["type"] == "equals" and cell_str == condition["value"]:
+                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                            elif condition["type"] == "in_list" and cell_str in condition["value"]:
+                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                            elif condition["type"] == "not_in_list" and cell_str not in condition["value"]:
+                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                    elif column_styles and i in column_styles:
+                        # Apply column-specific styles if provided
+                        aligned_cell = self.cp.apply_style(column_styles[i], aligned_cell)
+                    elif cell_style:
+                        if isinstance(cell_style, list):
+                            # Apply alternating styles based on the row index
+                            style_to_apply = cell_style[0] if row_idx % 2 == 1 else cell_style[1]
+                            aligned_cell = self.cp.apply_style(style_to_apply, aligned_cell)
+                        else:
+                            aligned_cell = self.cp.apply_style(cell_style, aligned_cell)
+
+
+                # Add aligned and styled cell to the row
+                aligned_row.append(aligned_cell)
+
+            # Create a row string and add to table output
+            if target_text_box:
+                row_str = self.cp.apply_style(col_sep_style, col_sep.lstrip()) + styled_col_sep.join(aligned_row) + self.cp.apply_style(col_sep_style, col_sep.rstrip())
+            else:
+                row_str = styled_col_sep + styled_col_sep.join(aligned_row) + styled_col_sep
+            table_output.append(row_str)
+
+        # 3. Generate Borders and Rows
+        table_str = ""
+        border_line = ""  # Initialize border_line to ensure it always has a value
+        if border_style:
+            border_length = sum(max_col_lengths) + len(max_col_lengths) * len(col_sep) + len(col_sep) - 2
+            border_line = self.cp.apply_style(border_style, border_char * border_length)
+            #print(f' {border_line}')
+            if target_text_box:
+                table_str += f'{border_line}\n'
+            else:
+                table_str += f' {border_line}\n'
+
+        if show_table_name and table_name:
+            centered_table_name = self.cp.apply_style(self.title_style, table_name.center(border_length))
+            table_str += f'{centered_table_name}\n'
+            if border_style:
+                table_str += f'{border_line}\n'
+
+        for i, row in enumerate(table_output):
+            #print(row)
+            table_str += row + "\n"
+            if i != 0 and double_space:
+                table_str += "\n"
+            #if double_space:
+                #table_str += "\n"
+            if i == 0 and (header_style or header_column_styles) and border_style:
+                #print(f' {border_line}')
+                if target_text_box:
+                    table_str += f'{border_line}\n'
+                else:
+                    table_str += f' {border_line}\n'
+
+        if border_style:
+            #print(f' {border_line}')
+            if target_text_box:
+                table_str += f'{border_line}\n'
+            else:
+                table_str += f' {border_line}\n'
+
+        return table_str
+
+
+
+
+
+
+class FormattedTextBox:
+    def __init__(self, cp=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=0, vert_char='|'):
+        self.cp = cp if cp else ColorPrinter()
+        self.terminal_width = get_terminal_width()
+        self.horiz_width = horiz_width if horiz_width else self.terminal_width
         self.horiz_char = horiz_char
-        self.horiz_border = horiz_width * horiz_char
+        self.horiz_border = self.horiz_width * horiz_char
         self.vert_width = vert_width
         self.vert_padding = vert_padding * ' '
         self.vert_char = horiz_char if vert_width and not vert_char else vert_char
@@ -805,12 +999,29 @@ class FormattedTextBox:
             return left_aligned + right_aligned
 
 
-
+    def split_text_to_lines(self, text, available_width):
+        words = text.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if len(current_line) + len(word) + 1 <= available_width:
+                if current_line:
+                    current_line += " "
+                current_line += word
+            else:
+                lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+        return lines
 
 
     def get_available_width(self):
         return self.horiz_width - (2 * self.vert_width) - 2 if self.vert_border else self.horiz_width - (len(self.vert_padding) * 2)
 
+    def strip_ansi_escape_sequences(self, text):
+        ansi_escape = re.compile(r'\x1b\[([0-9]+)(;[0-9]+)*m')
+        return ansi_escape.sub('', text)
 
     def print_simple_border_boxed_text(self, title, subtitle='', align='center'):
         available_width = self.get_available_width()
@@ -842,44 +1053,47 @@ class FormattedTextBox:
         print(horiz_border_bottom)
         print()
 
-    def split_text_to_lines(self, text, available_width):
-        words = text.split()
-        lines = []
-        current_line = ""
-        for word in words:
-            if len(current_line) + len(word) + 1 <= available_width:
-                if current_line:
-                    current_line += " "
-                current_line += word
-            else:
-                lines.append(current_line)
-                current_line = word
-        if current_line:
-            lines.append(current_line)
-        return lines
 
 
-    def build_border_box(self, horiz_border_top=True, horiz_border_top_style=None, horiz_border_bottom=True, horiz_border_bottom_style=None, vert_border_left=True, vert_border_left_style=None, vert_border_right=True, vert_border_right_style=None):
+
+    def build_border_box(self, horiz_border_top=True, horiz_border_top_style=None,
+                         horiz_border_bottom=True, horiz_border_bottom_style=None,
+                         vert_border_left=True, vert_border_left_style=None,
+                         vert_border_right=True, vert_border_right_style=None):
 
         if horiz_border_top:
             horiz_border_top = self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border)
         else:
             horiz_border_top = None
 
-        if vert_border_left:
-            vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.cp.apply_style(vert_border_left_style, self.vert_border) + self.vert_padding
-        else:
-            vert_border_left = self.vert_padding
-
-        if vert_border_right:
-            vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.cp.apply_style(vert_border_right_style, self.vert_border)
-        else:
-            vert_border_right = self.vert_padding
-
         if horiz_border_bottom:
             horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style, self.horiz_border)
         else:
             horiz_border_bottom = None
+
+        if self.vert_char == ' ':
+            if vert_border_left:
+                vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.cp.apply_bg_color(vert_border_left_style, self.vert_border) + self.vert_padding
+            else:
+                vert_border_left = self.vert_padding
+
+            if vert_border_right:
+                vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.cp.apply_bg_color(vert_border_right_style, self.vert_border)
+            else:
+                vert_border_right = self.vert_padding
+
+        else:
+            if vert_border_left:
+                vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.cp.apply_style(vert_border_left_style, self.vert_border) + self.vert_padding
+            else:
+                vert_border_left = self.vert_padding
+
+            if vert_border_right:
+                vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.cp.apply_style(vert_border_right_style, self.vert_border)
+            else:
+                vert_border_right = self.vert_padding
+
+
 
         return horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom
 
@@ -935,7 +1149,12 @@ class FormattedTextBox:
             horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style, self.horiz_border)
             print(horiz_border_bottom)
 
-    def print_border_boxed_text2(self, texts, text_styles=None, alignments=None, horiz_border_top_style=None, horiz_border_bottom_style=None, vert_border_l_style=None, vert_border_r_style=None, horiz_border_top=True, horiz_border_bottom=True, vert_borders=True):
+
+
+    def print_border_boxed_text2(self, texts, text_styles=None, alignments=None,
+                                 horiz_border_top=True, horiz_border_bottom=True,
+                                 horiz_border_top_style=None, horiz_border_bottom_style=None,
+                                 vert_border_l_style=None, vert_border_r_style=None,  vert_borders=True):
 
         # Set default values for parameters if not provided
         if not text_styles:
@@ -950,6 +1169,7 @@ class FormattedTextBox:
 
         available_width = self.get_available_width()
         lines_list = [self.split_text_to_lines(text, available_width) for text in texts]
+
 
         horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = self.build_border_box(
             horiz_border_top=horiz_border_top,
@@ -967,7 +1187,7 @@ class FormattedTextBox:
 
         for lines, text_style, text_align in zip(lines_list, text_styles, alignments):
             for line in lines:
-                if line == 'invisible_text':
+                if line == 'invisible_text' or line == '':
                     line = ' '
                     aligned_text = self.align_text(line, available_width, text_align)
                 else:
@@ -980,17 +1200,372 @@ class FormattedTextBox:
             print(horiz_border_bottom)
 
 
+
+    def construct_text(self, vert_border_left, vert_border_right, aligned_text):
+        # Define a dictionary mapping conditions to their corresponding text constructions
+        construction_map = {
+            (True, True): lambda: f"{vert_border_left}{aligned_text}{vert_border_right}",
+            (True, False): lambda: f"{vert_border_left}{aligned_text}",
+            (False, True): lambda: f"{aligned_text}{vert_border_right}",
+            (False, False): lambda: aligned_text
+        }
+
+        # Determine the key based on the presence of the borders
+        key = (bool(vert_border_left), bool(vert_border_right))
+
+        # Construct and return the text based on the mapped lambda function
+        return construction_map[key]()
+
+
+    def print_border_boxed_text3(self, texts, text_styles=None, alignments=None,
+                                 horiz_border_top=None, horiz_border_bottom=None,
+                                 vert_border_left=None, vert_border_right=None,
+                                 default_alignment='center'):
+
+        # Set default values for parameters if not provided
+        if not text_styles:
+            text_styles = ['default'] * len(texts)
+        if isinstance(text_styles, str):
+            text_styles = [text_styles] * len(texts)
+
+        if not alignments:
+            alignments = [default_alignment] * len(texts)
+        if isinstance(alignments, str):
+            alignments = [alignments] * len(texts)
+
+        available_width = self.get_available_width()
+        lines_list = [self.split_text_to_lines(text, available_width) for text in texts]
+
+        if horiz_border_top:
+            print(horiz_border_top)
+
+        for lines, text_style, text_align in zip(lines_list, text_styles, alignments):
+            for line in lines:
+                if line == 'invisible_text' or line == '':
+                    line = ' '
+                    aligned_text = self.align_text(line, available_width, text_align)
+                else:
+                    aligned_text = self.cp.apply_style(text_style, self.align_text(line, available_width, text_align))
+
+                final_text = self.construct_text(vert_border_left, vert_border_right, aligned_text)
+
+                print(final_text)
+
+        if horiz_border_bottom:
+            print(horiz_border_bottom)
+
+    def print_border_boxed_text4(self, texts, text_styles=None, text_alignments=None,
+                                 horiz_border_top=None, horiz_border_bottom=None,
+                                 vert_border_left=None, vert_border_right=None,
+                                 default_text_alignment='center',
+                                 table_strs=None, table_strs_alignments=None,
+                                 table_strs_horiz_border_top=False,
+                                 table_strs_horiz_border_bottom=False,
+                                 table_strs_vert_border_left=False,
+                                 table_strs_vert_border_right=False,
+                                 default_table_alignment='center'):
+
+        # Set default values for parameters if not provided
+        if not text_styles:
+            text_styles = ['default'] * len(texts)
+        if isinstance(text_styles, str):
+            text_styles = [text_styles] * len(texts)
+
+        if not text_alignments:
+            text_alignments = [default_text_alignment] * len(texts)
+        if isinstance(text_alignments, str):
+            text_alignments = [text_alignments] * len(texts)
+
+        available_width = self.get_available_width()
+        lines_list = [self.split_text_to_lines(text, available_width) for text in texts]
+
+        if horiz_border_top:
+            print(horiz_border_top)
+
+        for lines, text_style, text_align in zip(lines_list, text_styles, text_alignments):
+            for line in lines:
+                if line == 'invisible_text' or line == '':
+                    line = ' '
+                    aligned_text = self.align_text(line, available_width, text_align)
+                else:
+                    aligned_text = self.cp.apply_style(text_style, self.align_text(line, available_width, text_align))
+
+                final_text = self.construct_text(vert_border_left, vert_border_right, aligned_text)
+
+                print(final_text)
+
+        if horiz_border_bottom:
+            print(horiz_border_bottom)
+            blank_text = ' '
+            print(blank_text.center(self.horiz_width))
+
+
+
+
+        if table_strs:
+            if table_strs_horiz_border_top and isinstance(table_strs_horiz_border_top, bool):
+                table_strs_horiz_border_top = horiz_border_top
+            if table_strs_horiz_border_bottom and isinstance(table_strs_horiz_border_bottom, bool):
+                table_strs_horiz_border_bottom = horiz_border_bottom
+            if table_strs_vert_border_left and isinstance(table_strs_vert_border_left, bool):
+                table_strs_vert_border_left = vert_border_left
+            if table_strs_vert_border_right and isinstance(table_strs_vert_border_right, bool):
+                table_strs_vert_border_right = vert_border_right
+
+
+            if not table_strs_alignments:
+                table_strs_alignments = [default_table_alignment] * len(table_strs)
+            if isinstance(table_strs_alignments, str):
+                table_strs_alignments = [table_strs_alignments] * len(table_strs)
+
+            if len(table_strs) > 1:
+
+                self.print_border_boxed_tables(table_strs,
+                                               horiz_border_top=table_strs_horiz_border_top,
+                                               vert_border_left=table_strs_vert_border_left,
+                                               vert_border_right=table_strs_vert_border_right,
+                                               horiz_border_bottom=table_strs_horiz_border_bottom,
+                                               alignments=table_strs_alignments)
+            else:
+                table_str = table_strs[0]
+                table_str_alignment = table_strs_alignments[0]
+                self.print_border_boxed_table(table_str,
+                                              table_strs_horiz_border_top,
+                                              table_strs_vert_border_left,
+                                              table_strs_vert_border_right,
+                                              table_strs_horiz_border_bottom,
+                                              text_align=table_str_alignment)
+
+        if horiz_border_bottom:
+            print(horiz_border_bottom)
+
+
+
+
+    def print_border_boxed_table(self,
+                                 table_str,
+                                 horiz_border_top,
+                                 vert_border_left,
+                                 vert_border_right,
+                                 horiz_border_bottom,
+                                 table_style=None,
+                                 text_style=None,
+                                 text_align='center'):
+
+        available_width = self.get_available_width()
+        table_lines = table_str.split("\n")
+
+        if horiz_border_top:
+            print(horiz_border_top)
+            blank_line = ' '.center(available_width)
+            print(f'{vert_border_left}{blank_line}{vert_border_right}')
+
+        for line in table_lines:
+            stripped_line = self.strip_ansi_escape_sequences(line)
+            padding_needed = available_width - len(stripped_line)
+            if text_align == 'center':
+                leading_spaces = padding_needed // 2
+                trailing_spaces = padding_needed - leading_spaces
+                aligned_text = ' ' * leading_spaces + line + ' ' * trailing_spaces
+            elif text_align == 'left':
+                aligned_text = line + ' ' * padding_needed
+            else:
+                aligned_text = padding_needed * ' ' + line
+
+
+            final_text = self.construct_text(vert_border_left, vert_border_right, aligned_text)
+
+            print(final_text)
+
+            #print(f"{vert_border_left}{aligned_text}{vert_border_right}")
+            #aligned_text = self.align_text(line, available_width, text_align)
+            #print(f"{vert_border_left}{aligned_text}{vert_border_right}")
+
+        if horiz_border_bottom:
+            print(horiz_border_bottom)
+
+
+
+
+    def print_border_boxed_tables(self,
+                                  table_strs,
+                                  horiz_border_top,
+                                  vert_border_left,
+                                  vert_border_right,
+                                  horiz_border_bottom,
+                                  table_padding=4,
+                                  table_style=None,
+                                  text_style=None,
+                                  text_align='center',
+                                  alignments=None):
+        available_width = self.get_available_width()
+        table_lines_list = [table_str.split("\n") for table_str in table_strs]
+
+        blank_line = None
+
+        max_lines = max(len(table_lines) for table_lines in table_lines_list)
+        for table_lines in table_lines_list:
+            table_lines += [''] * (max_lines - len(table_lines))
+
+        if horiz_border_top:
+            print(horiz_border_top)
+            blank_line = ' '.center(available_width)
+            print(f'{vert_border_left}{blank_line}{vert_border_right}')
+
+        current_width = 0
+        row_buffer = []
+
+        for line_index in range(max_lines):
+            row = ""
+            row_length = 0
+            for table_index, table_lines in enumerate(table_lines_list):
+                line = table_lines[line_index]
+                stripped_line = self.strip_ansi_escape_sequences(line)
+                line_length = len(stripped_line)
+                if current_width + line_length > available_width:
+                    row_buffer.append(row.rstrip())
+                    row = ""
+                    current_width = 0
+                if row:
+                    row += " " * table_padding
+                    row_length += table_padding
+                row += line
+                row_length += line_length
+                current_width += line_length + table_padding
+
+            if row:
+                row_buffer.append(row.rstrip())
+                current_width = 0
+
+        for row in row_buffer:
+
+            row_length = len(self.strip_ansi_escape_sequences(row))
+            leading_spaces = (available_width - row_length) // 2
+            if (available_width - row_length) % 2 != 0:
+                leading_spaces += 1  # Adjust if the remaining space is odd
+            #print(leading_spaces)
+            #padding_needed = available_width - len(self.strip_ansi_escape_sequences(row))
+            #aligned_text = row + ' ' * padding_needed
+            aligned_text = ' ' * leading_spaces + row
+            padding_needed = available_width - len(self.strip_ansi_escape_sequences(aligned_text))
+
+            print(f"{vert_border_left}{aligned_text + ' ' * padding_needed}{vert_border_right}")
+
+
+
+        if horiz_border_bottom:
+            if not blank_line:
+                blank_line = ' '.center(available_width) if vert_border_left and vert_border_right else ' '.center(self.horiz_width)
+            print(f'{vert_border_left}{blank_line}{vert_border_right}')
+            print(horiz_border_bottom)
+
+
+
+    def print_border_boxed_tables2(self,
+                                  table_strs,
+                                  horiz_border_top,
+                                  vert_border_left,
+                                  vert_border_right,
+                                  horiz_border_bottom,
+                                  table_alignments=None,
+                                  table_style=None,
+                                  text_style=None):
+        available_width = self.get_available_width()
+        num_tables = len(table_strs)
+        section_width = (available_width - (num_tables - 1)) // num_tables
+
+        table_lines_list = [table_str.split("\n") for table_str in table_strs]
+        max_lines = max(len(table_lines) for table_lines in table_lines_list)
+        for table_lines in table_lines_list:
+            table_lines += [''] * (max_lines - len(table_lines))
+
+        if horiz_border_top:
+            print(horiz_border_top)
+            blank_line = ' '.center(available_width)
+            print(f'{vert_border_left}{blank_line}{vert_border_right}')
+
+        for line_index in range(max_lines):
+            row = ""
+            for table_index, table_lines in enumerate(table_lines_list):
+                line = table_lines[line_index]
+                stripped_line = self.strip_ansi_escape_sequences(line)
+                padding_needed = section_width - len(stripped_line)
+                if table_alignments and table_index < len(table_alignments):
+                    text_align = table_alignments[table_index]
+                else:
+                    text_align = 'left'
+                if text_align == 'center':
+                    leading_spaces = padding_needed // 2
+                    trailing_spaces = padding_needed - leading_spaces
+                    aligned_line = ' ' * leading_spaces + line + ' ' * trailing_spaces
+                elif text_align == 'left':
+                    aligned_line = line + ' ' * padding_needed
+                else:  # right align
+                    aligned_line = ' ' * padding_needed + line
+                if table_index > 0:
+                    row += " "  # Padding between tables
+                row += aligned_line
+            row_length = len(self.strip_ansi_escape_sequences(row))
+            padding_needed = available_width - row_length
+            print(f"{vert_border_left}{row + ' ' * padding_needed}{vert_border_right}")
+
+        if horiz_border_bottom:
+            print(horiz_border_bottom)
+
+
+    def print_border_boxed_tables4(self,
+                                  table_strs,
+                                  horiz_border_top,
+                                  vert_border_left,
+                                  vert_border_right,
+                                  horiz_border_bottom,
+                                  table_alignments=None,
+                                  table_padding=4,
+                                  table_style=None,
+                                  text_style=None):
+        available_width = self.get_available_width()
+        num_tables = len(table_strs)
+        section_width = (available_width - (num_tables - 1) * table_padding) // num_tables
+
+        table_lines_list = [table_str.split("\n") for table_str in table_strs]
+        max_lines = max(len(table_lines) for table_lines in table_lines_list)
+        for table_lines in table_lines_list:
+            table_lines += [''] * (max_lines - len(table_lines))
+
+        for line_index in range(max_lines):
+            row_parts = []
+            for table_index, table_lines in enumerate(table_lines_list):
+                line = table_lines[line_index]
+                stripped_line = self.strip_ansi_escape_sequences(line)
+                if table_alignments and table_index < len(table_alignments):
+                    text_align = table_alignments[table_index]
+                else:
+                    text_align = 'left'
+
+                aligned_line = self.align_text(line, section_width, text_align)
+                row_parts.append(aligned_line)
+
+            row = (' ' * table_padding).join(row_parts)
+            row_length = len(self.strip_ansi_escape_sequences(row))
+            padding_needed = available_width - row_length
+            print(f"{vert_border_left}{row.ljust(available_width)}{vert_border_right}")
+
+
+
+
+
+
+
 class ColorPrinterError(Exception):
     """Base class for exceptions in this module."""
 
-    def __init__(
-            self,
-            message: str,
-            cp: 'ColorPrinter',
-            apply_style: Callable[[str, str], str],
-            tb_style_name: str = 'default',
-            format_specific_exception: bool = False
-    ) -> None:
+    def __init__(self,
+                 message: str,
+                 cp: 'ColorPrinter',
+                 apply_style: Callable[[str, str], str],
+                 tb_style_name: str = 'default',
+                 format_specific_exception: bool = False
+                 ) -> None:
 
         super().__init__(message)
         self.message = message
