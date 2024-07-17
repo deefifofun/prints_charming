@@ -7,7 +7,7 @@ import sys
 import traceback
 import re
 import logging
-from time import perf_counter
+import time
 
 
 
@@ -122,6 +122,17 @@ class ColorPrinter:
         "reversed"     : "\033[7m",
     }
 
+    CONTROL_MAP: Dict[str, str] = {
+        "clear_line": "\033[2K",
+        "clear_screen": "\033[2J",
+        "move_cursor_up": "\033[{n}A",
+        "move_cursor_down": "\033[{n}B",
+        "move_cursor_right": "\033[{n}C",
+        "move_cursor_left": "\033[{n}D",
+        "save_cursor_position": "\033[s",
+        "restore_cursor_position": "\033[u",
+    }
+
     STYLES: Dict[str, TextStyle] = {
         "default"      : TextStyle(),
         "default_bg"   : TextStyle(bg_color="black"),
@@ -131,6 +142,7 @@ class ColorPrinter:
         "black"        : TextStyle(color="black"),
         "green"        : TextStyle(color="green"),
         "vgreen"       : TextStyle(color="vgreen", bold=True),
+        "bg_color_vgreen": TextStyle(color="white", bg_color='vgreen'),
         "forest"       : TextStyle(color="forest", bold=True),
         "red"          : TextStyle(color="red"),
         "vred"         : TextStyle(color="vred", bold=True),
@@ -167,6 +179,22 @@ class ColorPrinter:
         "conceal"      : TextStyle(conceal=True),
     }
 
+
+    def clear_line(cls, use_carriage_return: bool = True):
+        if use_carriage_return:
+            print("\r" + cls.CONTROL_MAP["clear_line"], end='')
+        else:
+            print(cls.CONTROL_MAP["clear_line"], end='')
+
+    """
+    def print(cls, *args, color=None, end='\n'):
+        if color:
+            color_code = cls.COLOR_MAP.get(color, cls.COLOR_MAP['default'])
+            reset_code = cls.reset
+            print(color_code + ' '.join(map(str, args)) + reset_code, end=end)
+        else:
+            print(*args, end=end)
+    """
 
 
     def __init__(self,
@@ -233,6 +261,13 @@ class ColorPrinter:
         self.style_conditions_map = {}
         if style_conditions:
             self.style_conditions_map = style_conditions.map
+
+        self.style_cache = {}
+
+
+
+    def escape_ansi_codes(self, ansi_string):
+        return ansi_string.replace("\033", "\\033")
 
 
     def replace_and_style_placeholders(self, text: str, kwargs: Dict[str, Any], enable_label_style: bool = True, label_delimiter: str = ':') -> str:
@@ -387,6 +422,10 @@ class ColorPrinter:
         # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset}"
 
+        escaped_string = self.escape_ansi_codes(styled_text)
+        print(f'escaped_string: {escaped_string}')
+        print(styled_text)
+
         return styled_text
 
 
@@ -539,6 +578,18 @@ class ColorPrinter:
 
         converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
 
+        """
+        escaped_args = [self.escape_ansi_codes(arg) for arg in converted_args]
+
+        for arg in escaped_args:
+            print(f'escaped_string: {arg}')
+            for arg in converted_args:
+                print(arg)
+
+        return
+        """
+
+
         # Handle not colored text
         if not self.config["color_text"]:
             output = sep.join(converted_args)
@@ -576,6 +627,7 @@ class ColorPrinter:
             converted_args = [text] + converted_args
 
         text = sep.join(converted_args)
+        print(f'<text>{text}</text>')
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
@@ -591,26 +643,37 @@ class ColorPrinter:
 
         if any([color, bg_color, bold, italic, underlined, overlined, strikethrough, reversed, blink, conceal]):
 
-            # Apply the effective style to text which is not already styled
-            # Create an empty dict
-            effective_style = {}
+            # Create a key for caching the effective style
+            style_key = (
+                color, bg_color, bold, italic, underlined, overlined,
+                strikethrough, reversed, blink, conceal
+            )
 
-            updated_style = {k: v for k, v in {
-                'color'        : color,
-                'bg_color'     : bg_color,
-                'bold'         : bold,
-                'italic'       : italic,
-                'underlined'   : underlined,
-                'overlined'    : overlined,
-                'strikethrough': strikethrough,
-                'reversed'     : reversed,
-                'blink'        : blink,
-                'conceal'      : conceal
-            }.items() if v is not None}
+            if style_key in self.style_cache:
+                effective_style_code = self.style_cache[style_key]
 
-            effective_style.update(updated_style)
+            else:
 
-            effective_style_code = self.create_style_code(effective_style)
+                # Apply the effective style to text which is not already styled
+                # Create an empty dict
+                effective_style = {}
+
+                updated_style = {k: v for k, v in {
+                    'color'        : color,
+                    'bg_color'     : bg_color,
+                    'bold'         : bold,
+                    'italic'       : italic,
+                    'underlined'   : underlined,
+                    'overlined'    : overlined,
+                    'strikethrough': strikethrough,
+                    'reversed'     : reversed,
+                    'blink'        : blink,
+                    'conceal'      : conceal
+                }.items() if v is not None}
+
+                effective_style.update(updated_style)
+                effective_style_code = self.create_style_code(effective_style)
+                self.style_cache[style_key] = effective_style_code
 
         else:
             if style and isinstance(style, str):
@@ -686,6 +749,20 @@ class ColorPrinter:
 
 
         return
+
+
+    def print_progress_bar(self, total_steps: int = 4, bar_symbol: str = ' ', bar_length: int = 40, color: str = 'vgreen'):
+        for i in range(total_steps):
+            progress = (i + 1) / total_steps
+            block = int(bar_length * progress)
+            if bar_symbol == ' ':
+                bar_symbol = self.apply_bg_color(color, bar_symbol)
+            bar = bar_symbol * block + "-" * (bar_length - block)
+            time.sleep(1)
+            self.clear_line()
+            self.print(f"Progress: |{bar}| {int(progress * 100)}%", end='', color=color)
+            sys.stdout.flush()
+            time.sleep(0.25)  # Simulate work
 
 
 
