@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from datetime import datetime
+import time
 import os
 import sys
 import traceback
 import re
 import logging
-import time
 
 
 
@@ -22,6 +23,8 @@ def get_all_subclass_names(cls, trailing_char=None):
     for subclass in subclasses.copy():
         result.update(get_all_subclass_names(subclass, trailing_char))
     return result
+
+
 
 
 @dataclass
@@ -48,8 +51,50 @@ class TextStyle:
                 setattr(self, attr, value)
 
 
+class ColorPrinterLogHandler(logging.Handler):
+    TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
+    def __init__(self, cp: 'ColorPrinter' = None, styles: Dict[str, TextStyle] = None):
+        super().__init__()
+        self.cp = cp or ColorPrinter()
+
+    def emit(self, record):
+        log_entry = self.format(record)
+        self.handle_log_event(log_entry, log_level=record.levelname)
+
+    def handle_log_event(self, text, log_level):
+        timestamp = time.time()
+        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
+
+        # Define styles for different components
+        timestamp_style = 'timestamp'
+        level_styles = {
+            'DEBUG': 'debug',
+            'INFO': 'info',
+            'WARNING': 'warning',
+            'ERROR': 'error',
+            'CRITICAL': 'critical'
+        }
+
+        log_level_style = level_styles.get(log_level, 'default')
+
+        # Get styled components
+        styled_log_level_prefix = self.cp.apply_logging_style(log_level_style, f"LOG[{log_level}]")
+        styled_timestamp = self.cp.apply_logging_style(timestamp_style, formatted_timestamp)
+        styled_level = self.cp.apply_logging_style(log_level_style, log_level)
+        styled_text = self.cp.apply_logging_style(log_level_style, text)
+
+        # Create the final styled message
+        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
+
+        print(log_message)
+
+
+
+
 class ColorPrinter:
-    reset = "\033[0m"
+    TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+    RESET = "\033[0m"
     
     """
     This module provides a ColorPrinter class for handling colored text printing tasks.
@@ -60,12 +105,23 @@ class ColorPrinter:
     """
     
     CONFIG: Dict[str, bool] = {
+        "enable_logging"      : False,
+        "log_level"           : 10,  # Default to DEBUG level
+        "internal_logging"    : False,
         "color_text"          : True,
         "args_to_strings"     : True,
         "style_names"         : True,
         "style_words_by_index": True,
         "kwargs"              : True,
         "conceal"             : True,
+    }
+
+    LOG_LEVEL_MAP = {
+        10: logging.DEBUG,
+        20: logging.INFO,
+        30: logging.WARNING,
+        40: logging.ERROR,
+        50: logging.CRITICAL
     }
 
     COLOR_MAP: Dict[str, str] = {
@@ -142,6 +198,7 @@ class ColorPrinter:
         "black"        : TextStyle(color="black"),
         "green"        : TextStyle(color="green"),
         "vgreen"       : TextStyle(color="vgreen", bold=True),
+        "log_true"     : TextStyle(color='vgreen'),
         "bg_color_vgreen": TextStyle(color="white", bg_color='vgreen'),
         "forest"       : TextStyle(color="forest", bold=True),
         "red"          : TextStyle(color="red"),
@@ -149,6 +206,7 @@ class ColorPrinter:
         "blue"         : TextStyle(color="blue"),
         "dblue"        : TextStyle(color="dblue"),
         "vblue"        : TextStyle(color="vblue"),
+        "vsky"         : TextStyle(color="vsky"),
         "yellow"       : TextStyle(color="yellow"),
         "vyellow"      : TextStyle(color="vyellow"),
         "magenta"      : TextStyle(color="magenta", bold=True),
@@ -179,6 +237,26 @@ class ColorPrinter:
         "conceal"      : TextStyle(conceal=True),
     }
 
+    LOGGING_STYLES: Dict[str, TextStyle] = {
+        "default": TextStyle(),
+        "timestamp": TextStyle(color="white"),
+        "debug": TextStyle(color="blue"),
+        "info": TextStyle(color="green"),
+        "warning": TextStyle(color="yellow"),
+        "error": TextStyle(color="red"),
+        "critical": TextStyle(color="vred"),
+        "dict_key": TextStyle(color="sky"),
+        "dict_value": TextStyle(color="white"),
+        "true": TextStyle(color="vgreen"),
+        "false": TextStyle(color="vred"),
+        'none': TextStyle(color="lpurple"),
+        "int": TextStyle(color="cyan"),
+        "float": TextStyle(color="vcyan"),
+        "other": TextStyle(color="lav"),
+    }
+
+
+
 
     def clear_line(cls, use_carriage_return: bool = True):
         if use_carriage_return:
@@ -186,15 +264,6 @@ class ColorPrinter:
         else:
             print(cls.CONTROL_MAP["clear_line"], end='')
 
-    """
-    def print(cls, *args, color=None, end='\n'):
-        if color:
-            color_code = cls.COLOR_MAP.get(color, cls.COLOR_MAP['default'])
-            reset_code = cls.reset
-            print(color_code + ' '.join(map(str, args)) + reset_code, end=end)
-        else:
-            print(*args, end=end)
-    """
 
 
     def __init__(self,
@@ -205,6 +274,7 @@ class ColorPrinter:
                  styles: Optional[Dict[str, TextStyle]] = None,
                  colorprinter_variables: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
+                 logging_styles: Optional[Dict[str, TextStyle]] = None
                  ) -> None:
 
         """
@@ -219,9 +289,7 @@ class ColorPrinter:
         :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
         """
 
-        if not config:
-            config = ColorPrinter.CONFIG.copy()
-        self.config = config
+        self.config = {**ColorPrinter.CONFIG, **(config or {})}
 
         if not color_map:
             color_map = ColorPrinter.COLOR_MAP.copy()
@@ -246,7 +314,15 @@ class ColorPrinter:
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
         }
 
-        self.reset = ColorPrinter.reset
+        if not logging_styles:
+            logging_styles = ColorPrinter.LOGGING_STYLES.copy()
+        self.logging_styles = logging_styles
+
+        self.logging_style_codes: Dict[str, str] = {
+            name: self.create_style_code(style) for name, style in self.logging_styles.items() if self.logging_styles[name].color in self.color_map
+        }
+
+        self.reset = ColorPrinter.RESET
 
 
         self.variable_map: Dict[str, str] = {}
@@ -264,14 +340,116 @@ class ColorPrinter:
 
         self.style_cache = {}
 
+        # Setup logging
+        self.logger = None
+        self.internal_logging_enabled = self.config["internal_logging"]
+        self.setup_logging(self.config["enable_logging"], self.config["log_level"], logging_styles)
+
+
+    def setup_logging(self, enable_logging: bool, log_level: int, styles: Optional[Dict[str, TextStyle]] = None):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.handlers = []  # Clear existing handlers
+        self.logger.propagate = False  # Prevent propagation to root logger
+        if enable_logging:
+            self.logger.setLevel(self.LOG_LEVEL_MAP.get(log_level, logging.DEBUG))
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(message)s'))
+            self.logger.addHandler(handler)
+            self.logger.disabled = False
+
+            # Log the initialization message with proper formatting
+            if self.logger.handlers:
+                if self.internal_logging_enabled:
+                    init_message = f"ColorPrinter initialized with configuration:\n{self.pretty_print_dict(self.config)}"
+                    #self.log(10, init_message)
+                    self.debug(init_message)
+        else:
+            #self.logger.setLevel(logging.CRITICAL)
+            self.logger.disabled = True
+
+
+
+    def update_logging(self):
+        self.setup_logging(self.config["enable_logging"], self.config["log_level"])
+
+
+    def log(self, level: int, message: str) -> None:
+        if not self.internal_logging_enabled:
+            return
+
+        timestamp = time.time()
+        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
+
+        timestamp_style = 'timestamp'
+        level_styles = {
+            10: 'debug',
+            20: 'info',
+            30: 'warning',
+            40: 'error',
+            50: 'critical',
+        }
+
+        log_level_style = level_styles.get(level, 'default')
+
+        styled_log_level_prefix = self.apply_logging_style(log_level_style, f"LOG[{logging.getLevelName(level)}]")
+        styled_timestamp = self.apply_logging_style(timestamp_style, formatted_timestamp)
+        styled_level = self.apply_logging_style(log_level_style, logging.getLevelName(level))
+        styled_text = self.apply_logging_style(log_level_style, message)
+
+        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
+        self.logger.log(level, log_message)
+
+
+    def debug(self, message: str) -> None:
+        self.log(10, message)
+
+    def info(self, message: str) -> None:
+        self.log(20, message)
+
+    def warning(self, message: str) -> None:
+        self.log(30, message)
+
+    def error(self, message: str) -> None:
+        self.log(40, message)
+
+    def critical(self, message: str) -> None:
+        self.log(50, message)
+
+
+    def pretty_print_dict(self, d, indent=4):
+        def pprint_dict(d, level=0):
+            result = ""
+            for key, value in d.items():
+                result += " " * (level * indent) + self.apply_logging_style('dict_key', f"{key}: ")
+                if isinstance(value, dict):
+                    result += "{\n" + pprint_dict(value, level + 1) + " " * (level * indent) + "}\n"
+                elif isinstance(value, bool):
+                    bool_style = 'true' if value else 'false'
+                    result += self.apply_logging_style(bool_style, str(value)) + "\n"
+                elif value is None:
+                    result += self.apply_logging_style('none', str(value)) + "\n"
+                elif isinstance(value, int):
+                    result += self.apply_logging_style('int', str(value)) + "\n"
+                elif isinstance(value, float):
+                    result += self.apply_logging_style('float', str(value)) + "\n"
+
+                else:
+                    result += f"{value}\n"
+            return result
+
+        return "{\n" + pprint_dict(d) + "}"
 
 
     def escape_ansi_codes(self, ansi_string):
-        return ansi_string.replace("\033", "\\033")
+        self.logger.debug("Escaping ANSI codes in string: %s", ansi_string)
+        escaped_ansi_string = ansi_string.replace("\033", "\\033")
+        self.logger.debug("Escaped ANSI codes in string: %s", escaped_ansi_string)
+        return escaped_ansi_string
 
 
     def replace_and_style_placeholders(self, text: str, kwargs: Dict[str, Any], enable_label_style: bool = True, label_delimiter: str = ':') -> str:
         """Replace placeholders with actual values and apply colors."""
+        self.logger.debug("Replacing and styling placeholders in text: %s with kwargs: %s", text, kwargs)
         label_style_code = self.get_style_code('label') if enable_label_style else ''
         lines = text.split('\n')
 
@@ -299,6 +477,7 @@ class ColorPrinter:
                 styled_value = f"{style_code}{styled_value}{self.reset}"
             styled_text = styled_text.replace(f"{{{key}}}", styled_value)
 
+        self.logger.debug(f"Styled text: '{styled_text}'")
         return styled_text
 
 
@@ -321,6 +500,7 @@ class ColorPrinter:
         :raises ColorNotFoundError: If the background color is not found in the background color map.
         :raises InvalidLengthError: If the length is not valid.
         """
+        self.logger.debug("Printing background color: %s with length: %d", color_name, length)
 
         if length <= 0:
             message = f"Invalid length '{length}'. Length must be positive."
@@ -407,7 +587,7 @@ class ColorPrinter:
         return self.style_codes.get(style_name, self.style_codes['default'])
 
     def apply_style(self, style_name, text):
-
+        self.logger.debug("Applying style: %s with length: %s", style_name, text)
         if text.isspace():
             style_code = self.bg_color_map.get(
                 style_name,
@@ -423,8 +603,29 @@ class ColorPrinter:
         styled_text = f"{style_code}{text}{self.reset}"
 
         escaped_string = self.escape_ansi_codes(styled_text)
-        print(f'escaped_string: {escaped_string}')
-        print(styled_text)
+        self.logger.debug('escaped_string: %s', escaped_string)
+        self.logger.debug(styled_text)
+
+        return styled_text
+
+
+    def get_logging_style_code(self, style_name):
+        return self.logging_style_codes.get(style_name, self.style_codes['default'])
+
+    def apply_logging_style(self, style_name, text):
+        # This method does not log debug messages to avoid recursion
+        if text.isspace():
+            style_code = self.bg_color_map.get(
+                style_name,
+                self.bg_color_map.get(
+                    self.styles.get(style_name, TextStyle(bg_color="default_bg")).bg_color
+                )
+            )
+        else:
+            style_code = self.logging_style_codes[style_name]
+
+        # Append the style code at the beginning of the text and the reset code at the end
+        styled_text = f"{style_code}{text}{self.reset}"
 
         return styled_text
 
@@ -578,17 +779,6 @@ class ColorPrinter:
 
         converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
 
-        """
-        escaped_args = [self.escape_ansi_codes(arg) for arg in converted_args]
-
-        for arg in escaped_args:
-            print(f'escaped_string: {arg}')
-            for arg in converted_args:
-                print(arg)
-
-        return
-        """
-
 
         # Handle not colored text
         if not self.config["color_text"]:
@@ -627,7 +817,7 @@ class ColorPrinter:
             converted_args = [text] + converted_args
 
         text = sep.join(converted_args)
-        print(f'<text>{text}</text>')
+        self.logger.debug('<text>%s</text>', text)
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
@@ -973,9 +1163,6 @@ class TableManager:
 
 
 
-
-
-
 class FormattedTextBox:
     def __init__(self, cp=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=0, vert_char='|'):
         self.cp = cp if cp else ColorPrinter()
@@ -1244,9 +1431,6 @@ class FormattedTextBox:
 
 
 
-
-
-
     def print_border_boxed_text3(self, texts, text_styles=None, alignments=None,
                                  horiz_border_top=None, horiz_border_bottom=None,
                                  vert_border_left=None, vert_border_right=None,
@@ -1412,7 +1596,6 @@ class FormattedTextBox:
 
         if horiz_border_bottom:
             print(horiz_border_bottom)
-
 
 
 
