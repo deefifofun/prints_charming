@@ -51,12 +51,21 @@ class TextStyle:
                 setattr(self, attr, value)
 
 
-class ColorPrinterLogHandler(logging.Handler):
+class PrintsCharmingLogHandler(logging.Handler):
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self, cp: 'ColorPrinter' = None, styles: Dict[str, TextStyle] = None):
+    def __init__(self, cp: 'PrintsCharming' = None, styles: Dict[str, TextStyle] = None, timestamp_style: str = 'timestamp',
+                 level_styles: Optional[Dict[str, str]] = None):
         super().__init__()
-        self.cp = cp or ColorPrinter()
+        self.cp = cp or PrintsCharming()
+        self.timestamp_style = timestamp_style
+        self.level_styles = level_styles or {
+            'DEBUG': 'debug',
+            'INFO': 'info',
+            'WARNING': 'warning',
+            'ERROR': 'error',
+            'CRITICAL': 'critical'
+        }
 
     def emit(self, record):
         log_entry = self.format(record)
@@ -66,21 +75,11 @@ class ColorPrinterLogHandler(logging.Handler):
         timestamp = time.time()
         formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
 
-        # Define styles for different components
-        timestamp_style = 'timestamp'
-        level_styles = {
-            'DEBUG': 'debug',
-            'INFO': 'info',
-            'WARNING': 'warning',
-            'ERROR': 'error',
-            'CRITICAL': 'critical'
-        }
-
-        log_level_style = level_styles.get(log_level, 'default')
+        log_level_style = self.level_styles.get(log_level, 'default')
 
         # Get styled components
         styled_log_level_prefix = self.cp.apply_logging_style(log_level_style, f"LOG[{log_level}]")
-        styled_timestamp = self.cp.apply_logging_style(timestamp_style, formatted_timestamp)
+        styled_timestamp = self.cp.apply_logging_style(self.timestamp_style, formatted_timestamp)
         styled_level = self.cp.apply_logging_style(log_level_style, log_level)
         styled_text = self.cp.apply_logging_style(log_level_style, text)
 
@@ -92,12 +91,12 @@ class ColorPrinterLogHandler(logging.Handler):
 
 
 
-class ColorPrinter:
+class PrintsCharming:
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
     RESET = "\033[0m"
     
     """
-    This module provides a ColorPrinter class for handling colored text printing tasks.
+    This module provides a PrintsCharming class for handling colored text printing tasks.
     It also includes TextStyle, a dataclass for managing text styles. In the COLOR_MAP "v" before a color stands for "vibrant".
 
     Note: This module is developed and tested on Linux and is intended for use in Linux terminals.
@@ -257,7 +256,7 @@ class ColorPrinter:
 
 
 
-
+    @classmethod
     def clear_line(cls, use_carriage_return: bool = True):
         if use_carriage_return:
             print("\r" + cls.CONTROL_MAP["clear_line"], end='')
@@ -272,27 +271,27 @@ class ColorPrinter:
                  bg_color_map: Optional[Dict[str, str]] = None,
                  effect_map: Optional[Dict[str, str]] = None,
                  styles: Optional[Dict[str, TextStyle]] = None,
-                 colorprinter_variables: Optional[Dict[str, List[str]]] = None,
+                 printscharming_variables: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
                  logging_styles: Optional[Dict[str, TextStyle]] = None
                  ) -> None:
 
         """
-        Initialize the ColorPrinter with args to any of these optional parameters.
+        Initialize PrintsCharming with args to any of these optional parameters.
 
-        :param config: enable or disable various functionalities of this class. Default is the ColorPrinter.CONFIG dictionary above
-        :param color_map: supply your own color_map dictionary. Default is the ColorPrinter.COLOR_MAP dictionary above
+        :param config: enable or disable various functionalities of this class. Default is the PrintsCharming.CONFIG dictionary above
+        :param color_map: supply your own color_map dictionary. Default is the PrintsCharming.COLOR_MAP dictionary above
         :param bg_color_map: supply your own bg_color_map dictionary. Default is computed from color_map dictionary
-        :param effect_map: supply your own effect_map dictionary. Default is the ColorPrinter.EFFECT_MAP dictionary above
-        :param styles: supply your own styles dictionary. Default is the ColorPrinter.STYLES dictionary above
-        :param colorprinter_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
+        :param effect_map: supply your own effect_map dictionary. Default is the PrintsCharming.EFFECT_MAP dictionary above
+        :param styles: supply your own styles dictionary. Default is the PrintsCharming.STYLES dictionary above
+        :param printscharming_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
         """
 
-        self.config = {**ColorPrinter.CONFIG, **(config or {})}
+        self.config = {**PrintsCharming.CONFIG, **(config or {})}
 
         if not color_map:
-            color_map = ColorPrinter.COLOR_MAP.copy()
+            color_map = PrintsCharming.COLOR_MAP.copy()
         self.color_map = color_map
 
         if not bg_color_map:
@@ -302,12 +301,12 @@ class ColorPrinter:
         self.bg_color_map = bg_color_map
 
         if not effect_map:
-            effect_map = ColorPrinter.EFFECT_MAP.copy()
+            effect_map = PrintsCharming.EFFECT_MAP.copy()
         self.effect_map = effect_map
 
 
         if not styles:
-            styles = ColorPrinter.STYLES.copy()
+            styles = PrintsCharming.STYLES.copy()
         self.styles = styles
 
         self.style_codes: Dict[str, str] = {
@@ -315,14 +314,14 @@ class ColorPrinter:
         }
 
         if not logging_styles:
-            logging_styles = ColorPrinter.LOGGING_STYLES.copy()
+            logging_styles = PrintsCharming.LOGGING_STYLES.copy()
         self.logging_styles = logging_styles
 
         self.logging_style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.logging_styles.items() if self.logging_styles[name].color in self.color_map
         }
 
-        self.reset = ColorPrinter.RESET
+        self.reset = PrintsCharming.RESET
 
 
         self.variable_map: Dict[str, str] = {}
@@ -330,8 +329,8 @@ class ColorPrinter:
         self.phrase_map: Dict[str, Dict[str, str]] = {}
         self.conceal_map: Dict[str, Dict[str, str]] = {}
 
-        if colorprinter_variables:
-            self.add_variables_from_dict(colorprinter_variables)
+        if printscharming_variables:
+            self.add_variables_from_dict(printscharming_variables)
 
         self.style_conditions = style_conditions
         self.style_conditions_map = {}
@@ -344,6 +343,7 @@ class ColorPrinter:
         self.logger = None
         self.internal_logging_enabled = self.config["internal_logging"]
         self.setup_logging(self.config["enable_logging"], self.config["log_level"], logging_styles)
+
 
 
     def setup_logging(self, enable_logging: bool, log_level: int, styles: Optional[Dict[str, TextStyle]] = None):
@@ -360,7 +360,7 @@ class ColorPrinter:
             # Log the initialization message with proper formatting
             if self.logger.handlers:
                 if self.internal_logging_enabled:
-                    init_message = f"ColorPrinter initialized with configuration:\n{self.pretty_print_dict(self.config)}"
+                    init_message = f"PrintsCharming initialized with configuration:\n{self.pretty_print_dict(self.config)}"
                     #self.log(10, init_message)
                     self.debug(init_message)
         else:
@@ -985,11 +985,16 @@ class ColorPrinter:
             print(f"{closing_brace},")
 
 
+def get_default_printer() -> Any:
+    p = PrintsCharming()
+    return p.print
+
+
 
 
 class TableManager:
-    def __init__(self, cp: ColorPrinter = None, style_themes: dict = None, conditional_styles: dict = None):
-        self.cp = cp if cp else ColorPrinter()
+    def __init__(self, cp: PrintsCharming = None, style_themes: dict = None, conditional_styles: dict = None):
+        self.cp = cp or PrintsCharming()
         self.style_themes = style_themes
         self.conditional_styles = conditional_styles
         self.tables = {}
@@ -1165,7 +1170,7 @@ class TableManager:
 
 class FormattedTextBox:
     def __init__(self, cp=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=0, vert_char='|'):
-        self.cp = cp if cp else ColorPrinter()
+        self.cp = cp if cp else PrintsCharming()
         self.terminal_width = get_terminal_width()
         self.horiz_width = horiz_width if horiz_width else self.terminal_width
         self.horiz_char = horiz_char
@@ -1767,12 +1772,12 @@ class FormattedTextBox:
 
 
 
-class ColorPrinterError(Exception):
+class PrintsCharmingError(Exception):
     """Base class for exceptions in this module."""
 
     def __init__(self,
                  message: str,
-                 cp: 'ColorPrinter',
+                 cp: 'PrintsCharming',
                  apply_style: Callable[[str, str], str],
                  tb_style_name: str = 'default',
                  format_specific_exception: bool = False
@@ -1799,7 +1804,7 @@ class ColorPrinterError(Exception):
 
         styled_lines = []
         file_line_regex = re.compile(r'(File ")(.*?)(/[^/]+)(", line )(\d+)(, )(in )(.*)')
-        subclass_names_with_colon = list(get_all_subclass_names(ColorPrinterError, trailing_char=':'))
+        subclass_names_with_colon = list(get_all_subclass_names(PrintsCharmingError, trailing_char=':'))
 
         for line in tb_lines:
             leading_whitespace = re.match(r"^\s*", line).group()
@@ -1890,31 +1895,31 @@ class ColorPrinterError(Exception):
         print()
 
 
-class ColorNotFoundError(ColorPrinterError):
+class ColorNotFoundError(PrintsCharmingError):
     """Exception raised when a color is not found in the color map."""
     pass
 
 
-class InvalidLengthError(ColorPrinterError):
+class InvalidLengthError(PrintsCharmingError):
     """Exception raised when an invalid length is provided."""
     pass
 
 
-class UnsupportedEffectError(ColorPrinterError):
+class UnsupportedEffectError(PrintsCharmingError):
     """Exception raised when an unsupported effect is requested."""
     pass
 
 
 # Define the global exception hook
 def custom_excepthook(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, ColorPrinterError):
+    if issubclass(exc_type, PrintsCharmingError):
         exc_value.handle_exception()
     else:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
 def custom_excepthook_with_logging(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, ColorPrinterError):
+    if issubclass(exc_type, PrintsCharmingError):
         exc_value.handle_exception()
     else:
         logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))

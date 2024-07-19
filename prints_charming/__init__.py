@@ -1,10 +1,10 @@
 from .prints_charming import (
     TextStyle,
-    ColorPrinter,
-    ColorPrinterLogHandler,
+    PrintsCharming,
+    PrintsCharmingLogHandler,
     TableManager,
     FormattedTextBox,
-    ColorPrinterError,
+    PrintsCharmingError,
     ColorNotFoundError,
     InvalidLengthError,
     set_custom_excepthook,
