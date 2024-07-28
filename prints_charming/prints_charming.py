@@ -1,14 +1,16 @@
 # prints_charming.py
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from datetime import datetime
 import time
 import os
 import sys
+import copy
 import traceback
 import re
 import logging
+import ctypes
 
 
 
@@ -26,7 +28,6 @@ def get_all_subclass_names(cls, trailing_char=None):
 
 
 
-
 @dataclass
 class TextStyle:
 
@@ -36,19 +37,24 @@ class TextStyle:
 
     color: Optional[str] = 'default'
     bg_color: Optional[str] = None
+    reverse: bool = False
     bold: bool = False
+    dim: bool = False
     italic: bool = False
-    underlined: bool = False
-    overlined: bool = False
-    strikethrough: bool = False
-    reversed: bool = False
-    blink: bool = False
+    underline: bool = False
+    overline: bool = False
+    strikethru: bool = False
     conceal: bool = False
+    blink: bool = False
+
 
     def update(self, attributes):
         for attr, value in attributes.items():
             if hasattr(self, attr):
                 setattr(self, attr, value)
+
+
+
 
 
 class PrintsCharmingLogHandler(logging.Handler):
@@ -57,7 +63,7 @@ class PrintsCharmingLogHandler(logging.Handler):
     def __init__(self, cp: 'PrintsCharming' = None, styles: Dict[str, TextStyle] = None, timestamp_style: str = 'timestamp',
                  level_styles: Optional[Dict[str, str]] = None):
         super().__init__()
-        self.cp = cp or PrintsCharming()
+        self.cp = cp or PrintsCharming(styles=styles)
         self.timestamp_style = timestamp_style
         self.level_styles = level_styles or {
             'DEBUG': 'debug',
@@ -66,6 +72,7 @@ class PrintsCharmingLogHandler(logging.Handler):
             'ERROR': 'error',
             'CRITICAL': 'critical'
         }
+        self.cp.log_level_styles = self.level_styles
 
     def emit(self, record):
         log_entry = self.format(record)
@@ -105,7 +112,7 @@ class PrintsCharming:
     
     CONFIG: Dict[str, bool] = {
         "enable_logging"      : False,
-        "log_level"           : 10,  # Default to DEBUG level
+        "log_level"           : 'DEBUG',  # Default to DEBUG level
         "internal_logging"    : False,
         "color_text"          : True,
         "args_to_strings"     : True,
@@ -115,24 +122,17 @@ class PrintsCharming:
         "conceal"             : True,
     }
 
-    LOG_LEVEL_MAP = {
-        10: logging.DEBUG,
-        20: logging.INFO,
-        30: logging.WARNING,
-        40: logging.ERROR,
-        50: logging.CRITICAL
-    }
 
     COLOR_MAP: Dict[str, str] = {
         "default" : "\033[0m",
+        "black"   : "\033[38;5;0m",
         "white"   : "\033[97m",
+        "beige"   : "\033[38;5;230m",
         "gray"    : "\033[38;5;248m",
-        "dgray"   : "\033[38;5;8m",
-        "black"   : "\033[30m",
+        #"black"   : "\033[30m",
         "green"   : "\033[32m",
         "vgreen"  : "\033[38;5;46m",
-        "lime"    : "\033[38;5;118m",
-        "forest"  : "\033[38;5;28m",
+        "wmelon"  : "\033[38;5;48m",
         "aqua"    : "\033[38;5;122m",
         "turq"    : "\033[38;5;80m",
         "red"     : "\033[31m",
@@ -156,9 +156,8 @@ class PrintsCharming:
         "pink"    : "\033[38;5;200m",
         "lpink"   : "\033[38;5;218m",
         "purple"  : "\033[38;5;129m",
+        "indigo"  : "\033[38;5;54m",
         "lpurple" : "\033[38;5;147m",
-        "indigo"  : "\033[38;5;63m",
-        "violet" : "\033[38;5;69m",
         "lav"     : "\033[38;5;183m",
         "brown"   : "\033[38;5;94m",
         "gold"    : "\033[38;5;220m",
@@ -167,14 +166,16 @@ class PrintsCharming:
     }
 
     EFFECT_MAP: Dict[str, str] = {
+        "reverse"      : "\033[7m",
         "bold"         : "\033[1m",
+        "dim"          : "\033[2m",
         "italic"       : "\033[3m",
-        "underlined"   : "\033[4m",
-        "overlined"    : "\033[53m",
-        "strikethrough": "\033[9m",
-        "blink"        : "\033[5m",
+        "underline"    : "\033[4m",
+        "overline"     : "\033[53m",
+        "strikethru"   : "\033[9m",
         "conceal"      : "\033[8m",
-        "reversed"     : "\033[7m",
+        "blink"        : "\033[5m",
+
     }
 
     CONTROL_MAP: Dict[str, str] = {
@@ -195,42 +196,61 @@ class PrintsCharming:
         "gray"         : TextStyle(color="gray"),
         "dgray"        : TextStyle(color="dgray"),
         "black"        : TextStyle(color="black"),
-        "green"        : TextStyle(color="green"),
+        "green"        : TextStyle(color="green", bold=True),
         "vgreen"       : TextStyle(color="vgreen", bold=True),
+        "melon"        : TextStyle(color="melon", bg_color="pink", bold=True),
         "log_true"     : TextStyle(color='vgreen'),
-        "bg_color_vgreen": TextStyle(color="white", bg_color='vgreen'),
+        "bg_color_vgreen": TextStyle(color="white", bg_color='forest'),
         "forest"       : TextStyle(color="forest", bold=True),
         "red"          : TextStyle(color="red"),
         "vred"         : TextStyle(color="vred", bold=True),
         "blue"         : TextStyle(color="blue"),
-        "dblue"        : TextStyle(color="dblue"),
+        "dblue"        : TextStyle(color="vwhite", bg_color="dblue", bold=True, dim=True),
         "vblue"        : TextStyle(color="vblue"),
+        "sky"          : TextStyle(color="sky"),
         "vsky"         : TextStyle(color="vsky"),
         "yellow"       : TextStyle(color="yellow"),
         "vyellow"      : TextStyle(color="vyellow"),
+        "brass"        : TextStyle(color="brass"),
+        "bronze"       : TextStyle(color="bronze"),
+        "lbrown"       : TextStyle(color="lbrown"),
+        "vorange"      : TextStyle(color="vorange"),
+        "lplum"        : TextStyle(color="lplum"),
+        "plum"         : TextStyle(color="plum"),
+        "vplum"        : TextStyle(color="vplum"),
+        "tarheel"      : TextStyle(color="tarheel"),
+        "lmagenta"     : TextStyle(color="lmagenta"),
         "magenta"      : TextStyle(color="magenta", bold=True),
         "vmagenta"     : TextStyle(color="vmagenta"),
-        "pink"         : TextStyle(color="pink"),
+        "lpink"        : TextStyle(color="lpink"),
+        "pink"         : TextStyle(color="pink",),
+        "vpink"        : TextStyle(color="vpink"),
         "purple"       : TextStyle(color="purple"),
+        "dpurple"      : TextStyle(color="dpurple"),
+        "gold"         : TextStyle(color="gold"),
         "cyan"         : TextStyle(color="cyan"),
         "vcyan"        : TextStyle(color="vcyan"),
         "orange"       : TextStyle(color="orange"),
+        "orangewhite"  : TextStyle(color="green", bg_color='dgray', underline=True),
         "copper"       : TextStyle(color="copper"),
         "brown"        : TextStyle(color="brown"),
         "sand"         : TextStyle(color="sand"),
         "lav"          : TextStyle(color="lav"),
         "lpurple"      : TextStyle(color="lpurple"),
+        "plat"         : TextStyle(color="plat"),
+        "silver"       : TextStyle(color="steel", bg_color="dsilver"),
+        "steel"        : TextStyle(color="steel", bg_color="purple", reverse=True),
+        "vwhite"       : TextStyle(color="vwhite"),
         "header"       : TextStyle(color="vcyan"),
         "header_text"  : TextStyle(color="purple", bg_color="gray", bold=True, italic=True),
         "header_text2" : TextStyle(color="gray", bg_color="purple", bold=True),
-        "header_symbol": TextStyle(color="magenta", bold=True, overlined=True, strikethrough=True),
         "task"         : TextStyle(color="blue", bold=True),
         "path"         : TextStyle(color="blue"),
         "filename"     : TextStyle(color="yellow"),
         "line_info"    : TextStyle(color="yellow", bold=True),
-        "line_number"  : TextStyle(color="yellow", bold=True),
+        "line_number"  : TextStyle(color="orange", bold=True),
         "function_name": TextStyle(color="yellow", italic=True),
-        "error_message": TextStyle(color="vred", bg_color="vyellow", bold=True),
+        "error_message": TextStyle(color="vred", bold=True, dim=True),
         "code"         : TextStyle(color="yellow"),
         "label"        : TextStyle(bold=True, italic=True),
         "conceal"      : TextStyle(conceal=True),
@@ -273,7 +293,8 @@ class PrintsCharming:
                  styles: Optional[Dict[str, TextStyle]] = None,
                  printscharming_variables: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
-                 logging_styles: Optional[Dict[str, TextStyle]] = None
+                 logging_styles: Optional[Dict[str, TextStyle]] = None,
+                 autoconf_win: bool = True
                  ) -> None:
 
         """
@@ -290,32 +311,22 @@ class PrintsCharming:
 
         self.config = {**PrintsCharming.CONFIG, **(config or {})}
 
-        if not color_map:
-            color_map = PrintsCharming.COLOR_MAP.copy()
-        self.color_map = color_map
+        self.color_map = color_map or PrintsCharming.COLOR_MAP.copy()
+        self.color_map.setdefault('default', PrintsCharming.RESET)
 
-        if not bg_color_map:
-            bg_color_map = {
+        self.bg_color_map = bg_color_map or {
                 color: self.compute_bg_color_map(code) for color, code in self.color_map.items()
             }
-        self.bg_color_map = bg_color_map
 
-        if not effect_map:
-            effect_map = PrintsCharming.EFFECT_MAP.copy()
-        self.effect_map = effect_map
+        self.effect_map = effect_map or PrintsCharming.EFFECT_MAP.copy()
 
-
-        if not styles:
-            styles = PrintsCharming.STYLES.copy()
-        self.styles = styles
+        self.styles = styles or PrintsCharming.STYLES.copy()
 
         self.style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
         }
 
-        if not logging_styles:
-            logging_styles = PrintsCharming.LOGGING_STYLES.copy()
-        self.logging_styles = logging_styles
+        self.logging_styles = logging_styles or PrintsCharming.LOGGING_STYLES.copy()
 
         self.logging_style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.logging_styles.items() if self.logging_styles[name].color in self.color_map
@@ -344,14 +355,40 @@ class PrintsCharming:
         self.internal_logging_enabled = self.config["internal_logging"]
         self.setup_logging(self.config["enable_logging"], self.config["log_level"], logging_styles)
 
+        if sys.platform == 'win32':
+            if autoconf_win:
+                self.enable_win_console_ansi_handling()
+            else:
+                self.win_utils = WinUtils
 
 
-    def setup_logging(self, enable_logging: bool, log_level: int, styles: Optional[Dict[str, TextStyle]] = None):
+
+    @staticmethod
+    def enable_win_console_ansi_handling():
+        try:
+            k32 = ctypes.windll.kernel32
+            handle = k32.GetStdHandle(-11)
+            ENABLE_PROCESSED_OUTPUT = 0x0001
+            ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
+            ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+            mode = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            if not k32.SetConsoleMode(handle, mode):
+                logging.error("Failed to set console mode")
+                return False
+            logging.info(f"Console mode set to {mode}")
+            return True
+        except Exception as e:
+            logging.error(f"Error enabling ANSI handling: {e}")
+            return False
+
+
+
+    def setup_logging(self, enable_logging: bool, log_level: str, styles: Optional[Dict[str, TextStyle]] = None):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.handlers = []  # Clear existing handlers
         self.logger.propagate = False  # Prevent propagation to root logger
         if enable_logging:
-            self.logger.setLevel(self.LOG_LEVEL_MAP.get(log_level, logging.DEBUG))
+            self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
             handler = logging.StreamHandler()
             handler.setFormatter(logging.Formatter('%(message)s'))
             self.logger.addHandler(handler)
@@ -359,10 +396,12 @@ class PrintsCharming:
 
             # Log the initialization message with proper formatting
             if self.logger.handlers:
+                logging_enabled_init_message = f"PrintsCharming initialized with configuration:\n{self.pretty_print_dict(self.config)}"
+                self.debug(logging_enabled_init_message)
+
                 if self.internal_logging_enabled:
-                    init_message = f"PrintsCharming initialized with configuration:\n{self.pretty_print_dict(self.config)}"
-                    #self.log(10, init_message)
-                    self.debug(init_message)
+                    internal_logging_enabled_init_message = f"PrintsCharming internal_logging enabled."
+                    self.debug(internal_logging_enabled_init_message)
         else:
             #self.logger.setLevel(logging.CRITICAL)
             self.logger.disabled = True
@@ -373,20 +412,26 @@ class PrintsCharming:
         self.setup_logging(self.config["enable_logging"], self.config["log_level"])
 
 
-    def log(self, level: int, message: str) -> None:
+    def log(self, level: str, message: str, *args, **kwargs) -> None:
         if not self.internal_logging_enabled:
             return
+
+        if args:
+            message = message % args
+
+        if kwargs:
+            message = message.format(**kwargs)
 
         timestamp = time.time()
         formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
 
         timestamp_style = 'timestamp'
         level_styles = {
-            10: 'debug',
-            20: 'info',
-            30: 'warning',
-            40: 'error',
-            50: 'critical',
+            'DEBUG': 'debug',
+            'INFO': 'info',
+            'WARNING': 'warning',
+            'ERROR': 'error',
+            'CRITICAL': 'critical',
         }
 
         log_level_style = level_styles.get(level, 'default')
@@ -400,20 +445,20 @@ class PrintsCharming:
         self.logger.log(level, log_message)
 
 
-    def debug(self, message: str) -> None:
-        self.log(10, message)
+    def debug(self, message: str, *args, **kwargs) -> None:
+        self.log('DEBUG', message, *args, **kwargs)
 
-    def info(self, message: str) -> None:
-        self.log(20, message)
+    def info(self, message: str, *args, **kwargs) -> None:
+        self.log('INFO', message, *args, **kwargs)
 
-    def warning(self, message: str) -> None:
-        self.log(30, message)
+    def warning(self, message: str, *args, **kwargs) -> None:
+        self.log('WARNING', message, *args, **kwargs)
 
-    def error(self, message: str) -> None:
-        self.log(40, message)
+    def error(self, message: str, *args, **kwargs) -> None:
+        self.log('ERROR', message, *args, **kwargs)
 
-    def critical(self, message: str) -> None:
-        self.log(50, message)
+    def critical(self, message: str, *args, **kwargs) -> None:
+        self.log('CRITICAL', message, *args, **kwargs)
 
 
     def pretty_print_dict(self, d, indent=4):
@@ -432,6 +477,8 @@ class PrintsCharming:
                     result += self.apply_logging_style('int', str(value)) + "\n"
                 elif isinstance(value, float):
                     result += self.apply_logging_style('float', str(value)) + "\n"
+                elif isinstance(value, str) and value.isupper() and value.lower() in ['debug', 'info', 'warning', 'error', 'critical']:
+                    result += self.apply_logging_style(value.lower(), str(value)) + "\n"
 
                 else:
                     result += f"{value}\n"
@@ -441,15 +488,15 @@ class PrintsCharming:
 
 
     def escape_ansi_codes(self, ansi_string):
-        self.logger.debug("Escaping ANSI codes in string: %s", ansi_string)
+        self.debug("Escaping ANSI codes in string: %s", ansi_string)
         escaped_ansi_string = ansi_string.replace("\033", "\\033")
-        self.logger.debug("Escaped ANSI codes in string: %s", escaped_ansi_string)
+        self.debug("Escaped ANSI codes in string: %s", escaped_ansi_string)
         return escaped_ansi_string
 
 
     def replace_and_style_placeholders(self, text: str, kwargs: Dict[str, Any], enable_label_style: bool = True, label_delimiter: str = ':') -> str:
         """Replace placeholders with actual values and apply colors."""
-        self.logger.debug("Replacing and styling placeholders in text: %s with kwargs: %s", text, kwargs)
+        self.debug("Replacing and styling placeholders in text: %s with kwargs: %s", text, kwargs)
         label_style_code = self.get_style_code('label') if enable_label_style else ''
         lines = text.split('\n')
 
@@ -477,7 +524,7 @@ class PrintsCharming:
                 styled_value = f"{style_code}{styled_value}{self.reset}"
             styled_text = styled_text.replace(f"{{{key}}}", styled_value)
 
-        self.logger.debug(f"Styled text: '{styled_text}'")
+        self.debug(f"Styled text: '{styled_text}'")
         return styled_text
 
 
@@ -500,7 +547,7 @@ class PrintsCharming:
         :raises ColorNotFoundError: If the background color is not found in the background color map.
         :raises InvalidLengthError: If the length is not valid.
         """
-        self.logger.debug("Printing background color: %s with length: %d", color_name, length)
+        self.debug("Printing background color: %s with length: %d", color_name, length)
 
         if length <= 0:
             message = f"Invalid length '{length}'. Length must be positive."
@@ -577,18 +624,21 @@ class PrintsCharming:
 
         return "".join(style_codes)
 
+
     def add_style(self, name: str, style: TextStyle):
         self.styles[name] = style
         if self.styles[name].color in self.color_map:
             style_code = self.create_style_code(self.styles[name])
             self.style_codes[name] = style_code
 
+
     def get_style_code(self, style_name):
         return self.style_codes.get(style_name, self.style_codes['default'])
 
-    def apply_style(self, style_name, text):
-        self.logger.debug("Applying style: %s with length: %s", style_name, text)
-        if text.isspace():
+
+    def apply_style(self, style_name, text, fill_space=True):
+        self.debug("Applying style: %s with length: %s", style_name, text)
+        if text.isspace() and fill_space:
             style_code = self.bg_color_map.get(
                 style_name,
                 self.bg_color_map.get(
@@ -597,20 +647,30 @@ class PrintsCharming:
             )
 
         else:
-            style_code = self.style_codes[style_name]
+            style_code = self.style_codes.get(style_name, self.styles[style_name].color)
 
         # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset}"
 
         escaped_string = self.escape_ansi_codes(styled_text)
-        self.logger.debug('escaped_string: %s', escaped_string)
-        self.logger.debug(styled_text)
+        self.debug('escaped_string: %s', escaped_string)
+        self.debug(styled_text)
 
         return styled_text
 
 
+    def apply_index_style(self, strs_list, styles_list, return_list=False):
+        styled_strs = [self.apply_style(style, str(text)) for style, text in zip(styles_list, strs_list)]
+        return ' '.join(styled_strs) if not return_list else styled_strs
+
+
+    def apply_my_new_style_code(self, code, text):
+        return f'{code}{text}{self.reset}'
+
+
     def get_logging_style_code(self, style_name):
         return self.logging_style_codes.get(style_name, self.style_codes['default'])
+
 
     def apply_logging_style(self, style_name, text):
         # This method does not log debug messages to avoid recursion
@@ -633,8 +693,17 @@ class PrintsCharming:
     def get_color_code(self, color_name):
         return self.color_map.get(color_name, self.color_map['default'])
 
-    def apply_color(self, color_name, text):
-        color_code = self.color_map[color_name]
+
+    def apply_color(self, color_name, text, fill_space=True):
+
+        if text.isspace() and fill_space:
+            color_code = self.bg_color_map.get(
+                color_name,
+                'default'
+            )
+        else:
+            color_code = self.color_map[color_name]
+
         colored_text = f"{color_code}{text}{self.reset}"
 
         return colored_text
@@ -663,6 +732,12 @@ class PrintsCharming:
         variable = str(variable)
         if style_name in self.styles:
             styled_string = f"{self.style_codes[style_name]}{variable}{self.reset}"
+
+            attribs = vars(self.styles.get(style_name)).copy()
+            if attribs.get('reversed'):
+                attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
+
+
             if style_name == 'conceal':
                 self.conceal_map[variable] = {
                     "style": style_name,
@@ -671,16 +746,19 @@ class PrintsCharming:
             contains_inner_space = ' ' in variable.strip()
             if contains_inner_space:
                 self.phrase_map[variable] = {
-                    "style" : style_name,
-                    "styled": styled_string
+                    "style": style_name,
+                    "styled": styled_string,
+                    "attribs": attribs
                 }
             else:
                 self.word_map[variable] = {
                     "style" : style_name,
-                    "styled": styled_string
+                    "styled": styled_string,
+                    "attribs": attribs
                 }
         else:
             print(f"Style {style_name} not found in styles dictionary.")
+
 
     def add_variables(self, variables: List[str], style_name: str) -> None:
         if style_name in self.styles:
@@ -688,12 +766,14 @@ class PrintsCharming:
             for variable in variables:
                 self.add_variable(variable, style_name)
 
+
     def add_variables_from_dict(self, style_variables_dict: Dict[str, List[str]]) -> None:
         for style_name, variables in style_variables_dict.items():
             if style_name in self.styles:
                 self.add_variables(variables, style_name)
             else:
                 print(f"Style {style_name} not found in styles dictionary.")
+
 
     def remove_variable(self, variable: str) -> None:
         if variable in self.word_map:
@@ -733,9 +813,34 @@ class PrintsCharming:
 
         self.print(text, style=text_style, skip_ansi_check=True)
 
+    def style_spaces_by_index(self, text: str, style_mapping: Dict[Union[int, Tuple[int, int]], str], bg_only=True) -> str:
+        # Process each character instead of words
+        styled_text = list(text)
+
+        for i, char in enumerate(styled_text, start=1):  # Start indexing from 1
+            for key in style_mapping:
+                style_name = style_mapping[key]
+                style_code = self.style_codes[style_name] if not bg_only else self.bg_color_map[style_name]
+                if isinstance(key, tuple):
+                    start, end = key
+                    if start <= i <= end and style_name in self.styles:  # Inclusive end
+                        styled_text[i - 1] = f"{style_code}{char}{self.reset}"
+                elif isinstance(key, int):
+                    if not bg_only:
+                        if key == i and style_name in self.styles:
+                            styled_text[i - 1] = f"{style_code}{char}{self.reset}"
+                    else:
+                        if key == i and style_name in self.bg_color_map:
+                            styled_text[i - 1] = f"{style_code}{char}{self.reset}"
+        styled_spaces = "".join(styled_text)
+
+        return styled_spaces
+
 
     def style_words_by_index(self, text: str, style_mapping: Dict[Union[int, Tuple[int, int]], str]) -> str:
+
         words = text.split()
+
         for i, word in enumerate(words, start=1):  # Start indexing from 1
             for key in style_mapping:
                 style_name = style_mapping[key]
@@ -747,11 +852,19 @@ class PrintsCharming:
                 elif isinstance(key, int):
                     if key == i and style_name in self.styles:
                         words[i - 1] = f"{style_code}{word}{self.reset}"
+
         return " ".join(words)
+
 
     @staticmethod
     def contains_ansi_codes(s: str) -> bool:
         return '\033' in s
+
+    @staticmethod
+    def remove_ansi_codes(text):
+        ansi_escape = re.compile(r'\033\[[0-9;]*[mK]')
+        return ansi_escape.sub('', text)
+
 
 
     def print(self,
@@ -763,19 +876,28 @@ class PrintsCharming:
               style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None,
               color: str = None,
               bg_color: str = None,
-              bold: bool = False,
-              italic: bool = False,
-              overlined: bool = False,
-              underlined: bool = False,
-              strikethrough: bool = False,
-              reversed: bool = False,
-              blink: bool = False,
-              conceal: bool = False,
+              reverse: bool = None,
+              bold: bool = None,
+              dim: bool = None,
+              italic: bool = None,
+              underline: bool = None,
+              overline: bool = None,
+              strikethru: bool = None,
+              conceal: bool = None,
+              blink: bool = None,
               sep: str = ' ',
+              share_alike_sep_bg: bool = True,
+              share_alike_sep_ul: bool = False,
+              share_alike_sep_ol: bool = False,
+              share_alike_sep_st: bool = False,
+              share_alike_sep_bl: bool = False,
               end: str = '\n',
               filename: str = None,
               skip_ansi_check: bool = False,
               **kwargs: Any) -> None:
+
+
+        print_start = time.perf_counter()
 
         converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
 
@@ -783,6 +905,11 @@ class PrintsCharming:
         # Handle not colored text
         if not self.config["color_text"]:
             output = sep.join(converted_args)
+
+            # Remove ANSI codes if present
+            if self.contains_ansi_codes(output):
+                output = self.remove_ansi_codes(output)
+
             if filename:
                 with open(filename, 'a') as file:
                     file.write(output + end)
@@ -816,8 +943,9 @@ class PrintsCharming:
         if text is not None:
             converted_args = [text] + converted_args
 
+
         text = sep.join(converted_args)
-        self.logger.debug('<text>%s</text>', text)
+        self.debug('<text>%s</text>', text)
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
@@ -831,104 +959,203 @@ class PrintsCharming:
                 print(text, end=end)
             return
 
-        if any([color, bg_color, bold, italic, underlined, overlined, strikethrough, reversed, blink, conceal]):
 
-            # Create a key for caching the effective style
+        style_instance, style_code = (
+            (self.styles.get(style, self.styles['default']), self.style_codes.get(style, self.style_codes['default'])) if style and isinstance(style, str)
+            else (self.styles.get('default'), self.style_codes.get('default'))
+        )
+
+        if any((color is not None,
+                bg_color is not None,
+                reverse is not None,
+                bold is not None,
+                dim is not None,
+                italic is not None,
+                underline is not None,
+                overline is not None,
+                strikethru is not None,
+                conceal is not None,
+                blink is not None)):
+
+            style_instance = copy.copy(style_instance)
+
+
+            updated_style = {k: v for k, v in {
+                'color': color,
+                'bg_color': bg_color,
+                'reverse': reverse,
+                'bold': bold,
+                'dim': dim,
+                'italic': italic,
+                'underline': underline,
+                'overline': overline,
+                'strikethru': strikethru,
+                'conceal': conceal,
+                'blink': blink,
+
+            }.items() if v is not None}
+
+
+            style_instance.update(updated_style)
+
+
             style_key = (
-                color, bg_color, bold, italic, underlined, overlined,
-                strikethrough, reversed, blink, conceal
+                style_instance.color,
+                style_instance.bg_color,
+                style_instance.reverse,
+                style_instance.bold,
+                style_instance.dim,
+                style_instance.italic,
+                style_instance.underline,
+                style_instance.overline,
+                style_instance.strikethru,
+                style_instance.conceal,
+                style_instance.blink,
             )
 
-            if style_key in self.style_cache:
-                effective_style_code = self.style_cache[style_key]
-
+            # Check the cache for the style code
+            cached_style_code = self.style_cache.get(style_key)
+            if cached_style_code:
+                style_code = cached_style_code
             else:
-
-                # Apply the effective style to text which is not already styled
-                # Create an empty dict
-                effective_style = {}
-
-                updated_style = {k: v for k, v in {
-                    'color'        : color,
-                    'bg_color'     : bg_color,
-                    'bold'         : bold,
-                    'italic'       : italic,
-                    'underlined'   : underlined,
-                    'overlined'    : overlined,
-                    'strikethrough': strikethrough,
-                    'reversed'     : reversed,
-                    'blink'        : blink,
-                    'conceal'      : conceal
-                }.items() if v is not None}
-
-                effective_style.update(updated_style)
-                effective_style_code = self.create_style_code(effective_style)
-                self.style_cache[style_key] = effective_style_code
-
-        else:
-            if style and isinstance(style, str):
-                effective_style_code = self.style_codes[style]
-            else:
-                effective_style_code = self.style_codes['default']
-
-        # Count leading and trailing spaces
-        leading_spaces = len(text) - len(text.lstrip())
-        trailing_spaces = len(text) - len(text.rstrip())
+                # Cache the style code
+                style_code = self.create_style_code(style_instance)
+                self.style_cache[style_key] = style_code
 
 
         # Convert the text to a list of words and spaces
-        words = text.split()
+        words_and_spaces = re.findall(r'\S+|\s+', text)
 
-        # Initialize the list to keep track of which indexes are used by phrases and which are not
+
+        # Initialize the lists to keep track of which indexes are used by what
         indexes_used_by_phrases = set()
+        indexes_used_by_words = set()
+        indexes_used_by_default_styling = set()
+        indexes_used_by_spaces = set()
+        indexes_used_by_none_styling = set()
 
-        # Initialize list to hold the final styled words
-        styled_words = [None] * len(words)
+        boundary_indices_dict = {}
+
+        # Dictionary to store the boundary indices for each phrase
+        boundary_indices_list = []
+
+        # Initialize list to hold the final styled words and spaces
+        styled_words_and_spaces = [None] * len(words_and_spaces)
+
 
         # Step 1: Handle phrases
         for phrase, details in self.phrase_map.items():
-            # Check if the phrase exists in the text
             if phrase in text:
-                # Extract the styled phrase
                 styled_phrase = details.get('styled', phrase)
 
-                # Split the styled_phrase into words
-                styled_phrase_words = styled_phrase.split()
+                # Split the styled_phrase into words and spaces
+                styled_phrase_words_and_spaces = re.findall(r'\S+|\s+', styled_phrase)
 
-                # Find the starting index of this phrase in the list of words
-                for i in range(len(words) - len(styled_phrase_words) + 1):
-                    if words[i:i + len(styled_phrase_words)] == phrase.split():
+                # Find the starting index of this phrase in the list of words_and_spaces
+                for i in range(len(words_and_spaces) - len(styled_phrase_words_and_spaces) + 1):
+                    if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == re.findall(r'\S+|\s+', phrase):
                         # Update the indexes_used_by_phrases set
-                        indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words))))
-                        # Update the styled_words list
-                        for j, styled_word in enumerate(styled_phrase_words):
-                            styled_words[i + j] = styled_word
+                        indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words_and_spaces))))
+
+                        # Add the index before the starting index
+                        if i > 0:
+                            if i - 1 not in boundary_indices_dict:
+                                boundary_indices_dict[i - 1] = details.get('attribs')
+
+                        # Add the index after the ending index
+                        if i + len(styled_phrase_words_and_spaces) < len(words_and_spaces):
+                            if i + len(styled_phrase_words_and_spaces) not in boundary_indices_dict:
+                                boundary_indices_dict[i + len(styled_phrase_words_and_spaces)] = details.get('attribs')
+
+
+                        # Update the styled_words_and_spaces list
+                        for j, styled_word_or_space in enumerate(styled_phrase_words_and_spaces):
+                            styled_words_and_spaces[i + j] = styled_word_or_space
+
 
         # Step 2: Handle individual words
-        for i, word in enumerate(words):
+        for i, word_or_space in enumerate(words_and_spaces):
             # Skip the index if it's used by a phrase
             if i in indexes_used_by_phrases:
                 continue
 
             # Check if the word is in the word_map
-            if word in self.word_map:
-                styled_word = self.word_map.get(word, {}).get('styled', word)
+            if word_or_space.strip() in self.word_map:
+                styled_word_or_space = self.word_map.get(word_or_space.strip(), {}).get('styled', word_or_space)
+                styled_words_and_spaces[i] = styled_word_or_space
+
+                # Add the index before the starting index
+                if i > 0:
+                    if i - 1 not in boundary_indices_dict:
+                        boundary_indices_dict[i - 1] = self.word_map.get(word_or_space.strip(), {}).get('attribs')
+
+                # Add the index after the ending index
+                if i + 1 < len(words_and_spaces):
+                    if i + 1 not in boundary_indices_dict:
+                        boundary_indices_dict[i + 1] = self.word_map.get(word_or_space.strip(), {}).get('attribs')
+
+                # Update the indexes_used_by_words set
+                indexes_used_by_words.add(i)
+
+
+        # Step 3: Handle other styled text and spaces
+        for i, word_or_space in enumerate(words_and_spaces):
+            # Skip the index if it's used by a phrase or a word in the word_map
+            if i in indexes_used_by_phrases or i in indexes_used_by_words:
+                continue
+
+            if word_or_space.isspace():
+                indexes_used_by_spaces.add(i)
+                if i not in boundary_indices_dict:
+                    styled_word_or_space = f"{style_code}{word_or_space}{self.reset}"
+                else:
+
+                    style_instance_dict = asdict(style_instance)
+                    keys_to_compare = ['color', 'bg_color']
+                    if share_alike_sep_ul:
+                        keys_to_compare.append('underline')
+                    if share_alike_sep_ol:
+                        keys_to_compare.append('overline')
+                    if share_alike_sep_st:
+                        keys_to_compare.append('strikethru')
+                    if share_alike_sep_bl:
+                        keys_to_compare.append('blink')
+
+                    comparison_results = self.compare_dicts(boundary_indices_dict[i], style_instance_dict, keys_to_compare)
+
+
+                    space_style_codes = []
+                    if share_alike_sep_bg and comparison_results.get('bg_color'):
+                        space_style_codes.append(self.bg_color_map.get(style_instance_dict.get('bg_color')))
+
+                    if len(keys_to_compare) > 2:
+                        if comparison_results.get('color'):
+                            space_style_codes.append(self.color_map.get(style_instance_dict.get('color'), self.color_map.get(boundary_indices_dict[i].get('color', ''))))
+
+                            for key in keys_to_compare[2:]:
+                                if comparison_results.get(key):
+                                    space_style_codes.append(self.effect_map.get(key, ''))
+
+                    new_style_code = ''.join(space_style_codes)
+                    styled_word_or_space = f'{new_style_code}{word_or_space}{self.reset}'
+
+
             else:
-                styled_word = f"{effective_style_code}{word}{self.reset}"
+                indexes_used_by_default_styling.add(i)
+                styled_word_or_space = f"{style_code}{word_or_space}{self.reset}"
 
-            # Update the styled_words list
-            styled_words[i] = styled_word
+            # Update the styled_words_and_spaces list
+            styled_words_and_spaces[i] = styled_word_or_space
 
-        # Step 3: Handle default styling for remaining words
-        for i, styled_word in enumerate(styled_words):
-            if styled_word is None:
-                styled_words[i] = f"{effective_style_code}{words[i]}{self.reset}"
+        # Step 4: Handle default styling for remaining words and spaces
+        for i, styled_word_or_space in enumerate(styled_words_and_spaces):
+            if styled_word_or_space is None:
+                styled_words_and_spaces[i] = f"{style_code}{words_and_spaces[i]}{self.reset}"
+                indexes_used_by_none_styling.add(i)
 
-        # Step 4: Join the styled_words to form the final styled text
-        styled_text = ' '.join(filter(None, styled_words))
 
-        # Add back the leading and trailing spaces
-        styled_text = ' ' * leading_spaces + styled_text + ' ' * trailing_spaces
+        # Step 5: Join the styled_words_and_spaces to form the final styled text
+        styled_text = ''.join(filter(None, styled_words_and_spaces))
 
         # Print or write to file
         if filename:
@@ -938,7 +1165,23 @@ class PrintsCharming:
             print(styled_text, end=end)
 
 
-        return
+    def compare_dicts(self, dict1, dict2, keys):
+        dict2 = self.apply_reverse_effect(dict2)
+
+        results = {}
+        for key in keys:
+            if key in ['color', 'bg_color']:
+                results[key] = dict1.get(key) == dict2.get(key) and dict1.get(key) is not None
+            else:
+                results[key] = dict1.get(key) == dict2.get(key) and dict1.get(key) is True
+        return results
+
+
+    def apply_reverse_effect(self, style_dict):
+        if style_dict.get('reversed'):
+            style_dict['color'], style_dict['bg_color'] = style_dict.get('bg_color'), style_dict.get('color')
+        return style_dict
+
 
 
     def print_progress_bar(self, total_steps: int = 4, bar_symbol: str = ' ', bar_length: int = 40, color: str = 'vgreen'):
@@ -1020,7 +1263,8 @@ class TableManager:
                        cell_style: Optional[str or list] = None,
                        target_text_box: bool = False,
                        conditional_styles: Optional[Dict[str, List[Dict[str, Union[str, int]]]]] = None,
-                       double_space: bool = False
+                       double_space: bool = False,
+                       use_styles=True
                        ) -> str:
 
         """
@@ -1037,7 +1281,10 @@ class TableManager:
         :return: A string representing the formatted table.
         """
 
-        styled_col_sep = self.cp.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
+        if use_styles:
+            styled_col_sep = self.cp.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
+        else:
+            styled_col_sep = self.cp.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
 
         # 1. Automatic Column Sizing
         max_col_lengths = [0] * len(table_data[0])
@@ -1169,7 +1416,7 @@ class TableManager:
 
 
 class FormattedTextBox:
-    def __init__(self, cp=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=0, vert_char='|'):
+    def __init__(self, cp=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=1, vert_char='|'):
         self.cp = cp if cp else PrintsCharming()
         self.terminal_width = get_terminal_width()
         self.horiz_width = horiz_width if horiz_width else self.terminal_width
@@ -1268,6 +1515,25 @@ class FormattedTextBox:
             return left_aligned + right_aligned
 
 
+    def split_text_to_lines_v2(self, text, available_width):
+        lines = text.split('\n')
+        split_lines = []
+        for line in lines:
+            words = line.split()
+            current_line = ""
+            for word in words:
+                if len(current_line) + len(word) + 1 <= available_width:
+                    if current_line:
+                        current_line += " "
+                    current_line += word
+                else:
+                    split_lines.append(current_line)
+                    current_line = word
+            if current_line:
+                split_lines.append(current_line)
+        return split_lines
+
+
     def split_text_to_lines(self, text, available_width):
         words = text.split()
         lines = []
@@ -1286,7 +1552,7 @@ class FormattedTextBox:
 
 
     def get_available_width(self):
-        return self.horiz_width - (2 * self.vert_width) - 2 if self.vert_border else self.horiz_width - (len(self.vert_padding) * 2)
+        return self.horiz_width - (2 * self.vert_width) - (len(self.vert_padding) * 2) if self.vert_border else self.horiz_width - (len(self.vert_padding) * 2)
 
     def strip_ansi_escape_sequences(self, text):
         ansi_escape = re.compile(r'\x1b\[([0-9]+)(;[0-9]+)*m')
@@ -1321,8 +1587,6 @@ class FormattedTextBox:
             print(formatted_subtitle_line)
         print(horiz_border_bottom)
         print()
-
-
 
 
     def build_styled_border_box(self, horiz_border_top=True, horiz_border_top_style=None,
@@ -1384,7 +1648,13 @@ class FormattedTextBox:
 
 
 
-    def print_border_boxed_text(self, text, text_style=None, text_align='center', subtext='', subtext_style=None, subtext_align='center', horiz_border_top=True, horiz_border_top_style=None, horiz_border_bottom=True, horiz_border_bottom_style=None, text_vert_border_l_style=None, text_vert_border_r_style=None, subtext_vert_border_l_style=None, subtext_vert_border_r_style=None, first_line_blank=False):
+    def print_border_boxed_text(self, text, text_style=None, text_align='center',
+                                subtext='', subtext_style=None, subtext_align='center',
+                                horiz_border_top=True, horiz_border_top_style=None,
+                                horiz_border_bottom=True, horiz_border_bottom_style=None,
+                                text_vert_border_l_style=None, text_vert_border_r_style=None,
+                                subtext_vert_border_l_style=None, subtext_vert_border_r_style=None,
+                                first_line_blank=False):
 
         if not text_style:
             text_style = 'default'
@@ -1771,6 +2041,298 @@ class FormattedTextBox:
 
 
 
+    def print_multi_column_box(self, columns, col_widths, col_styles=None, col_alignments=None,
+                               horiz_border_top=True, horiz_border_bottom=True,
+                               vert_border_left=True, vert_border_right=True):
+        if len(columns) != len(col_widths):
+            raise ValueError("Number of columns and column widths must match.")
+
+        if col_styles and len(col_styles) != len(columns):
+            raise ValueError("Number of column styles must match number of columns.")
+
+        if col_alignments and len(col_alignments) != len(columns):
+            raise ValueError("Number of column alignments must match number of columns.")
+
+        available_width = self.get_available_width()
+        total_col_width = sum(col_widths)
+        if total_col_width > available_width:
+            raise ValueError("Total width of columns exceeds available width.")
+
+        horiz_border = self.cp.apply_style('purple', self.horiz_border)
+        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+
+        if horiz_border_top:
+            print(horiz_border)
+
+        # Split each column's text into lines
+        col_lines = [self.split_text_to_lines(col, col_widths[i]) for i, col in enumerate(columns)]
+        max_lines = max(len(lines) for lines in col_lines)
+
+        # Print each row of columns
+        for line_num in range(max_lines):
+            row = []
+            for col_num in range(len(columns)):
+                col_style = col_styles[col_num] if col_styles else 'default'
+                col_align = col_alignments[col_num] if col_alignments else 'center'
+                if line_num < len(col_lines[col_num]):
+                    line = col_lines[col_num][line_num]
+                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align))
+                else:
+                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num])
+                row.append(aligned_text)
+            if vert_border_left and vert_border_right:
+                print(f"{vert_border}{' '.join(row)}{vert_border}")
+            elif vert_border_left:
+                print(f"{vert_border}{' '.join(row)}")
+            elif vert_border_right:
+                print(f"{' '.join(row)}{vert_border}")
+            else:
+                print(' '.join(row))
+
+        if horiz_border_bottom:
+            print(horiz_border)
+
+
+    def print_multi_column_box2(self, columns, col_widths, col_styles=None, col_alignments=None,
+                               horiz_border_top=True, horiz_border_bottom=True,
+                               vert_border_left=True, vert_border_right=True, col_sep=None,
+                                col_widths_percent=False):
+
+        if not col_sep:
+            col_sep = self.vert_char
+
+        if len(columns) != len(col_widths):
+            raise ValueError("Number of columns and column widths must match.")
+
+        if col_styles and len(col_styles) != len(columns):
+            raise ValueError("Number of column styles must match number of columns.")
+
+        if col_alignments and len(col_alignments) != len(columns):
+            raise ValueError("Number of column alignments must match number of columns.")
+
+        available_width = self.get_available_width()
+        print(f'horiz_width: {self.horiz_width}')
+        print(f'available_width: {available_width}')
+        #total_padding = sig_columns + len(self.vert_padding) * sig_columns
+        #total_padding = sig_columns + len(self.vert_padding) * sig_columns + sig_columns
+        #total_padding = sig_columns + len(self.vert_padding) * sig_columns + sig_columns
+        num_columns = len(columns)
+        sig_columns = num_columns - 1
+        #total_padding = sig_columns * (len(self.vert_padding) + 2)
+        total_padding = sig_columns * (len(self.vert_padding) * 3)
+        print(f'total_padding: {total_padding}')
+
+        if col_widths_percent:
+            # Convert percentages to absolute widths
+            col_widths = [int(available_width * (w / 100)) if w != '' else '' for w in col_widths]
+
+
+        if '' in col_widths:
+            unspecified_index = col_widths.index('')
+            specified_width = sum(col_widths[i] for i in range(len(col_widths)) if i != unspecified_index)
+            print(f'specified_width: {specified_width}')
+            remaining_width = available_width - specified_width - total_padding
+            print(f'remaining_width: {remaining_width}')
+            #col_widths[unspecified_index] = remaining_width - len(self.vert_padding) * 2
+            col_widths[unspecified_index] = remaining_width
+
+        total_col_width = sum(col_widths)
+        print(f'total_col_width: {total_col_width}')
+        if total_col_width > available_width:
+            raise ValueError("Total width of columns exceeds available width.")
+
+        horiz_border = self.cp.apply_style('purple', self.horiz_border)
+        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+
+        if horiz_border_top:
+            print(horiz_border)
+
+        # Split each column's text into lines
+        col_lines = [self.split_text_to_lines_v2(col, col_widths[i]) for i, col in enumerate(columns)]
+        max_lines = max(len(lines) for lines in col_lines)
+
+        # Print each row of columns
+        for line_num in range(max_lines):
+            row = []
+            for col_num in range(len(columns)):
+                col_style = col_styles[col_num] if col_styles else 'default'
+                col_align = col_alignments[col_num] if col_alignments else 'center'
+                if line_num < len(col_lines[col_num]):
+                    line = col_lines[col_num][line_num]
+                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
+                    #aligned_text = self.align_text(line, col_widths[col_num], col_align)
+                    #styled_text = self.cp.apply_style(col_style, aligned_text.strip())
+                    #final_text = styled_text + ' ' * (col_widths[col_num] - len(aligned_text.strip()))
+                else:
+                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
+                    #final_text = ' ' * col_widths[col_num]
+                row.append(aligned_text)
+                #row.append(final_text)
+            row_text = f"{self.vert_padding}{col_sep}{self.vert_padding}".join(row)
+            if vert_border_left and vert_border_right:
+                print(f"{vert_border}{self.vert_padding}{row_text}{self.vert_padding}{vert_border}")
+            elif vert_border_left:
+                print(f"{vert_border}{self.vert_padding}{row_text}{self.vert_padding}")
+            elif vert_border_right:
+                print(f"{self.vert_padding}{row_text}{self.vert_padding}{vert_border}")
+            else:
+                print(f"{self.vert_padding}{row_text}{self.vert_padding}")
+
+        if horiz_border_bottom:
+            print(horiz_border)
+
+    def print_multi_column_box3(self, columns, col_widths, col_styles=None, col_alignments=None,
+                                horiz_border_top=True, horiz_border_bottom=True,
+                                vert_border_left=True, vert_border_right=True, col_sep=None,
+                                col_widths_percent=False):
+
+        if not col_sep:
+            col_sep = self.vert_char
+
+        if len(columns) != len(col_widths):
+            raise ValueError("Number of columns and column widths must match.")
+
+        if col_styles and len(col_styles) != len(columns):
+            raise ValueError("Number of column styles must match number of columns.")
+
+        if col_alignments and len(col_alignments) != len(columns):
+            raise ValueError("Number of column alignments must match number of columns.")
+
+        available_width = self.get_available_width()
+        print(f'horiz_width: {self.horiz_width}')
+        print(f'available_width: {available_width}')
+        num_columns = len(columns)
+        sig_columns = num_columns - 1
+        total_padding = sig_columns * (len(self.vert_padding) * 3)
+        print(f'total_padding: {total_padding}')
+
+        if col_widths_percent:
+            # Convert percentages to absolute widths
+            col_widths = [int(available_width * (w / 100)) if w != '' else '' for w in col_widths]
+
+        if '' in col_widths:
+            unspecified_index = col_widths.index('')
+            specified_width = sum(col_widths[i] for i in range(len(col_widths)) if i != unspecified_index and col_widths[i] != '')
+            print(f'specified_width: {specified_width}')
+            remaining_width = available_width - specified_width - total_padding
+            print(f'remaining_width: {remaining_width}')
+            col_widths[unspecified_index] = remaining_width
+
+        total_col_width = sum(col_widths)
+        print(f'total_col_width: {total_col_width}')
+        if total_col_width > available_width:
+            raise ValueError("Total width of columns exceeds available width.")
+
+        horiz_border = self.cp.apply_style('purple', self.horiz_border)
+        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+
+        if horiz_border_top:
+            print(horiz_border)
+
+        # Split each column's text into lines
+        col_lines = [self.split_text_to_lines_v2(col, col_widths[i]) for i, col in enumerate(columns)]
+        max_lines = max(len(lines) for lines in col_lines)
+
+        # Print each row of columns
+        for line_num in range(max_lines):
+            row = []
+            for col_num in range(len(columns)):
+                col_style = col_styles[col_num] if col_styles else 'default'
+                col_align = col_alignments[col_num] if col_alignments else 'center'
+                if line_num < len(col_lines[col_num]):
+                    line = col_lines[col_num][line_num]
+                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
+                else:
+                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
+                row.append(aligned_text)
+            row_text = f"{self.vert_padding}{col_sep}{self.vert_padding}".join(row)
+            if vert_border_left and vert_border_right:
+                print(f"{vert_border}{self.vert_padding}{row_text}{self.vert_padding}{vert_border}")
+            elif vert_border_left:
+                print(f"{vert_border}{self.vert_padding}{row_text}{self.vert_padding}")
+            elif vert_border_right:
+                print(f"{self.vert_padding}{row_text}{self.vert_padding}{vert_border}")
+            else:
+                print(f"{self.vert_padding}{row_text}{self.vert_padding}")
+
+        if horiz_border_bottom:
+            print(horiz_border)
+
+    def print_multi_column_box4(self, columns, col_widths, col_styles=None, col_alignments=None,
+                                horiz_border_top=True, horiz_border_bottom=True,
+                                vert_border_left=True, vert_border_right=True, col_sep=None,
+                                col_sep_width=1):
+
+        if not col_sep:
+            col_sep = self.vert_char
+
+        if len(columns) != len(col_widths):
+            raise ValueError("Number of columns and column widths must match.")
+
+        if col_styles and len(col_styles) != len(columns):
+            raise ValueError("Number of column styles must match number of columns.")
+
+        if col_alignments and len(col_alignments) != len(columns):
+            raise ValueError("Number of column alignments must match number of columns.")
+
+        available_width = self.get_available_width()
+        print(f'horiz_width: {self.horiz_width}')
+        print(f'available_width: {available_width}')
+
+        num_columns = len(columns)
+        sig_columns = num_columns - 1
+        col_sep_length = len(col_sep) * col_sep_width
+        col_sep = col_sep * col_sep_width
+        #total_padding = (sig_columns * col_sep_length) * (len(self.vert_padding) * 3)
+        total_padding = (sig_columns * len(col_sep) * (len(self.vert_padding) * 2))
+        print(f'total_padding: {total_padding}')
+
+        if '' in col_widths:
+            unspecified_index = col_widths.index('')
+            specified_width = sum(col_widths[i] for i in range(len(col_widths)) if i != unspecified_index)
+            print(f'specified_width: {specified_width}')
+            remaining_width = available_width - specified_width - total_padding
+            print(f'remaining_width: {remaining_width}')
+            col_widths[unspecified_index] = remaining_width
+
+        total_col_width = sum(col_widths)
+        print(f'total_col_width: {total_col_width}')
+        if total_col_width > available_width:
+            raise ValueError("Total width of columns exceeds available width.")
+
+        horiz_border = self.cp.apply_style('purple', self.horiz_border)
+        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+
+        if horiz_border_top:
+            print(horiz_border)
+
+        col_lines = [self.split_text_to_lines_v2(col, col_widths[i]) for i, col in enumerate(columns)]
+        max_lines = max(len(lines) for lines in col_lines)
+
+        for line_num in range(max_lines):
+            row = []
+            for col_num in range(len(columns)):
+                col_style = col_styles[col_num] if col_styles else 'default'
+                col_align = col_alignments[col_num] if col_alignments else 'center'
+                if line_num < len(col_lines[col_num]):
+                    line = col_lines[col_num][line_num]
+                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
+                else:
+                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
+                row.append(aligned_text)
+            row_text = f"{self.vert_padding}{col_sep * col_sep_width}{self.vert_padding}".join(row)
+            if vert_border_left and vert_border_right:
+                print(f"{vert_border}{self.vert_padding}{row_text}{self.vert_padding}{vert_border}")
+            elif vert_border_left:
+                print(f"{vert_border}{self.vert_padding}{row_text}{self.vert_padding}")
+            elif vert_border_right:
+                print(f"{self.vert_padding}{row_text}{self.vert_padding}{vert_border}")
+            else:
+                print(f"{self.vert_padding}{row_text}{self.vert_padding}")
+
+        if horiz_border_bottom:
+            print(horiz_border)
+
 
 class PrintsCharmingError(Exception):
     """Base class for exceptions in this module."""
@@ -1925,12 +2487,97 @@ def custom_excepthook_with_logging(exc_type, exc_value, exc_traceback):
         logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
+
 def set_custom_excepthook():
     sys.excepthook = custom_excepthook
 
 
+
 def set_custom_excepthook_with_logging():
     sys.excepthook = custom_excepthook_with_logging
+
+
+
+
+
+class WinUtils:
+    # Constants for handle types
+    STD_INPUT_HANDLE = -10
+    STD_OUTPUT_HANDLE = -11
+    STD_ERROR_HANDLE = -12
+
+    # Console mode flags
+    ENABLE_PROCESSED_OUTPUT = 0x0001
+    ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
+    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+
+    @staticmethod
+    def enable_win_console_ansi_handling(handle_type=-11, mode=None):
+        """
+        Enables ANSI escape code handling for the specified console handle.
+
+        Parameters:
+        handle_type (int): The type of console handle (-10: stdin, -11: stdout, -12: stderr).
+        mode (int): Custom mode flags to set. If None, the default mode enabling ANSI will be used.
+        """
+        try:
+            k32 = ctypes.windll.kernel32
+
+            # Get the console handle
+            handle = k32.GetStdHandle(handle_type)
+
+            # Save the original console mode
+            original_mode = ctypes.c_uint32()
+            if not k32.GetConsoleMode(handle, ctypes.byref(original_mode)):
+                logging.error("Failed to get original console mode")
+                return False
+
+            if mode is None:
+                # Default mode enabling ANSI escape code handling
+                mode = (WinUtils.ENABLE_PROCESSED_OUTPUT |
+                        WinUtils.ENABLE_WRAP_AT_EOL_OUTPUT |
+                        WinUtils.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+
+            # Set the new console mode
+            if not k32.SetConsoleMode(handle, mode):
+                logging.error("Failed to set console mode")
+                return False
+
+            logging.info(f"Console mode set to {mode}")
+            return True
+        except Exception as e:
+            logging.error(f"Error enabling ANSI handling: {e}")
+            return False
+
+    @staticmethod
+    def restore_console_mode(handle_type=-11):
+        """
+        Restores the original console mode for the specified console handle.
+
+        Parameters:
+        handle_type (int): The type of console handle (-10: stdin, -11: stdout, -12: stderr).
+        """
+        try:
+            k32 = ctypes.windll.kernel32
+
+            # Get the console handle
+            handle = k32.GetStdHandle(handle_type)
+
+            # Restore the original console mode
+            original_mode = ctypes.c_uint32()
+            if not k32.GetConsoleMode(handle, ctypes.byref(original_mode)):
+                logging.error("Failed to get original console mode")
+                return False
+
+            if not k32.SetConsoleMode(handle, original_mode.value):
+                logging.error("Failed to restore console mode")
+                return False
+
+            logging.info("Original console mode restored")
+            return True
+        except Exception as e:
+            logging.error(f"Error restoring console mode: {e}")
+            return False
 
 
 
