@@ -2,7 +2,10 @@
 
 import os
 import re
-import readline
+import sys
+
+if not sys.platform == 'win32':
+    import readline
 from .prints_charming import PrintsCharming, TextStyle, TableManager
 
 
@@ -150,7 +153,7 @@ def generate_custom_color_map():
     print(final_color_map_str)
 
     save_to_file = input("\nDo you want to save this COLOR_MAP to a file? (yes/no): ").strip().lower()
-    if save_to_file in ['yes', 'y']:
+    if save_to_file in ['yes', 'y'] and not sys.platform == 'win32':
         setup_readline()
 
         save_location = input("Do you want to save it within the package? (yes/no): ").strip().lower()
