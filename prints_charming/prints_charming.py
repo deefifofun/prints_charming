@@ -56,7 +56,6 @@ class TextStyle:
 
 
 
-
 class PrintsCharmingLogHandler(logging.Handler):
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
@@ -127,23 +126,15 @@ class PrintsCharming:
         "default" : "\033[0m",
         "black"   : "\033[38;5;0m",
         "white"   : "\033[97m",
-        "beige"   : "\033[38;5;230m",
         "gray"    : "\033[38;5;248m",
-        #"black"   : "\033[30m",
         "green"   : "\033[32m",
         "vgreen"  : "\033[38;5;46m",
-        "wmelon"  : "\033[38;5;48m",
-        "aqua"    : "\033[38;5;122m",
-        "turq"    : "\033[38;5;80m",
         "red"     : "\033[31m",
         "vred"    : "\033[38;5;196m",
-        "maroon"  : "\033[38;5;124m",
         "yellow"  : "\033[33m",
         "vyellow" : "\033[38;5;226m",
         "blue"    : "\033[34m",
-        "dblue"   : "\033[38;5;21m",
         "vblue"   : "\033[38;5;27m",
-        "navy"    : "\033[38;5;17m",
         "sky"     : "\033[38;5;117m",
         "vsky"    : "\033[38;5;39m",
         "magenta" : "\033[35m",
@@ -191,6 +182,14 @@ class PrintsCharming:
 
     STYLES: Dict[str, TextStyle] = {
         "default"      : TextStyle(),
+        "top_level_label": TextStyle(bold=True, italic=True),
+        "sub_level_label": TextStyle(color='sky'),
+        "numbers"      : TextStyle(color="yellow"),
+        'main_bullets' : TextStyle(color="purple"),
+        "sub_bullets"  : TextStyle(color="pink"),
+        "sub_proj"     : TextStyle(color="cyan"),
+        "sub_bullet_title": TextStyle(color="orange"),
+        "sub_bullet_sentence": TextStyle(color="vblue"),
         "default_bg"   : TextStyle(bg_color="black"),
         "white"        : TextStyle(color="white"),
         "gray"         : TextStyle(color="gray"),
@@ -198,7 +197,6 @@ class PrintsCharming:
         "black"        : TextStyle(color="black"),
         "green"        : TextStyle(color="green", bold=True),
         "vgreen"       : TextStyle(color="vgreen", bold=True),
-        "melon"        : TextStyle(color="melon", bg_color="pink", bold=True),
         "log_true"     : TextStyle(color='vgreen'),
         "bg_color_vgreen": TextStyle(color="white", bg_color='forest'),
         "forest"       : TextStyle(color="forest", bold=True),
@@ -252,7 +250,6 @@ class PrintsCharming:
         "function_name": TextStyle(color="yellow", italic=True),
         "error_message": TextStyle(color="vred", bold=True, dim=True),
         "code"         : TextStyle(color="yellow"),
-        "label"        : TextStyle(bold=True, italic=True),
         "conceal"      : TextStyle(conceal=True),
     }
 
@@ -294,7 +291,7 @@ class PrintsCharming:
                  printscharming_variables: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
                  logging_styles: Optional[Dict[str, TextStyle]] = None,
-                 autoconf_win: bool = True
+                 autoconf_win: bool = False
                  ) -> None:
 
         """
@@ -307,6 +304,8 @@ class PrintsCharming:
         :param styles: supply your own styles dictionary. Default is the PrintsCharming.STYLES dictionary above
         :param printscharming_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
+        :param logging_styles: A separate dict for logging_styles.
+        :param autoconf_win: If your using legacy windows cmd prompt and not getting colored/styled text then change this to True to make things work.
         """
 
         self.config = {**PrintsCharming.CONFIG, **(config or {})}
@@ -339,6 +338,7 @@ class PrintsCharming:
         self.word_map: Dict[str, Dict[str, str]] = {}
         self.phrase_map: Dict[str, Dict[str, str]] = {}
         self.conceal_map: Dict[str, Dict[str, str]] = {}
+        self.substring_map = {}
 
         if printscharming_variables:
             self.add_variables_from_dict(printscharming_variables)
@@ -494,24 +494,35 @@ class PrintsCharming:
         return escaped_ansi_string
 
 
-    def replace_and_style_placeholders(self, text: str, kwargs: Dict[str, Any], enable_label_style: bool = True, label_delimiter: str = ':') -> str:
+    def replace_and_style_placeholders(self,
+                                       text: str,
+                                       kwargs: Dict[str, Any],
+                                       enable_label_style: bool = True,
+                                       top_level_label: str = 'top_level_label',
+                                       sub_level_label: str = 'sub_level_label',
+                                       label_delimiter: str = ':',
+                                       style_function: Callable[[str, Dict[str, Any]], str] = None,
+                                       **style_kwargs) -> str:
+
         """Replace placeholders with actual values and apply colors."""
         self.debug("Replacing and styling placeholders in text: %s with kwargs: %s", text, kwargs)
-        label_style_code = self.get_style_code('label') if enable_label_style else ''
+        top_level_label_style_code = self.get_style_code(top_level_label) if enable_label_style else ''
+        sub_level_label_style_code = self.get_style_code(sub_level_label) if enable_label_style else ''
         lines = text.split('\n')
 
         # Style labels directly in the text
         if enable_label_style:
             for i, line in enumerate(lines):
+                stripped_line = line.strip()
                 # Handle standalone labels that end with ':'
-                if line.strip().endswith(label_delimiter):
+                if stripped_line.endswith(label_delimiter):
                     label, _, rest = line.partition(label_delimiter)
-                    lines[i] = f"{label_style_code}{label}{label_delimiter}{self.reset}{rest}"
+                    lines[i] = f"{sub_level_label_style_code}{label}{label_delimiter}{self.reset}{rest}"
                 # Handle inline labels followed by placeholders
                 elif label_delimiter in line:
                     label, delimiter, rest = line.partition(label_delimiter)
                     if '{' in rest:
-                        lines[i] = f"{label_style_code}{label}{delimiter}{self.reset}{rest}"
+                        lines[i] = f"{top_level_label_style_code}{label}{delimiter}{self.reset}{rest}"
 
         styled_text = '\n'.join(lines)
 
@@ -524,8 +535,46 @@ class PrintsCharming:
                 styled_value = f"{style_code}{styled_value}{self.reset}"
             styled_text = styled_text.replace(f"{{{key}}}", styled_value)
 
+        if not style_function:
+
+            # Apply additional styles for bullets, numbers, and sentences
+            lines = styled_text.split('\n')
+            for i, line in enumerate(lines):
+                stripped_line = line.strip()
+                leading_whitespace = line[:len(line) - len(stripped_line)]
+
+                if stripped_line.startswith('- ') and not stripped_line.endswith(':'):
+                    # Apply main bullet style
+                    parts = stripped_line.split(' ', 1)
+                    if len(parts) == 2:
+                        lines[
+                            i] = f"{leading_whitespace}{self.get_style_code('main_bullets')}{parts[0]} {self.reset}{self.get_style_code('main_bullet_text')}{parts[1]}{self.reset}"
+                elif len(stripped_line) > 1 and stripped_line[0].isdigit() and stripped_line[1] == '.':
+                    # Apply number and period style, followed by phrase style
+                    parts = stripped_line.split('. ', 1)
+                    if len(parts) == 2:
+                        lines[i] = f"{leading_whitespace}{self.get_style_code('numbers')}{parts[0]}.{self.reset} {self.get_style_code('sub_proj')}{parts[1]}{self.reset}"
+                elif stripped_line.startswith('- ') and stripped_line.endswith(':'):
+                    # Apply sub-bullet style
+                    parts = stripped_line.split(' ', 2)
+                    if len(parts) == 3:
+                        lines[i] = f"{leading_whitespace}{self.get_style_code('sub_bullets')}{parts[1]} {self.reset}{self.get_style_code('sub_bullet_text')}{parts[2]}{self.reset}"
+                elif leading_whitespace.startswith('   '):
+                    # Apply sub-bullet sentence style
+                    words = stripped_line.split()
+                    if len(words) > 1:
+                        lines[
+                            i] = f"{leading_whitespace}{self.get_style_code('sub_bullet_title')}{words[0]} {self.reset}{self.get_style_code('sub_bullet_sentence')}{' '.join(words[1:])}{self.reset}"
+
+            styled_text = '\n'.join(lines)
+
+        else:
+            styled_text = style_function(styled_text, **style_kwargs)
+
         self.debug(f"Styled text: '{styled_text}'")
+
         return styled_text
+
 
 
     def compute_bg_color_map(self, code):
@@ -720,6 +769,23 @@ class PrintsCharming:
         return bg_color_block
 
 
+    def add_substring(self, substr: str, style_name: str) -> None:
+        substr = str(substr)
+        if style_name in self.styles:
+
+            attribs = vars(self.styles.get(style_name)).copy()
+            if attribs.get('reversed'):
+                attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
+
+            self.substring_map[substr] = {
+                "style": style_name,
+                "style_code": self.style_codes[style_name],
+                "attribs": attribs
+            }
+        else:
+            print(f"Style {style_name} not found in styles dictionary.")
+
+
     def add_variable(self, variable: str, style_name: str) -> None:
 
         """
@@ -731,7 +797,8 @@ class PrintsCharming:
 
         variable = str(variable)
         if style_name in self.styles:
-            styled_string = f"{self.style_codes[style_name]}{variable}{self.reset}"
+            style_code = self.style_codes.get(style_name)
+            styled_string = f"{style_code}{variable}{self.reset}"
 
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
@@ -747,12 +814,14 @@ class PrintsCharming:
             if contains_inner_space:
                 self.phrase_map[variable] = {
                     "style": style_name,
+                    "style_code": style_code,
                     "styled": styled_string,
                     "attribs": attribs
                 }
             else:
                 self.word_map[variable] = {
                     "style" : style_name,
+                    "style_code": style_code,
                     "styled": styled_string,
                     "attribs": attribs
                 }
@@ -952,6 +1021,7 @@ class PrintsCharming:
 
         if self.config["kwargs"] and kwargs:
             text = self.replace_and_style_placeholders(text, kwargs)
+
             if filename:
                 with open(filename, 'a') as file:
                     file.write(text + end)
@@ -1026,21 +1096,23 @@ class PrintsCharming:
         # Convert the text to a list of words and spaces
         words_and_spaces = re.findall(r'\S+|\s+', text)
 
+        # Initialize list to hold the final styled words and spaces
+        styled_words_and_spaces = [None] * len(words_and_spaces)
+
 
         # Initialize the lists to keep track of which indexes are used by what
         indexes_used_by_phrases = set()
         indexes_used_by_words = set()
+        indexes_used_by_substrings = set()
         indexes_used_by_default_styling = set()
         indexes_used_by_spaces = set()
         indexes_used_by_none_styling = set()
 
+
         boundary_indices_dict = {}
 
-        # Dictionary to store the boundary indices for each phrase
-        boundary_indices_list = []
-
-        # Initialize list to hold the final styled words and spaces
-        styled_words_and_spaces = [None] * len(words_and_spaces)
+        # Define sentence-ending characters
+        sentence_ending_characters = ".,!?:;"
 
 
         # Step 1: Handle phrases
@@ -1073,35 +1145,70 @@ class PrintsCharming:
                             styled_words_and_spaces[i + j] = styled_word_or_space
 
 
-        # Step 2: Handle individual words
+        # Step 2: Handle individual words and substrings
         for i, word_or_space in enumerate(words_and_spaces):
-            # Skip the index if it's used by a phrase
             if i in indexes_used_by_phrases:
                 continue
+            if not word_or_space.isspace():
+                word = word_or_space.strip()
+                stripped_word = word.rstrip(sentence_ending_characters)
+                trailing_chars = word[len(stripped_word):]
 
-            # Check if the word is in the word_map
-            if word_or_space.strip() in self.word_map:
-                styled_word_or_space = self.word_map.get(word_or_space.strip(), {}).get('styled', word_or_space)
-                styled_words_and_spaces[i] = styled_word_or_space
 
-                # Add the index before the starting index
-                if i > 0:
-                    if i - 1 not in boundary_indices_dict:
-                        boundary_indices_dict[i - 1] = self.word_map.get(word_or_space.strip(), {}).get('attribs')
+                # Check if the word is in the word_map
+                if stripped_word in self.word_map:
 
-                # Add the index after the ending index
-                if i + 1 < len(words_and_spaces):
-                    if i + 1 not in boundary_indices_dict:
-                        boundary_indices_dict[i + 1] = self.word_map.get(word_or_space.strip(), {}).get('attribs')
+                    if trailing_chars:
+                        style_start = self.word_map.get(stripped_word, {}).get('style_code', '')
+                        styled_word_or_space = f'{style_start}{word}{self.reset}'
+                    else:
+                        styled_word_or_space = self.word_map.get(stripped_word, {}).get('styled', stripped_word)
 
-                # Update the indexes_used_by_words set
-                indexes_used_by_words.add(i)
+                    styled_words_and_spaces[i] = styled_word_or_space
+
+                    # Add the index before the starting index
+                    if i > 0:
+                        if i - 1 not in boundary_indices_dict:
+                            boundary_indices_dict[i - 1] = self.word_map.get(stripped_word, {}).get('attribs')
+
+                    # Add the index after the ending index
+                    if i + 1 < len(words_and_spaces):
+                        if i + 1 not in boundary_indices_dict:
+                            boundary_indices_dict[i + 1] = self.word_map.get(stripped_word, {}).get('attribs')
+
+                    # Update the indexes_used_by_words set
+                    indexes_used_by_words.add(i)
+
+
+                else:
+                    # Check if the word contains any substring in the substring_map
+                    for substring, details in self.substring_map.items():
+                        if substring in word:
+                            style_start = details.get('style_code', '')
+                            style_end = self.reset
+                            styled_word_or_space = f"{style_start}{word_or_space}{style_end}"
+                            styled_words_and_spaces[i] = styled_word_or_space
+
+                            # Add the index before the starting index
+                            if i > 0:
+                                if i - 1 not in boundary_indices_dict:
+                                    boundary_indices_dict[i - 1] = details.get('attribs')
+
+                            # Add the index after the ending index
+                            if i + 1 < len(words_and_spaces):
+                                if i + 1 not in boundary_indices_dict:
+                                    boundary_indices_dict[i + 1] = details.get('attribs')
+
+                            indexes_used_by_substrings.add(i)
+
+                            break  # Stop after the first matching substring
+
 
 
         # Step 3: Handle other styled text and spaces
         for i, word_or_space in enumerate(words_and_spaces):
             # Skip the index if it's used by a phrase or a word in the word_map
-            if i in indexes_used_by_phrases or i in indexes_used_by_words:
+            if i in indexes_used_by_phrases or i in indexes_used_by_words or i in indexes_used_by_substrings:
                 continue
 
             if word_or_space.isspace():
@@ -1146,6 +1253,7 @@ class PrintsCharming:
 
             # Update the styled_words_and_spaces list
             styled_words_and_spaces[i] = styled_word_or_space
+
 
         # Step 4: Handle default styling for remaining words and spaces
         for i, styled_word_or_space in enumerate(styled_words_and_spaces):
@@ -2181,6 +2289,7 @@ class FormattedTextBox:
         if horiz_border_bottom:
             print(horiz_border)
 
+
     def print_multi_column_box3(self, columns, col_widths, col_styles=None, col_alignments=None,
                                 horiz_border_top=True, horiz_border_bottom=True,
                                 vert_border_left=True, vert_border_right=True, col_sep=None,
@@ -2257,6 +2366,7 @@ class FormattedTextBox:
 
         if horiz_border_bottom:
             print(horiz_border)
+
 
     def print_multi_column_box4(self, columns, col_widths, col_styles=None, col_alignments=None,
                                 horiz_border_top=True, horiz_border_bottom=True,
