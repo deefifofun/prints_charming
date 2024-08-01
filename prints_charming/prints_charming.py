@@ -1,8 +1,5 @@
 # prints_charming.py
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from datetime import datetime
 import time
 import os
 import sys
@@ -10,7 +7,12 @@ import copy
 import traceback
 import re
 import logging
+import inspect
 import ctypes
+from datetime import datetime
+from dataclasses import dataclass, field, asdict
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from .logging_utils import logger
 
 
 
@@ -55,14 +57,13 @@ class TextStyle:
 
 
 
-
 class PrintsCharmingLogHandler(logging.Handler):
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self, cp: 'PrintsCharming' = None, styles: Dict[str, TextStyle] = None, timestamp_style: str = 'timestamp',
+    def __init__(self, pc: 'PrintsCharming' = None, styles: Dict[str, TextStyle] = None, timestamp_style: str = 'timestamp',
                  level_styles: Optional[Dict[str, str]] = None):
         super().__init__()
-        self.cp = cp or PrintsCharming(styles=styles)
+        self.pc = pc or PrintsCharming(styles=styles)
         self.timestamp_style = timestamp_style
         self.level_styles = level_styles or {
             'DEBUG': 'debug',
@@ -71,23 +72,41 @@ class PrintsCharmingLogHandler(logging.Handler):
             'ERROR': 'error',
             'CRITICAL': 'critical'
         }
-        self.cp.log_level_styles = self.level_styles
+        self.pc.log_level_styles = self.level_styles
 
-    def emit(self, record):
-        log_entry = self.format(record)
-        self.handle_log_event(log_entry, log_level=record.levelname)
+    def emit(self, record: logging.LogRecord):
+        try:
+            # Format the message using a custom method
+            formatted_message = self.format_message(record.msg, record.args)
 
-    def handle_log_event(self, text, log_level):
-        timestamp = time.time()
-        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
+            # Pass the formatted message to the handle_log_event method
+            self.handle_log_event(formatted_message, log_level=record.levelname)
+
+        except Exception as e:
+            self.handleError(record)
+            print(f"Unexpected error during logging: {e}")
+
+    def format_message(self, message: str, args):
+
+        if args:
+            try:
+                message = message.format(*args)
+            except (IndexError, KeyError, ValueError) as e:
+                self.pc.logger.error(f"Error formatting log message: {e}")
+                return message
+
+        return message
+
+    def handle_log_event(self, text: str, log_level: str):
+        timestamp = datetime.now().strftime(self.TIMESTAMP_FORMAT)
 
         log_level_style = self.level_styles.get(log_level, 'default')
 
         # Get styled components
-        styled_log_level_prefix = self.cp.apply_logging_style(log_level_style, f"LOG[{log_level}]")
-        styled_timestamp = self.cp.apply_logging_style(self.timestamp_style, formatted_timestamp)
-        styled_level = self.cp.apply_logging_style(log_level_style, log_level)
-        styled_text = self.cp.apply_logging_style(log_level_style, text)
+        styled_log_level_prefix = self.pc.apply_logging_style(log_level_style, f"LOG[{log_level}]")
+        styled_timestamp = self.pc.apply_logging_style(self.timestamp_style, timestamp)
+        styled_level = self.pc.apply_logging_style(log_level_style, log_level)
+        styled_text = self.pc.apply_logging_style(log_level_style, text)
 
         # Create the final styled message
         log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
@@ -110,50 +129,62 @@ class PrintsCharming:
     """
     
     CONFIG: Dict[str, bool] = {
-        "enable_logging"      : False,
-        "log_level"           : 'DEBUG',  # Default to DEBUG level
-        "internal_logging"    : False,
         "color_text"          : True,
         "args_to_strings"     : True,
         "style_names"         : True,
         "style_words_by_index": True,
         "kwargs"              : True,
         "conceal"             : True,
+        "internal_logging"    : False,
+        "log_level"           : 'DEBUG',  # Default to DEBUG level
     }
 
 
     COLOR_MAP: Dict[str, str] = {
-        "default" : "\033[0m",
-        "black"   : "\033[38;5;0m",
-        "white"   : "\033[97m",
-        "gray"    : "\033[38;5;248m",
-        "green"   : "\033[32m",
-        "vgreen"  : "\033[38;5;46m",
-        "red"     : "\033[31m",
-        "vred"    : "\033[38;5;196m",
-        "yellow"  : "\033[33m",
-        "vyellow" : "\033[38;5;226m",
-        "blue"    : "\033[34m",
-        "vblue"   : "\033[38;5;27m",
-        "sky"     : "\033[38;5;117m",
-        "vsky"    : "\033[38;5;39m",
-        "magenta" : "\033[35m",
-        "vmagenta": "\033[38;5;201m",
-        "cyan"    : "\033[36m",
-        "vcyan"   : "\033[38;5;51m",
-        "orange"  : "\033[38;5;208m",
-        "vorange" : "\033[38;5;202m",
-        "rorange" : "\033[38;5;203m",
-        "pink"    : "\033[38;5;200m",
-        "lpink"   : "\033[38;5;218m",
-        "purple"  : "\033[38;5;129m",
-        "indigo"  : "\033[38;5;54m",
-        "lpurple" : "\033[38;5;147m",
-        "lav"     : "\033[38;5;183m",
-        "brown"   : "\033[38;5;94m",
-        "gold"    : "\033[38;5;220m",
-        "sand"    : "\033[38;5;215m",
-        "copper"  : "\033[38;5;166m"
+        "default": "\033[0m",
+        "dfff": "\033[38;5;147m",
+        "black": "\033[38;5;0m",
+        "red": "\033[38;5;1m",
+        "vred": "\033[38;5;196m",
+        "green": "\033[38;5;34m",
+        "vgreen": "\033[38;5;46m",
+        "blue": "\033[38;5;4m",
+        "vblue": "\033[38;5;27m",
+        "sky": "\033[38;5;117m",
+        "vsky": "\033[38;5;39m",
+        "lmagenta": "\033[38;5;205m",
+        "magenta": "\033[38;5;5m",
+        "vmagenta": "\033[38;5;198m",
+        "lav": "\033[38;5;183m",
+        "lpurple": "\033[38;5;135m",
+        "purple": "\033[38;5;129m",
+        "dpurple": "\033[38;5;93m",
+        "lplum": "\033[38;5;177m",
+        "plum": "\033[38;5;128m",
+        "vplum": "\033[38;5;201m",
+        "lpink": "\033[38;5;218m",
+        "pink": "\033[38;5;206m",
+        "vpink": "\033[38;5;199m",
+        "cyan": "\033[38;5;6m",
+        "vcyan": "\033[38;5;51m",
+        "orange": "\033[38;5;208m",
+        "vorange": "\033[38;5;202m",
+        "copper": "\033[38;5;166m",
+        "yellow": "\033[38;5;3m",
+        "vyellow": "\033[38;5;226m",
+        "gold": "\033[38;5;220m",
+        "brass": "\033[38;5;178m",
+        "bronze": "\033[38;5;136m",
+        "brown": "\033[38;5;94m",
+        "sand": "\033[38;5;215m",
+        "lbrown": "\033[38;5;138m",
+        "silver": "\033[38;5;12m",
+        "dsilver": "\033[38;5;10m",
+        "gray": "\033[38;5;248m",
+        "dgray": "\033[38;5;8m",
+        "plat": "\033[38;5;252m",
+        "white": "\033[38;5;15m",
+        "vwhite": "\033[38;5;231m"
     }
 
     EFFECT_MAP: Dict[str, str] = {
@@ -198,12 +229,10 @@ class PrintsCharming:
         "green"        : TextStyle(color="green", bold=True),
         "vgreen"       : TextStyle(color="vgreen", bold=True),
         "log_true"     : TextStyle(color='vgreen'),
-        "bg_color_vgreen": TextStyle(color="white", bg_color='forest'),
-        "forest"       : TextStyle(color="forest", bold=True),
+        "bg_color_green": TextStyle(color="white", bg_color='green'),
         "red"          : TextStyle(color="red"),
         "vred"         : TextStyle(color="vred", bold=True),
         "blue"         : TextStyle(color="blue"),
-        "dblue"        : TextStyle(color="vwhite", bg_color="dblue", bold=True, dim=True),
         "vblue"        : TextStyle(color="vblue"),
         "sky"          : TextStyle(color="sky"),
         "vsky"         : TextStyle(color="vsky"),
@@ -216,7 +245,6 @@ class PrintsCharming:
         "lplum"        : TextStyle(color="lplum"),
         "plum"         : TextStyle(color="plum"),
         "vplum"        : TextStyle(color="vplum"),
-        "tarheel"      : TextStyle(color="tarheel"),
         "lmagenta"     : TextStyle(color="lmagenta"),
         "magenta"      : TextStyle(color="magenta", bold=True),
         "vmagenta"     : TextStyle(color="vmagenta"),
@@ -236,8 +264,8 @@ class PrintsCharming:
         "lav"          : TextStyle(color="lav"),
         "lpurple"      : TextStyle(color="lpurple"),
         "plat"         : TextStyle(color="plat"),
-        "silver"       : TextStyle(color="steel", bg_color="dsilver"),
-        "steel"        : TextStyle(color="steel", bg_color="purple", reverse=True),
+        "silver"       : TextStyle(color="dfff", bg_color="dsilver"),
+        "dfff"        : TextStyle(color="dfff", bg_color="purple", reverse=True),
         "vwhite"       : TextStyle(color="vwhite"),
         "header"       : TextStyle(color="vcyan"),
         "header_text"  : TextStyle(color="purple", bg_color="gray", bold=True, italic=True),
@@ -250,12 +278,23 @@ class PrintsCharming:
         "function_name": TextStyle(color="yellow", italic=True),
         "error_message": TextStyle(color="vred", bold=True, dim=True),
         "code"         : TextStyle(color="yellow"),
-        "conceal"      : TextStyle(conceal=True),
+        "dict_key": TextStyle(color="sky"),
+        "dict_value": TextStyle(color="white"),
+        "true": TextStyle(color="vgreen"),
+        "false": TextStyle(color="vred"),
+        'none': TextStyle(color="lpurple"),
+        "int": TextStyle(color="cyan"),
+        "float": TextStyle(color="vcyan"),
+        "other": TextStyle(color="lav"),
+        "conceal": TextStyle(conceal=True),
     }
 
     LOGGING_STYLES: Dict[str, TextStyle] = {
         "default": TextStyle(),
         "timestamp": TextStyle(color="white"),
+        "class_name": TextStyle(color="dfff"),
+        "method_name": TextStyle(color="lpurple"),
+        "line_number": TextStyle(color="lav"),
         "debug": TextStyle(color="blue"),
         "info": TextStyle(color="green"),
         "warning": TextStyle(color="yellow"),
@@ -350,16 +389,17 @@ class PrintsCharming:
 
         self.style_cache = {}
 
-        # Setup logging
-        self.logger = None
-        self.internal_logging_enabled = self.config["internal_logging"]
-        self.setup_logging(self.config["enable_logging"], self.config["log_level"], logging_styles)
-
         if sys.platform == 'win32':
             if autoconf_win:
                 self.enable_win_console_ansi_handling()
             else:
                 self.win_utils = WinUtils
+
+        # Setup logging
+        self.logger = None
+        self.setup_logging(self.config["internal_logging"], self.config["log_level"])
+
+
 
 
 
@@ -383,41 +423,43 @@ class PrintsCharming:
 
 
 
-    def setup_logging(self, enable_logging: bool, log_level: str, styles: Optional[Dict[str, TextStyle]] = None):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.handlers = []  # Clear existing handlers
+    def setup_logging(self, internal_logging: bool, log_level: str, log_format: str = '%(message)s'):
+        self.logger = logger
         self.logger.propagate = False  # Prevent propagation to root logger
-        if enable_logging:
+        if internal_logging:
             self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(message)s'))
-            self.logger.addHandler(handler)
-            self.logger.disabled = False
+            if not self.logger.hasHandlers():
+                console_handler = logging.StreamHandler()
+                console_handler.setFormatter(logging.Formatter(log_format))
+                self.logger.addHandler(console_handler)
+                self.logger.disabled = False
 
-            # Log the initialization message with proper formatting
-            if self.logger.handlers:
-                logging_enabled_init_message = f"PrintsCharming initialized with configuration:\n{self.pretty_print_dict(self.config)}"
-                self.debug(logging_enabled_init_message)
+            logging_enabled_init_message = f"Internal Logging Enabled:\n{self.print_dict(self.config)}"
+            self.debug(logging_enabled_init_message)
 
-                if self.internal_logging_enabled:
-                    internal_logging_enabled_init_message = f"PrintsCharming internal_logging enabled."
-                    self.debug(internal_logging_enabled_init_message)
         else:
-            #self.logger.setLevel(logging.CRITICAL)
             self.logger.disabled = True
 
 
 
-    def update_logging(self):
-        self.setup_logging(self.config["enable_logging"], self.config["log_level"])
+    def update_logging(self, log_format: str = '%(message)s'):
+        self.logger.handlers = []  # Clear existing handlers
+        self.setup_logging(self.config["internal_logging"], self.config["log_level"], log_format)
+
 
 
     def log(self, level: str, message: str, *args, **kwargs) -> None:
-        if not self.internal_logging_enabled:
+        if not self.config['internal_logging']:
             return
 
+        level = getattr(logging, level, None)
+
         if args:
-            message = message % args
+            try:
+                message = message.format(*args)
+            except (IndexError, KeyError, ValueError) as e:
+                self.logger.error(f"Error formatting log message: {e}")
+                return
 
         if kwargs:
             message = message.format(**kwargs)
@@ -426,12 +468,13 @@ class PrintsCharming:
         formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
 
         timestamp_style = 'timestamp'
+
         level_styles = {
-            'DEBUG': 'debug',
-            'INFO': 'info',
-            'WARNING': 'warning',
-            'ERROR': 'error',
-            'CRITICAL': 'critical',
+            10: 'debug',
+            20: 'info',
+            30: 'warning',
+            40: 'error',
+            50: 'critical',
         }
 
         log_level_style = level_styles.get(level, 'default')
@@ -446,6 +489,18 @@ class PrintsCharming:
 
 
     def debug(self, message: str, *args, **kwargs) -> None:
+        # Get the current stack frame
+        current_frame = inspect.currentframe()
+        # Get the caller frame
+        caller_frame = current_frame.f_back
+        # Extract the relevant information
+        class_name = self.apply_logging_style('class_name', self.__class__.__name__)
+        method_name = self.apply_logging_style('method_name', caller_frame.f_code.co_name)
+        line_number = self.apply_logging_style('line_number', caller_frame.f_lineno)
+
+        # Include the extracted information in the log message
+        message = f"{class_name}.{method_name}:{line_number} - {message}"
+
         self.log('DEBUG', message, *args, **kwargs)
 
     def info(self, message: str, *args, **kwargs) -> None:
@@ -461,36 +516,37 @@ class PrintsCharming:
         self.log('CRITICAL', message, *args, **kwargs)
 
 
-    def pretty_print_dict(self, d, indent=4):
+    def print_dict(self, d, indent=4):
         def pprint_dict(d, level=0):
             result = ""
             for key, value in d.items():
-                result += " " * (level * indent) + self.apply_logging_style('dict_key', f"{key}: ")
+                result += " " * (level * indent) + self.apply_style('dict_key', f"{key}: ")
                 if isinstance(value, dict):
                     result += "{\n" + pprint_dict(value, level + 1) + " " * (level * indent) + "}\n"
                 elif isinstance(value, bool):
                     bool_style = 'true' if value else 'false'
-                    result += self.apply_logging_style(bool_style, str(value)) + "\n"
+                    result += self.apply_style(bool_style, str(value)) + "\n"
                 elif value is None:
-                    result += self.apply_logging_style('none', str(value)) + "\n"
+                    result += self.apply_style('none', str(value)) + "\n"
                 elif isinstance(value, int):
-                    result += self.apply_logging_style('int', str(value)) + "\n"
+                    result += self.apply_style('int', str(value)) + "\n"
                 elif isinstance(value, float):
-                    result += self.apply_logging_style('float', str(value)) + "\n"
+                    result += self.apply_style('float', str(value)) + "\n"
                 elif isinstance(value, str) and value.isupper() and value.lower() in ['debug', 'info', 'warning', 'error', 'critical']:
                     result += self.apply_logging_style(value.lower(), str(value)) + "\n"
 
                 else:
                     result += f"{value}\n"
+
             return result
 
         return "{\n" + pprint_dict(d) + "}"
 
 
     def escape_ansi_codes(self, ansi_string):
-        self.debug("Escaping ANSI codes in string: %s", ansi_string)
+        self.debug("Escaping ANSI codes in string: {}", ansi_string)
         escaped_ansi_string = ansi_string.replace("\033", "\\033")
-        self.debug("Escaped ANSI codes in string: %s", escaped_ansi_string)
+        #self.debug("Escaped ANSI codes in string: {}", escaped_ansi_string)
         return escaped_ansi_string
 
 
@@ -505,7 +561,7 @@ class PrintsCharming:
                                        **style_kwargs) -> str:
 
         """Replace placeholders with actual values and apply colors."""
-        self.debug("Replacing and styling placeholders in text: %s with kwargs: %s", text, kwargs)
+        self.debug("Replacing and styling placeholders in text: {} with kwargs: {}", text, kwargs)
         top_level_label_style_code = self.get_style_code(top_level_label) if enable_label_style else ''
         sub_level_label_style_code = self.get_style_code(sub_level_label) if enable_label_style else ''
         lines = text.split('\n')
@@ -596,7 +652,7 @@ class PrintsCharming:
         :raises ColorNotFoundError: If the background color is not found in the background color map.
         :raises InvalidLengthError: If the length is not valid.
         """
-        self.debug("Printing background color: %s with length: %d", color_name, length)
+        self.debug("Printing background color: {} with length: {}", color_name, length)
 
         if length <= 0:
             message = f"Invalid length '{length}'. Length must be positive."
@@ -686,7 +742,8 @@ class PrintsCharming:
 
 
     def apply_style(self, style_name, text, fill_space=True):
-        self.debug("Applying style: %s with length: %s", style_name, text)
+        #self.debug("Applying style_name: {} to text: {}", self.apply_logging_style('info', style_name), self.apply_logging_style('info', text))
+        #self.debug("Applying style_name: %s to text: %s", self.apply_logging_style('info', style_name), self.apply_logging_style('info', text))
         if text.isspace() and fill_space:
             style_code = self.bg_color_map.get(
                 style_name,
@@ -701,9 +758,9 @@ class PrintsCharming:
         # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset}"
 
-        escaped_string = self.escape_ansi_codes(styled_text)
-        self.debug('escaped_string: %s', escaped_string)
-        self.debug(styled_text)
+        #escaped_string = self.escape_ansi_codes(styled_text)
+        #self.debug('escaped_string: {}', escaped_string)
+        #self.debug(styled_text)
 
         return styled_text
 
@@ -723,7 +780,8 @@ class PrintsCharming:
 
     def apply_logging_style(self, style_name, text):
         # This method does not log debug messages to avoid recursion
-        if text.isspace():
+
+        if isinstance(text, str) and text.isspace():
             style_code = self.bg_color_map.get(
                 style_name,
                 self.bg_color_map.get(
@@ -1014,7 +1072,7 @@ class PrintsCharming:
 
 
         text = sep.join(converted_args)
-        self.debug('<text>%s</text>', text)
+        self.debug('<text>{}</text>', text)
 
         if self.config["style_words_by_index"] and isinstance(style, dict):
             text = self.style_words_by_index(text, style)
@@ -2219,8 +2277,8 @@ class FormattedTextBox:
             raise ValueError("Number of column alignments must match number of columns.")
 
         available_width = self.get_available_width()
-        print(f'horiz_width: {self.horiz_width}')
-        print(f'available_width: {available_width}')
+        #print(f'horiz_width: {self.horiz_width}')
+        #print(f'available_width: {available_width}')
         #total_padding = sig_columns + len(self.vert_padding) * sig_columns
         #total_padding = sig_columns + len(self.vert_padding) * sig_columns + sig_columns
         #total_padding = sig_columns + len(self.vert_padding) * sig_columns + sig_columns
@@ -2228,7 +2286,7 @@ class FormattedTextBox:
         sig_columns = num_columns - 1
         #total_padding = sig_columns * (len(self.vert_padding) + 2)
         total_padding = sig_columns * (len(self.vert_padding) * 3)
-        print(f'total_padding: {total_padding}')
+        #print(f'total_padding: {total_padding}')
 
         if col_widths_percent:
             # Convert percentages to absolute widths
@@ -2238,14 +2296,14 @@ class FormattedTextBox:
         if '' in col_widths:
             unspecified_index = col_widths.index('')
             specified_width = sum(col_widths[i] for i in range(len(col_widths)) if i != unspecified_index)
-            print(f'specified_width: {specified_width}')
+            #print(f'specified_width: {specified_width}')
             remaining_width = available_width - specified_width - total_padding
-            print(f'remaining_width: {remaining_width}')
+            #print(f'remaining_width: {remaining_width}')
             #col_widths[unspecified_index] = remaining_width - len(self.vert_padding) * 2
             col_widths[unspecified_index] = remaining_width
 
         total_col_width = sum(col_widths)
-        print(f'total_col_width: {total_col_width}')
+        #print(f'total_col_width: {total_col_width}')
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 
@@ -2308,12 +2366,12 @@ class FormattedTextBox:
             raise ValueError("Number of column alignments must match number of columns.")
 
         available_width = self.get_available_width()
-        print(f'horiz_width: {self.horiz_width}')
-        print(f'available_width: {available_width}')
+        #print(f'horiz_width: {self.horiz_width}')
+        #print(f'available_width: {available_width}')
         num_columns = len(columns)
         sig_columns = num_columns - 1
         total_padding = sig_columns * (len(self.vert_padding) * 3)
-        print(f'total_padding: {total_padding}')
+        #print(f'total_padding: {total_padding}')
 
         if col_widths_percent:
             # Convert percentages to absolute widths
@@ -2322,13 +2380,13 @@ class FormattedTextBox:
         if '' in col_widths:
             unspecified_index = col_widths.index('')
             specified_width = sum(col_widths[i] for i in range(len(col_widths)) if i != unspecified_index and col_widths[i] != '')
-            print(f'specified_width: {specified_width}')
+            #print(f'specified_width: {specified_width}')
             remaining_width = available_width - specified_width - total_padding
-            print(f'remaining_width: {remaining_width}')
+            #print(f'remaining_width: {remaining_width}')
             col_widths[unspecified_index] = remaining_width
 
         total_col_width = sum(col_widths)
-        print(f'total_col_width: {total_col_width}')
+        #print(f'total_col_width: {total_col_width}')
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 
@@ -2386,8 +2444,8 @@ class FormattedTextBox:
             raise ValueError("Number of column alignments must match number of columns.")
 
         available_width = self.get_available_width()
-        print(f'horiz_width: {self.horiz_width}')
-        print(f'available_width: {available_width}')
+        #print(f'horiz_width: {self.horiz_width}')
+        #print(f'available_width: {available_width}')
 
         num_columns = len(columns)
         sig_columns = num_columns - 1
@@ -2395,18 +2453,18 @@ class FormattedTextBox:
         col_sep = col_sep * col_sep_width
         #total_padding = (sig_columns * col_sep_length) * (len(self.vert_padding) * 3)
         total_padding = (sig_columns * len(col_sep) * (len(self.vert_padding) * 2))
-        print(f'total_padding: {total_padding}')
+        #print(f'total_padding: {total_padding}')
 
         if '' in col_widths:
             unspecified_index = col_widths.index('')
             specified_width = sum(col_widths[i] for i in range(len(col_widths)) if i != unspecified_index)
-            print(f'specified_width: {specified_width}')
+            #print(f'specified_width: {specified_width}')
             remaining_width = available_width - specified_width - total_padding
-            print(f'remaining_width: {remaining_width}')
+            #print(f'remaining_width: {remaining_width}')
             col_widths[unspecified_index] = remaining_width
 
         total_col_width = sum(col_widths)
-        print(f'total_col_width: {total_col_width}')
+        #print(f'total_col_width: {total_col_width}')
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 

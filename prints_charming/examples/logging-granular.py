@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from ..prints_charming import TextStyle, ColorPrinter
+from ..prints_charming import TextStyle, PrintsCharming
 from datetime import datetime
 import time
 
@@ -23,13 +23,13 @@ styles = {
     "orange"       : TextStyle(color="orange"),
 }
 
-class ColorPrinterLogHandler(logging.Handler):
+class PrintsCharmingBasicLogHandler(logging.Handler):
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
     def __init__(self):
         super().__init__()
-        self.cp = ColorPrinter(styles=styles)
+        self.cp = PrintsCharming(styles=styles)
 
 
     def emit(self, record):
@@ -70,7 +70,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # Create an instance of your custom logging handler
-handler = ColorPrinterLogHandler()
+handler = PrintsCharmingBasicLogHandler()
 
 # Add the custom handler to the logger
 logger.addHandler(handler)
