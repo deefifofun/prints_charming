@@ -591,35 +591,35 @@ def index_styling_examples(cp):
 
 
 
-def variable_examples(cp):
+def variable_examples(pc):
     print(styled_mini_border)
     print(f'function: variable_examples:')
     print(styled_mini_border)
     print()
-    cp.print("# Use the add_variable method to add 'Hello, world!' to the phrases dictionary with 'vgreen' style.")
-    cp.add_variable("Hello, world!", style_name="vgreen")
-    cp.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
-    cp.print("Hello, world!")
-    cp.print("# Use the remove_variable method to remove 'Hello, world!' from the styled phrases dictionary.")
-    cp.remove_variable("Hello, world!")
-    cp.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
-    cp.print("Hello, world!")
-    cp.print("# Define a variable.")
+    pc.print("# Use the add_variable method to add 'Hello, world!' to the phrases dictionary with 'vgreen' style.")
+    pc.add_variable("Hello, world!", style_name="vgreen")
+    pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
+    pc.print("Hello, world!")
+    pc.print("# Use the remove_variable method to remove 'Hello, world!' from the styled phrases dictionary.")
+    pc.remove_variable("Hello, world!")
+    pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
+    pc.print("Hello, world!")
+    pc.print("# Define a variable.")
     text = "Hello, world!"
-    cp.print(f"# Use the add_variable method to add {text} to the phrases dictionary with 'yellow' style.")
-    cp.add_variable(text, style_name="yellow")
-    cp.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
-    cp.print(text)
-    cp.print("# Show that 'Hello, world!' retains its style while other words are unstyled.")
-    cp.print(f"This sentence says, {text}")
-    cp.print("# Show how you can style other words alongside, 'Hello, world!'.")
-    cp.print(f"This sentence says, {text}", style='task')
-    cp.print("# Show how the order of the words doesn't matter.")
-    cp.print(f"{text} Let me say that again, {text} {text} I said it again!", style="orange")
-    cp.print("# Use the remove_variable method to remove 'Hello, world!' from the styled phrases dictionary.")
-    cp.remove_variable("Hello, world!")
-    cp.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
-    cp.print("Hello, world!")
+    pc.print(f"# Use the add_variable method to add {text} to the phrases dictionary with 'yellow' style.")
+    pc.add_variable(text, style_name="yellow")
+    pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
+    pc.print(text)
+    pc.print("# Show that 'Hello, world!' retains its style while other words are unstyled.")
+    pc.print(f"This sentence says, {text}")
+    pc.print("# Show how you can style other words alongside, 'Hello, world!'.")
+    pc.print(f"This sentence says, {text}", style='task')
+    pc.print("# Show how the order of the words doesn't matter.")
+    pc.print(f"{text} Let me say that again, {text} {text} I said it again!", style="orange")
+    pc.print("# Use the remove_variable method to remove 'Hello, world!' from the styled phrases dictionary.")
+    pc.remove_variable("Hello, world!")
+    pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
+    pc.print("Hello, world!")
     print()
 
     return text
@@ -627,31 +627,31 @@ def variable_examples(cp):
 
 
 
-def simple_use_case(cp):
+def simple_use_case(pc):
 
     print(styled_mini_border)
-    cp.print(f'function: simple_use_case:')
+    pc.print(f'function: simple_use_case:')
     print(styled_mini_border)
     print()
 
-    cp.print("# Basic printing with ColorPrinter will print in the default style with default color.")
-    cp.print("Hello, world!")
-    cp.print("# Print in the default style reverse foreground and background.")
-    cp.print("Hello, world!", reverse=True)
-    cp.print("# Specify only the color of the args.")
-    cp.print("Hello, world!", color="red")
-    cp.print("# Specify only italic and underline will print in the default color.")
-    cp.print("Hello, world!", italic=True, underline=True)
-    cp.print("# Specify a predefined style 'magenta'. The 'magenta' style is defined above.")
-    cp.print("Hello, world!", style="magenta")
-    cp.print("# Specify predefined style 'task' for printing. The 'task' style is defined above.")
-    cp.print("This is a task.", style="task")
-    cp.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
-    cp.print("This is a task.", style="task", color="green", underline=True)
-    cp.print("Show text with bg_color:")
-    cp.print("This has a bg_color", style="bg_color_green")
-    cp.print("# Show that 'Hello, world!' isn't color or style defined.")
-    cp.print("Hello, world!")
+    pc.print("# Basic printing with ColorPrinter will print in the default style with default color.")
+    pc.print("Hello, world!")
+    pc.print("# Print in the default style reverse foreground and background.")
+    pc.print("Hello, world!", reverse=True)
+    pc.print("# Specify only the color of the args.")
+    pc.print("Hello, world!", color="red", dim=True)
+    pc.print("# Specify only italic and underline will print in the default color.")
+    pc.print("Hello, world!", italic=True, underline=True)
+    pc.print("# Specify a predefined style 'magenta'. The 'magenta' style is defined above.")
+    pc.print("Hello, world!", style="magenta")
+    pc.print("# Specify predefined style 'task' for printing. The 'task' style is defined above.")
+    pc.print("This is a task.", style="task")
+    pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
+    pc.print("This is a task.", style="task", color="green", underline=True)
+    pc.print("Show text with bg_color:")
+    pc.print("This has a bg_color", style="bg_color_green")
+    pc.print("# Show that 'Hello, world!' isn't color or style defined.")
+    pc.print("Hello, world!")
     print()
 
 
@@ -1046,25 +1046,25 @@ def main():
 
     welcome()
 
-    cp = PrintsCharming(logging_styles=logging_styles)
-    builder = FormattedTextBox(cp=cp, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
+    pc = PrintsCharming(logging_styles=logging_styles)
+    builder = FormattedTextBox(cp=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
-    cp.add_variable('function', 'blue')
+    pc.add_variable('function', 'blue')
 
     print_colors_and_styles()
 
-    simple_use_case(cp)
+    simple_use_case(pc)
 
-    text_from_variable_examples = variable_examples(cp)
-    index_styling_examples(cp)
-    auto_styling_examples(cp, text_from_variable_examples)
-    print_variable_examples(cp)
-    print_horizontal_bg_strip(cp)
+    text_from_variable_examples = variable_examples(pc)
+    index_styling_examples(pc)
+    auto_styling_examples(pc, text_from_variable_examples)
+    print_variable_examples(pc)
+    print_horizontal_bg_strip(pc)
     more_stuff()
     kwargs_replace_and_style_placeholders_examples()
     formatted_text_box_stuff()
-    my_custom_error(cp)
-    progress_bar(cp)
+    my_custom_error(pc)
+    progress_bar(pc)
 
 
 if __name__ == "__main__":
