@@ -95,7 +95,7 @@ class PrintsCharming:
     RESET = "\033[0m"
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
-    
+
     """
     This module provides a PrintsCharming class for handling colored text printing tasks.
     It also includes TextStyle, a dataclass for managing text styles. In the COLOR_MAP "v" before a color stands for "vibrant".
@@ -104,7 +104,7 @@ class PrintsCharming:
 
     """
 
-    # This will hold the shared COLOR_MAP if set by the user
+    # These maps are optionally available to be shared between all instances of the class if the set_shared_maps classmethod is called.
     shared_color_map: Optional[Dict[str, str]] = None
     shared_bg_color_map: Optional[Dict[str, str]] = None
     shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
@@ -119,20 +119,63 @@ class PrintsCharming:
                         shared_styles: Optional[Dict[str, TextStyle]] = None,
                         shared_logging_styles: Optional[Dict[str, TextStyle]] = None):
         """
-        If called, set shared maps accessible to all instances of PrintsCharming if map not explicitly passed in the init method.
+        **Advanced Use Only:**
 
-        :param shared_color_map: The dictionary of shared color mappings to be accessible globally across all instances. If None, DEFAULT_COLOR_MAP.copy() will be used.
-        :param shared_bg_color_map: The dictionary of shared bg_color mappings to be accessible globally across all instances. If None, it will be created from color_map.
-        :param shared_effect_map: The dictionary of effect mappings shared across all instances. This probably shouldn't be changed unless you know what you are doing.
-        :param shared_styles: The dictionary of shared styles to be accessible globally across all instances. If None, then no shared styles will be avail.
-        :param shared_logging_styles: The dictionary of shared logging_styles to be accessible globally across all instances. If None, then no shared logging styles will be avail.
+        This method is intended for very advanced users who understand the full implications of setting shared maps.
+        These maps include color mappings, background color mappings, effect mappings, styles, and logging styles.
+        Using this method improperly can lead to unexpected behavior, particularly when initializing multiple instances
+        of PrintsCharming.
+
+        **Happily Ever After Fairy Tale Use Case:**
+        - There are fairy tale-like scenarios where this method, in combination with the `__init__` method, creates a
+          powerful and elegant solution for managing multiple instances with shared configurations.
+        - After calling this class method with a `shared_color_map`, every new instance of the class will automatically
+          share this `shared_color_map` unless you explicitly pass a different `color_map` to the instance's `__init__` method.
+
+        **In a Perfect World:**
+        - Imagine a perfect world like a fairy tale where you have the power to define your own constants, just like those
+          hardcoded in most libraries. This method allows you to create and manage your own custom named colors via `shared_color_map`.
+        - This high configurability grants you full control to mimic traditional class-level constants in your own unique way.
+
+        **The Real World - Greater Flexibility:**
+        - While mimicking traditional class-level constants can be powerful, **not imitating this behavior** opens up even greater
+          functionality. Unlike many similar libraries, PrintsCharming allows each instance to have its own `color_map`.
+        - This instance-specific flexibility can make more sense for many use cases, providing you with unparalleled control
+          over how colors are managed on a per-instance basis.
+        - If you feel comfortable imitating class-level constants and that suits your needs, go for it. But remember, the
+          ability to configure each instance independently is what truly sets PrintsCharming apart, offering more versatility
+          than most other libraries.
+
+        **Caution:**
+        - **99% of users should not use this method.** The most straightforward way to use this class is to ignore this
+          method entirely.
+        - For the remaining 1% of you who are very advanced users, I highly discourage setting any parameters other than
+          `shared_color_map`.
+        - In a perfect world, this method would be used sparingly and with a deep understanding of its effects.
+
+        **If you're unsure whether you should be using this method, it's best to avoid it.**
+
+        :param shared_color_map: (Optional) A dictionary of shared color mappings to be accessible globally across
+                                 all instances. If not provided, `DEFAULT_COLOR_MAP.copy()` will be used.
+        :param shared_bg_color_map: (Optional) A dictionary of shared background color mappings. to be accessible globally across
+                                    all instances. If None (as it should be unless your really know what your doing), it will be computed
+                                    from shared_color_map.
+        :param shared_effect_map: (Optional) A dictionary of effect mappings.
+                                  **This should not be changed unless you are certain of what you're doing.**
+        :param shared_styles: (Optional) A dictionary of shared styles.
+                              **Consider carefully before setting this parameter.**
+        :param shared_logging_styles: (Optional) A dictionary of shared logging styles.
+                                      **Advanced users only.**
         """
+
+        # Logging a warning to indicate that this method is intended for advanced users
+        cls._log_advanced_use_warning()
 
         cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
         cls.shared_color_map.setdefault('default', PrintsCharming.RESET)
         cls.shared_bg_color_map = shared_bg_color_map or {
-                color: PrintsCharming.compute_bg_color_map(code) for color, code in cls.shared_color_map.items()
-            }
+            color: PrintsCharming.compute_bg_color_map(code) for color, code in cls.shared_color_map.items()
+        }
 
         if shared_effect_map:
             cls.shared_effect_map = shared_effect_map
@@ -142,6 +185,16 @@ class PrintsCharming:
 
         if shared_logging_styles:
             cls.shared_logging_styles = shared_logging_styles
+
+    @classmethod
+    def _log_advanced_use_warning(cls):
+        """Log a warning that this method is intended for advanced users."""
+        import warnings
+        warnings.warn(
+            "Warning: `set_shared_maps` is an advanced feature. Improper use can lead to unexpected behavior. "
+            "This method is intended for advanced users who fully understand the implications.",
+            UserWarning
+        )
 
 
 
@@ -2354,6 +2407,62 @@ class FormattedTextBox:
 
         if horiz_border_bottom:
             print(horiz_border)
+
+
+
+class InteractiveMenu:
+    def __init__(self, options, pc=None, selected_style=None, unselected_style=None, confirmed_style=None, previous='p', next='n'):
+        self.pc = pc or PrintsCharming()
+        self.options = options
+        self.selected_style = selected_style or 'vcyan'
+        self.unselected_style = unselected_style or 'default'
+        self.confirmed_style = confirmed_style or 'vgreen'
+        self.selected_index = 0
+        self.previous = previous  # Custom key for moving to the previous option
+        self.next = next  # Custom key for moving to the next option
+
+    def display_highlighted_menu(self):
+        for i, option in enumerate(self.options):
+            style = self.selected_style if i == self.selected_index else self.unselected_style
+            self.pc.print(f"{i + 1}. {option}", style=style)
+
+    def navigate(self, direction):
+        self.selected_index = (self.selected_index + direction) % len(self.options)
+        print(PrintsCharming.CONTROL_MAP['clear_screen'], PrintsCharming.CONTROL_MAP['cursor_home'])
+
+        self.display_highlighted_menu()
+
+    def run(self):
+        print(PrintsCharming.CONTROL_MAP['alt_buffer'])
+        print(PrintsCharming.CONTROL_MAP['cursor_home'])  # Move to top-left corner
+        # Display instructions
+        styled_instructions = self.pc.apply_style(style_name='vgreen', text='Instructions:')
+        print(styled_instructions)
+        self.pc.print(f"  Use '{self.previous}' to move up, '{self.next}' to move down, and press Enter to select.", style="default")
+        self.pc.print(f"  Press 'q' to quit.", style="vred")
+        print()
+
+        self.display_highlighted_menu()
+        while True:
+            key = input()
+            if key == 'q':
+                break
+            elif key == self.previous:
+                self.navigate(-1)
+            elif key == self.next:
+                self.navigate(1)
+            elif key == '':
+                confirmed_option = self.options[self.selected_index]
+                self.pc.print(f"Selected: {self.options[self.selected_index]}", style=self.confirmed_style)
+                time.sleep(2)
+                break
+
+        print(PrintsCharming.CONTROL_MAP['normal_buffer'])
+        self.pc.print(f"Selected: {self.options[self.selected_index]}", style=self.confirmed_style)
+
+
+
+
 
 
 class PrintsCharmingError(Exception):

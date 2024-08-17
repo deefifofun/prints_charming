@@ -10,6 +10,7 @@ from prints_charming import (
     PrintsCharmingLogHandler,
     TableManager,
     FormattedTextBox,
+    InteractiveMenu,
     PrintsCharmingError,
     ColorNotFoundError,
     set_custom_excepthook
@@ -1201,6 +1202,11 @@ if __name__ == "__main__":
     mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     styled_mini_border = quick_pc.apply_style('orange', mini_border)
     main()
+
+    menu_options = ["Option 1", "Option 2", "Option 3"]
+    menu = InteractiveMenu(menu_options, selected_style='vcyan', unselected_style='default', confirmed_style='vgreen')
+    menu.run()
+
     PrintsCharming.set_shared_maps(shared_color_map=color_map)
     pc_w_shared_color_map = PrintsCharming()
 

@@ -4,6 +4,7 @@ from .prints_charming import (
     PrintsCharmingLogHandler,
     TableManager,
     FormattedTextBox,
+    InteractiveMenu,
     PrintsCharmingError,
     ColorNotFoundError,
     InvalidLengthError,
