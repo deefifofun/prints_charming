@@ -4,6 +4,7 @@ from functools import partial
 
 
 from prints_charming import (
+    prints_charming_defaults,
     TextStyle,
     PrintsCharming,
     PrintsCharmingLogHandler,
@@ -13,6 +14,8 @@ from prints_charming import (
     ColorNotFoundError,
     set_custom_excepthook
 )
+
+
 
 import os
 import sys
@@ -1198,4 +1201,14 @@ if __name__ == "__main__":
     mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     styled_mini_border = quick_pc.apply_style('orange', mini_border)
     main()
+    PrintsCharming.set_shared_maps(shared_color_map=color_map)
+    pc_w_shared_color_map = PrintsCharming()
+
+    builder = FormattedTextBox(cp=pc_w_shared_color_map, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
+
+    print_foreground_colors(pc_w_shared_color_map, builder)
+    print_background_colors(pc_w_shared_color_map, builder)
+    print_styles(pc_w_shared_color_map, builder)
+
+    pc_w_shared_color_map.print("The sky is blue!", color='vsky')
 

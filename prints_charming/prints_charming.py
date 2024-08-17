@@ -10,10 +10,11 @@ import logging
 import inspect
 import ctypes
 from datetime import datetime
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from .logging_utils import logger
-
+from .prints_charming_defaults import DEFAULT_CONFIG, DEFAULT_COLOR_MAP, DEFAULT_EFFECT_MAP, DEFAULT_STYLES, DEFAULT_LOGGING_STYLES
+from .textstyle import TextStyle
 
 
 def get_terminal_width():
@@ -28,32 +29,6 @@ def get_all_subclass_names(cls, trailing_char=None):
         result.update(get_all_subclass_names(subclass, trailing_char))
     return result
 
-
-
-@dataclass
-class TextStyle:
-
-    """
-    A class to manage text styles including color, background color, and various text effects.
-    """
-
-    color: Optional[str] = 'default'
-    bg_color: Optional[str] = None
-    reverse: bool = False
-    bold: bool = False
-    dim: bool = False
-    italic: bool = False
-    underline: bool = False
-    overline: bool = False
-    strikethru: bool = False
-    conceal: bool = False
-    blink: bool = False
-
-
-    def update(self, attributes):
-        for attr, value in attributes.items():
-            if hasattr(self, attr):
-                setattr(self, attr, value)
 
 
 
@@ -117,8 +92,9 @@ class PrintsCharmingLogHandler(logging.Handler):
 
 
 class PrintsCharming:
-    TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
     RESET = "\033[0m"
+    TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
     
     """
     This module provides a PrintsCharming class for handling colored text printing tasks.
@@ -127,187 +103,63 @@ class PrintsCharming:
     Note: This module is developed and tested on Linux and is intended for use in Linux terminals.
 
     """
-    
-    CONFIG: Dict[str, bool] = {
-        "color_text"          : True,
-        "args_to_strings"     : True,
-        "style_names"         : True,
-        "style_words_by_index": True,
-        "kwargs"              : True,
-        "conceal"             : True,
-        "internal_logging"    : False,
-        "log_level"           : 'DEBUG',  # Default to DEBUG level
-    }
+
+    # This will hold the shared COLOR_MAP if set by the user
+    shared_color_map: Optional[Dict[str, str]] = None
+    shared_bg_color_map: Optional[Dict[str, str]] = None
+    shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
+    shared_styles: Optional[Dict[str, TextStyle]] = None
+    shared_logging_styles: Optional[Dict[str, TextStyle]] = None
+
+    @classmethod
+    def set_shared_maps(cls,
+                        shared_color_map: Dict[str, str] = None,
+                        shared_bg_color_map: Dict[str, str] = None,
+                        shared_effect_map: Optional[Dict[str, str]] = None,
+                        shared_styles: Optional[Dict[str, TextStyle]] = None,
+                        shared_logging_styles: Optional[Dict[str, TextStyle]] = None):
+        """
+        If called, set shared maps accessible to all instances of PrintsCharming if map not explicitly passed in the init method.
+
+        :param shared_color_map: The dictionary of shared color mappings to be accessible globally across all instances. If None, DEFAULT_COLOR_MAP.copy() will be used.
+        :param shared_bg_color_map: The dictionary of shared bg_color mappings to be accessible globally across all instances. If None, it will be created from color_map.
+        :param shared_effect_map: The dictionary of effect mappings shared across all instances. This probably shouldn't be changed unless you know what you are doing.
+        :param shared_styles: The dictionary of shared styles to be accessible globally across all instances. If None, then no shared styles will be avail.
+        :param shared_logging_styles: The dictionary of shared logging_styles to be accessible globally across all instances. If None, then no shared logging styles will be avail.
+        """
+
+        cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
+        cls.shared_color_map.setdefault('default', PrintsCharming.RESET)
+        cls.shared_bg_color_map = shared_bg_color_map or {
+                color: PrintsCharming.compute_bg_color_map(code) for color, code in cls.shared_color_map.items()
+            }
+
+        if shared_effect_map:
+            cls.shared_effect_map = shared_effect_map
+
+        if shared_styles:
+            cls.shared_styles = shared_styles
+
+        if shared_logging_styles:
+            cls.shared_logging_styles = shared_logging_styles
 
 
-    COLOR_MAP: Dict[str, str] = {
-        "default": "\033[0m",
-        "dfff": "\033[38;5;147m",
-        "black": "\033[38;5;0m",
-        "red": "\033[38;5;1m",
-        "vred": "\033[38;5;196m",
-        "green": "\033[38;5;34m",
-        "vgreen": "\033[38;5;46m",
-        "blue": "\033[38;5;4m",
-        "vblue": "\033[38;5;27m",
-        "sky": "\033[38;5;117m",
-        "vsky": "\033[38;5;39m",
-        "lmagenta": "\033[38;5;205m",
-        "magenta": "\033[38;5;5m",
-        "vmagenta": "\033[38;5;198m",
-        "lav": "\033[38;5;183m",
-        "lpurple": "\033[38;5;135m",
-        "purple": "\033[38;5;129m",
-        "dpurple": "\033[38;5;93m",
-        "lplum": "\033[38;5;177m",
-        "plum": "\033[38;5;128m",
-        "vplum": "\033[38;5;201m",
-        "lpink": "\033[38;5;218m",
-        "pink": "\033[38;5;206m",
-        "vpink": "\033[38;5;199m",
-        "cyan": "\033[38;5;6m",
-        "vcyan": "\033[38;5;51m",
-        "orange": "\033[38;5;208m",
-        "vorange": "\033[38;5;202m",
-        "copper": "\033[38;5;166m",
-        "yellow": "\033[38;5;3m",
-        "vyellow": "\033[38;5;226m",
-        "gold": "\033[38;5;220m",
-        "brass": "\033[38;5;178m",
-        "bronze": "\033[38;5;136m",
-        "brown": "\033[38;5;94m",
-        "sand": "\033[38;5;215m",
-        "lbrown": "\033[38;5;138m",
-        "silver": "\033[38;5;12m",
-        "dsilver": "\033[38;5;10m",
-        "gray": "\033[38;5;248m",
-        "dgray": "\033[38;5;8m",
-        "plat": "\033[38;5;252m",
-        "white": "\033[38;5;15m",
-        "vwhite": "\033[38;5;231m"
-    }
-
-    EFFECT_MAP: Dict[str, str] = {
-        "reverse"      : "\033[7m",
-        "bold"         : "\033[1m",
-        "dim"          : "\033[2m",
-        "italic"       : "\033[3m",
-        "underline"    : "\033[4m",
-        "overline"     : "\033[53m",
-        "strikethru"   : "\033[9m",
-        "conceal"      : "\033[8m",
-        "blink"        : "\033[5m",
-
-    }
 
     CONTROL_MAP: Dict[str, str] = {
+        "alt_buffer": "\033[?1049h",
+        "normal_buffer": "\033[?1049l",
+        "alt_buffer_no_save": "\033[?47h",  # Switch to alternate buffer without saving the cursor
+        "normal_buffer_no_save": "\033[?47l",  # Switch back to normal buffer without restoring the cursor
         "clear_line": "\033[2K",
         "clear_screen": "\033[2J",
+        "cursor_position": "\033[{row};{col}H",
+        "cursor_home": "\033[H",  # Move cursor to the home position (top-left corner)
         "move_cursor_up": "\033[{n}A",
         "move_cursor_down": "\033[{n}B",
         "move_cursor_right": "\033[{n}C",
         "move_cursor_left": "\033[{n}D",
         "save_cursor_position": "\033[s",
         "restore_cursor_position": "\033[u",
-    }
-
-    STYLES: Dict[str, TextStyle] = {
-        "default"      : TextStyle(),
-        "top_level_label": TextStyle(bold=True, italic=True),
-        "sub_level_label": TextStyle(color='sky'),
-        "numbers"      : TextStyle(color="yellow"),
-        'main_bullets' : TextStyle(color="purple"),
-        "sub_bullets"  : TextStyle(color="pink"),
-        "sub_proj"     : TextStyle(color="cyan"),
-        "sub_bullet_title": TextStyle(color="orange"),
-        "sub_bullet_sentence": TextStyle(color="vblue"),
-        "default_bg"   : TextStyle(bg_color="black"),
-        "white"        : TextStyle(color="white"),
-        "gray"         : TextStyle(color="gray"),
-        "dgray"        : TextStyle(color="dgray"),
-        "black"        : TextStyle(color="black"),
-        "green"        : TextStyle(color="green", bold=True),
-        "vgreen"       : TextStyle(color="vgreen", bold=True),
-        "log_true"     : TextStyle(color='vgreen'),
-        "bg_color_green": TextStyle(color="white", bg_color='green'),
-        "red"          : TextStyle(color="red"),
-        "vred"         : TextStyle(color="vred", bold=True),
-        "blue"         : TextStyle(color="blue"),
-        "vblue"        : TextStyle(color="vblue"),
-        "sky"          : TextStyle(color="sky"),
-        "vsky"         : TextStyle(color="vsky"),
-        "yellow"       : TextStyle(color="yellow"),
-        "vyellow"      : TextStyle(color="vyellow"),
-        "brass"        : TextStyle(color="brass"),
-        "bronze"       : TextStyle(color="bronze"),
-        "lbrown"       : TextStyle(color="lbrown"),
-        "vorange"      : TextStyle(color="vorange"),
-        "lplum"        : TextStyle(color="lplum"),
-        "plum"         : TextStyle(color="plum"),
-        "vplum"        : TextStyle(color="vplum"),
-        "lmagenta"     : TextStyle(color="lmagenta"),
-        "magenta"      : TextStyle(color="magenta", bold=True),
-        "vmagenta"     : TextStyle(color="vmagenta"),
-        "lpink"        : TextStyle(color="lpink"),
-        "pink"         : TextStyle(color="pink",),
-        "vpink"        : TextStyle(color="vpink"),
-        "purple"       : TextStyle(color="purple"),
-        "dpurple"      : TextStyle(color="dpurple"),
-        "gold"         : TextStyle(color="gold"),
-        "cyan"         : TextStyle(color="cyan"),
-        "vcyan"        : TextStyle(color="vcyan"),
-        "orange"       : TextStyle(color="orange"),
-        "orangewhite"  : TextStyle(color="green", bg_color='dgray', underline=True),
-        "copper"       : TextStyle(color="copper"),
-        "brown"        : TextStyle(color="brown"),
-        "sand"         : TextStyle(color="sand"),
-        "lav"          : TextStyle(color="lav"),
-        "lpurple"      : TextStyle(color="lpurple"),
-        "plat"         : TextStyle(color="plat"),
-        "silver"       : TextStyle(color="dfff", bg_color="dsilver"),
-        "dfff"        : TextStyle(color="dfff", bg_color="purple", reverse=True),
-        "vwhite"       : TextStyle(color="vwhite"),
-        "header"       : TextStyle(color="vcyan"),
-        "header_text"  : TextStyle(color="purple", bg_color="gray", bold=True, italic=True),
-        "header_text2" : TextStyle(color="gray", bg_color="purple", bold=True),
-        "task"         : TextStyle(color="blue", bold=True),
-        "path"         : TextStyle(color="blue"),
-        "filename"     : TextStyle(color="yellow"),
-        "line_info"    : TextStyle(color="yellow", bold=True),
-        "line_number"  : TextStyle(color="orange", bold=True),
-        "function_name": TextStyle(color="yellow", italic=True),
-        "error_message": TextStyle(color="vred", bold=True, dim=True),
-        "code"         : TextStyle(color="yellow"),
-        "dict_key": TextStyle(color="sky"),
-        "dict_value": TextStyle(color="white"),
-        "true": TextStyle(color="vgreen"),
-        "false": TextStyle(color="vred"),
-        'none': TextStyle(color="lpurple"),
-        "int": TextStyle(color="cyan"),
-        "float": TextStyle(color="vcyan"),
-        "other": TextStyle(color="lav"),
-        "conceal": TextStyle(conceal=True),
-    }
-
-    LOGGING_STYLES: Dict[str, TextStyle] = {
-        "default": TextStyle(),
-        "timestamp": TextStyle(color="white"),
-        "class_name": TextStyle(color="dfff"),
-        "method_name": TextStyle(color="lpurple"),
-        "line_number": TextStyle(color="lav"),
-        "debug": TextStyle(color="blue"),
-        "info": TextStyle(color="green"),
-        "warning": TextStyle(color="yellow"),
-        "error": TextStyle(color="red"),
-        "critical": TextStyle(color="vred"),
-        "dict_key": TextStyle(color="sky"),
-        "dict_value": TextStyle(color="white"),
-        "true": TextStyle(color="vgreen"),
-        "false": TextStyle(color="vred"),
-        'none': TextStyle(color="lpurple"),
-        "int": TextStyle(color="cyan"),
-        "float": TextStyle(color="vcyan"),
-        "other": TextStyle(color="lav"),
     }
 
 
@@ -336,35 +188,38 @@ class PrintsCharming:
         """
         Initialize PrintsCharming with args to any of these optional parameters.
 
-        :param config: enable or disable various functionalities of this class. Default is the PrintsCharming.CONFIG dictionary above
-        :param color_map: supply your own color_map dictionary. Default is the PrintsCharming.COLOR_MAP dictionary above
+        :param config: enable or disable various functionalities of this class.
+        :param color_map: supply your own color_map dictionary. 'color_name': 'ansi_code'
         :param bg_color_map: supply your own bg_color_map dictionary. Default is computed from color_map dictionary
         :param effect_map: supply your own effect_map dictionary. Default is the PrintsCharming.EFFECT_MAP dictionary above
-        :param styles: supply your own styles dictionary. Default is the PrintsCharming.STYLES dictionary above
+        :param styles: supply your own styles dictionary. Default is a copy of the DEFAULT_STYLES dictionary unless cls.shared_styles is defined.
         :param printscharming_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
         :param logging_styles: A separate dict for logging_styles.
         :param autoconf_win: If your using legacy windows cmd prompt and not getting colored/styled text then change this to True to make things work.
         """
 
-        self.config = {**PrintsCharming.CONFIG, **(config or {})}
+        self.config = {**DEFAULT_CONFIG, **(config or {})}
 
-        self.color_map = color_map or PrintsCharming.COLOR_MAP.copy()
+        # Set self.color_map based on the provided arguments and class-level settings
+        self.color_map = color_map or PrintsCharming.shared_color_map or DEFAULT_COLOR_MAP.copy()
         self.color_map.setdefault('default', PrintsCharming.RESET)
 
-        self.bg_color_map = bg_color_map or {
-                color: self.compute_bg_color_map(code) for color, code in self.color_map.items()
-            }
+        # Set self.bg_color_map based on the provided arguments and class-level settings
+        self.bg_color_map = bg_color_map or PrintsCharming.shared_bg_color_map or {
+                    color: PrintsCharming.compute_bg_color_map(code) for color, code in self.color_map.items()
+                }
 
-        self.effect_map = effect_map or PrintsCharming.EFFECT_MAP.copy()
+        self.effect_map = effect_map or PrintsCharming.shared_effect_map
 
-        self.styles = styles or PrintsCharming.STYLES.copy()
+        self.styles = styles or PrintsCharming.shared_styles or DEFAULT_STYLES.copy()
 
         self.style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
         }
 
-        self.logging_styles = logging_styles or PrintsCharming.LOGGING_STYLES.copy()
+        self.logging_styles = logging_styles or PrintsCharming.shared_logging_styles or DEFAULT_LOGGING_STYLES.copy()
+
 
         self.logging_style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.logging_styles.items() if self.logging_styles[name].color in self.color_map
@@ -398,7 +253,6 @@ class PrintsCharming:
         # Setup logging
         self.logger = None
         self.setup_logging(self.config["internal_logging"], self.config["log_level"])
-
 
 
 
@@ -632,8 +486,8 @@ class PrintsCharming:
         return styled_text
 
 
-
-    def compute_bg_color_map(self, code):
+    @staticmethod
+    def compute_bg_color_map(code):
         if '[38' in code:
             bg_code = code.replace('[38', '[48')  # Change to background color for 256-color codes
         elif '[9' in code:
