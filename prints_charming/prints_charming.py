@@ -36,7 +36,7 @@ class PrintsCharmingLogHandler(logging.Handler):
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, pc: 'PrintsCharming' = None, styles: Dict[str, TextStyle] = None, timestamp_style: str = 'timestamp',
-                 level_styles: Optional[Dict[str, str]] = None):
+                 level_styles: Optional[Dict[str, str]] = None, timestamp_format: str = None):
         super().__init__()
         self.pc = pc or PrintsCharming(styles=styles)
         self.timestamp_style = timestamp_style
@@ -48,6 +48,7 @@ class PrintsCharmingLogHandler(logging.Handler):
             'CRITICAL': 'critical'
         }
         self.pc.log_level_styles = self.level_styles
+        self.timestamp_format = timestamp_format or self.TIMESTAMP_FORMAT
 
     def emit(self, record: logging.LogRecord):
         try:
@@ -73,7 +74,7 @@ class PrintsCharmingLogHandler(logging.Handler):
         return message
 
     def handle_log_event(self, text: str, log_level: str):
-        timestamp = datetime.now().strftime(self.TIMESTAMP_FORMAT)
+        timestamp = datetime.now().strftime(self.timestamp_format)
 
         log_level_style = self.level_styles.get(log_level, 'default')
 
@@ -93,7 +94,7 @@ class PrintsCharmingLogHandler(logging.Handler):
 
 class PrintsCharming:
     RESET = "\033[0m"
-    TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+    _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
     """
@@ -101,6 +102,10 @@ class PrintsCharming:
     It also includes TextStyle, a dataclass for managing text styles. In the COLOR_MAP "v" before a color stands for "vibrant".
 
     Note: This module is developed and tested on Linux and is intended for use in Linux terminals.
+
+    Optional Feature: The `set_shared_maps` class method allows for shared configurations across all instances, 
+    but it is entirely optional. If you do not need shared configurations, you can skip this method and proceed 
+    with individual instance configurations.
 
     """
 
@@ -111,50 +116,43 @@ class PrintsCharming:
     shared_styles: Optional[Dict[str, TextStyle]] = None
     shared_logging_styles: Optional[Dict[str, TextStyle]] = None
 
+    # This method is entirely optional and not required for the basic usage of the PrintsCharming class.
     @classmethod
     def set_shared_maps(cls,
-                        shared_color_map: Dict[str, str] = None,
-                        shared_bg_color_map: Dict[str, str] = None,
+                        shared_color_map: Optional[Dict[str, str]] = None,
+                        shared_bg_color_map: Optional[Dict[str, str]] = None,
                         shared_effect_map: Optional[Dict[str, str]] = None,
                         shared_styles: Optional[Dict[str, TextStyle]] = None,
                         shared_logging_styles: Optional[Dict[str, TextStyle]] = None):
         """
-        **Advanced Use Only:**
+        Set shared maps across all instances of the PrintsCharming class.
 
-        This method is intended for very advanced users who understand the full implications of setting shared maps.
-        These maps include color mappings, background color mappings, effect mappings, styles, and logging styles.
-        Using this method improperly can lead to unexpected behavior, particularly when initializing multiple instances
-        of PrintsCharming.
+        **Purpose:**
+        The `set_shared_maps` method allows you to define shared configurations that are accessible by all instances of the
+        PrintsCharming class. This method lets you establish a consistent set of color maps, styles, and effects that will be
+        applied uniformly across all instances unless specifically overridden. This behavior is similar to having default
+        configurations that other libraries might hardcode, but with the added flexibility that you can modify these shared
+        configurations at runtime.
 
-        **Happily Ever After Fairy Tale Use Case:**
-        - There are fairy tale-like scenarios where this method, in combination with the `__init__` method, creates a
-          powerful and elegant solution for managing multiple instances with shared configurations.
-        - After calling this class method with a `shared_color_map`, every new instance of the class will automatically
-          share this `shared_color_map` unless you explicitly pass a different `color_map` to the instance's `__init__` method.
+        **Flexibility & Power:**
+        While this method allows you to set shared configurations that apply to all instances—similar to class-level
+        defaults—PrintsCharming’s true strength lies in its flexibility. Unlike many similar libraries with rigid,
+        predefined constants, PrintsCharming offers the freedom to configure each instance individually. This approach
+        gives you the power to either enforce consistency across all instances or tailor the behavior and styling of text
+        printing according to the specific needs of your application.
 
-        **In a Perfect World:**
-        - Imagine a perfect world like a fairy tale where you have the power to define your own constants, just like those
-          hardcoded in most libraries. This method allows you to create and manage your own custom named colors via `shared_color_map`.
-        - This high configurability grants you full control to mimic traditional class-level constants in your own unique way.
+        **When to Use This Method:**
+        - If you have a scenario where consistent styling or configurations are required across all instances, using
+          `set_shared_maps` can be very powerful.
+        - For many other cases, where instance-specific customization is more appropriate, you can skip this method
+          altogether and rely on individual configurations for each instance.
 
-        **The Real World - Greater Flexibility:**
-        - While mimicking traditional class-level constants can be powerful, **not imitating this behavior** opens up even greater
-          functionality. Unlike many similar libraries, PrintsCharming allows each instance to have its own `color_map`.
-        - This instance-specific flexibility can make more sense for many use cases, providing you with unparalleled control
-          over how colors are managed on a per-instance basis.
-        - If you feel comfortable imitating class-level constants and that suits your needs, go for it. But remember, the
-          ability to configure each instance independently is what truly sets PrintsCharming apart, offering more versatility
-          than most other libraries.
+        **Important Considerations:**
+        - This method is an option, not a requirement. Use it when it makes sense for your project.
+        - Shared maps set through this method will be applied to all future instances unless overridden in the instance's
+          `__init__` method.
 
-        **Caution:**
-        - **99% of users should not use this method.** The most straightforward way to use this class is to ignore this
-          method entirely.
-        - For the remaining 1% of you who are very advanced users, I highly discourage setting any parameters other than
-          `shared_color_map`.
-        - In a perfect world, this method would be used sparingly and with a deep understanding of its effects.
-
-        **If you're unsure whether you should be using this method, it's best to avoid it.**
-
+        **Parameters:**
         :param shared_color_map: (Optional) A dictionary of shared color mappings to be accessible globally across
                                  all instances. If not provided, `DEFAULT_COLOR_MAP.copy()` will be used.
         :param shared_bg_color_map: (Optional) A dictionary of shared background color mappings. to be accessible globally across
@@ -162,15 +160,13 @@ class PrintsCharming:
                                     from shared_color_map.
         :param shared_effect_map: (Optional) A dictionary of effect mappings.
                                   **This should not be changed unless you are certain of what you're doing.**
-        :param shared_styles: (Optional) A dictionary of shared styles.
-                              **Consider carefully before setting this parameter.**
-        :param shared_logging_styles: (Optional) A dictionary of shared logging styles.
-                                      **Advanced users only.**
+        :param shared_styles: (Optional) A dictionary of shared styles. This allows for the consistent application
+                              of text styles across all instances.
+        :param shared_logging_styles: (Optional) A dictionary of shared logging styles, useful for ensuring uniform
+                                      logging output across instances.
         """
 
-        # Logging a warning to indicate that this method is intended for advanced users
-        cls._log_advanced_use_warning()
-
+        # Setting the shared maps to be used globally across instances
         cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
         cls.shared_color_map.setdefault('default', PrintsCharming.RESET)
         cls.shared_bg_color_map = shared_bg_color_map or {
@@ -186,15 +182,6 @@ class PrintsCharming:
         if shared_logging_styles:
             cls.shared_logging_styles = shared_logging_styles
 
-    @classmethod
-    def _log_advanced_use_warning(cls):
-        """Log a warning that this method is intended for advanced users."""
-        import warnings
-        warnings.warn(
-            "Warning: `set_shared_maps` is an advanced feature. Improper use can lead to unexpected behavior. "
-            "This method is intended for advanced users who fully understand the implications.",
-            UserWarning
-        )
 
 
 
@@ -372,7 +359,7 @@ class PrintsCharming:
             message = message.format(**kwargs)
 
         timestamp = time.time()
-        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self.TIMESTAMP_FORMAT)
+        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self._TIMESTAMP_FORMAT)
 
         timestamp_style = 'timestamp'
 
@@ -660,7 +647,7 @@ class PrintsCharming:
             )
 
         else:
-            style_code = self.style_codes.get(style_name, self.styles[style_name].color)
+            style_code = self.style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
 
         # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset}"
@@ -1309,8 +1296,8 @@ def get_default_printer() -> Any:
 
 
 class TableManager:
-    def __init__(self, cp: PrintsCharming = None, style_themes: dict = None, conditional_styles: dict = None):
-        self.cp = cp or PrintsCharming()
+    def __init__(self, pc: PrintsCharming = None, style_themes: dict = None, conditional_styles: dict = None):
+        self.pc = pc or PrintsCharming()
         self.style_themes = style_themes
         self.conditional_styles = conditional_styles
         self.tables = {}
@@ -1355,9 +1342,9 @@ class TableManager:
         """
 
         if use_styles:
-            styled_col_sep = self.cp.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
+            styled_col_sep = self.pc.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
         else:
-            styled_col_sep = self.cp.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
+            styled_col_sep = self.pc.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
 
         # 1. Automatic Column Sizing
         max_col_lengths = [0] * len(table_data[0])
@@ -1397,42 +1384,42 @@ class TableManager:
                 if row_idx == 0:
                     # Apply header styles
                     if header_column_styles and i in header_column_styles:
-                        aligned_cell = self.cp.apply_style(header_column_styles[i], aligned_cell)
+                        aligned_cell = self.pc.apply_style(header_column_styles[i], aligned_cell)
                     elif header_style:
-                        aligned_cell = self.cp.apply_style(header_style, aligned_cell)
+                        aligned_cell = self.pc.apply_style(header_style, aligned_cell)
                 else:
                     if header[i] == 'Color Name':
-                        aligned_cell = self.cp.apply_color(cell_str, aligned_cell)
+                        aligned_cell = self.pc.apply_color(cell_str, aligned_cell)
                     elif header[i] == 'Foreground Text':
                         color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.cp.apply_color(color_name, aligned_cell)
+                        aligned_cell = self.pc.apply_color(color_name, aligned_cell)
                     elif header[i] == 'Background Block':
                         color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.cp.return_bg(color_name, length=max_length)
+                        aligned_cell = self.pc.return_bg(color_name, length=max_length)
 
                     # Apply conditional styles if provided
                     elif conditional_styles and header[i] in conditional_styles:
                         for condition in conditional_styles[header[i]]:
                             if condition["type"] == "below" and isinstance(cell, (int, float)) and cell < condition["value"]:
-                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
                             elif condition["type"] == "above_or_equal" and isinstance(cell, (int, float)) and cell >= condition["value"]:
-                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
                             elif condition["type"] == "equals" and cell_str == condition["value"]:
-                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
                             elif condition["type"] == "in_list" and cell_str in condition["value"]:
-                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
                             elif condition["type"] == "not_in_list" and cell_str not in condition["value"]:
-                                aligned_cell = self.cp.apply_style(condition["style"], aligned_cell)
+                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
                     elif column_styles and i in column_styles:
                         # Apply column-specific styles if provided
-                        aligned_cell = self.cp.apply_style(column_styles[i], aligned_cell)
+                        aligned_cell = self.pc.apply_style(column_styles[i], aligned_cell)
                     elif cell_style:
                         if isinstance(cell_style, list):
                             # Apply alternating styles based on the row index
                             style_to_apply = cell_style[0] if row_idx % 2 == 1 else cell_style[1]
-                            aligned_cell = self.cp.apply_style(style_to_apply, aligned_cell)
+                            aligned_cell = self.pc.apply_style(style_to_apply, aligned_cell)
                         else:
-                            aligned_cell = self.cp.apply_style(cell_style, aligned_cell)
+                            aligned_cell = self.pc.apply_style(cell_style, aligned_cell)
 
 
                 # Add aligned and styled cell to the row
@@ -1440,7 +1427,7 @@ class TableManager:
 
             # Create a row string and add to table output
             if target_text_box:
-                row_str = self.cp.apply_style(col_sep_style, col_sep.lstrip()) + styled_col_sep.join(aligned_row) + self.cp.apply_style(col_sep_style, col_sep.rstrip())
+                row_str = self.pc.apply_style(col_sep_style, col_sep.lstrip()) + styled_col_sep.join(aligned_row) + self.pc.apply_style(col_sep_style, col_sep.rstrip())
             else:
                 row_str = styled_col_sep + styled_col_sep.join(aligned_row) + styled_col_sep
             table_output.append(row_str)
@@ -1450,7 +1437,7 @@ class TableManager:
         border_line = ""  # Initialize border_line to ensure it always has a value
         if border_style:
             border_length = sum(max_col_lengths) + len(max_col_lengths) * len(col_sep) + len(col_sep) - 2
-            border_line = self.cp.apply_style(border_style, border_char * border_length)
+            border_line = self.pc.apply_style(border_style, border_char * border_length)
             #print(f' {border_line}')
             if target_text_box:
                 table_str += f'{border_line}\n'
@@ -1458,7 +1445,7 @@ class TableManager:
                 table_str += f' {border_line}\n'
 
         if show_table_name and table_name:
-            centered_table_name = self.cp.apply_style(self.title_style, table_name.center(border_length))
+            centered_table_name = self.pc.apply_style(self.title_style, table_name.center(border_length))
             table_str += f'{centered_table_name}\n'
             if border_style:
                 table_str += f'{border_line}\n'
@@ -1489,8 +1476,8 @@ class TableManager:
 
 
 class FormattedTextBox:
-    def __init__(self, cp=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=1, vert_char='|'):
-        self.cp = cp if cp else PrintsCharming()
+    def __init__(self, pc=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=1, vert_char='|'):
+        self.pc = pc if pc else PrintsCharming()
         self.terminal_width = get_terminal_width()
         self.horiz_width = horiz_width if horiz_width else self.terminal_width
         self.horiz_char = horiz_char
@@ -1499,6 +1486,7 @@ class FormattedTextBox:
         self.vert_padding = vert_padding * ' '
         self.vert_char = horiz_char if vert_width and not vert_char else vert_char
         self.vert_border = '' if not vert_width else vert_width * self.vert_char
+        self.available_width = None
 
 
     def align_text(self, text, available_width, align='center'):
@@ -1553,9 +1541,9 @@ class FormattedTextBox:
             if isinstance(alignments, str):
                 alignments = [alignments, alignments, alignments]
 
-            left_aligned = self.cp.apply_style(styles[0], self.align_text(strings[0], left_right_width, alignments[0]))
-            center_aligned = self.cp.apply_style(styles[1], self.align_text(strings[1], center_width, alignments[1]))
-            right_aligned = self.cp.apply_style(styles[2], self.align_text(strings[2], left_right_width, alignments[2]))
+            left_aligned = self.pc.apply_style(styles[0], self.align_text(strings[0], left_right_width, alignments[0]))
+            center_aligned = self.pc.apply_style(styles[1], self.align_text(strings[1], center_width, alignments[1]))
+            right_aligned = self.pc.apply_style(styles[2], self.align_text(strings[2], left_right_width, alignments[2]))
 
             # Concatenate the aligned strings
             return left_aligned + center_aligned + right_aligned
@@ -1581,8 +1569,8 @@ class FormattedTextBox:
             if isinstance(alignments, str):
                 alignments = [alignments, alignments]
 
-            left_aligned = self.cp.apply_style(styles[0], self.align_text(strings[0], part_width, alignments[0]))
-            right_aligned = self.cp.apply_style(styles[1], self.align_text(strings[1], part_width, alignments[1]))
+            left_aligned = self.pc.apply_style(styles[0], self.align_text(strings[0], part_width, alignments[0]))
+            right_aligned = self.pc.apply_style(styles[1], self.align_text(strings[1], part_width, alignments[1]))
 
             # Concatenate the aligned strings
             return left_aligned + right_aligned
@@ -1625,7 +1613,14 @@ class FormattedTextBox:
 
 
     def get_available_width(self):
-        return self.horiz_width - (2 * self.vert_width) - (len(self.vert_padding) * 2) if self.vert_border else self.horiz_width - (len(self.vert_padding) * 2)
+        if self.available_width is None:
+            self.available_width = (
+                self.horiz_width - (2 * self.vert_width) - (len(self.vert_padding) * 2)
+                if self.vert_border
+                else self.horiz_width - (len(self.vert_padding) * 2)
+            )
+        return self.available_width
+
 
     def strip_ansi_escape_sequences(self, text):
         ansi_escape = re.compile(r'\x1b\[([0-9]+)(;[0-9]+)*m')
@@ -1634,21 +1629,21 @@ class FormattedTextBox:
     def print_simple_border_boxed_text(self, title, subtitle='', align='center'):
         available_width = self.get_available_width()
 
-        title_aligned_text = self.cp.apply_style('vgreen', self.align_text(title, available_width, align))
+        title_aligned_text = self.pc.apply_style('vgreen', self.align_text(title, available_width, align))
 
         if subtitle:
-            subtitle_aligned_text = self.cp.apply_style('white', self.align_text(subtitle, available_width, align))
+            subtitle_aligned_text = self.pc.apply_style('white', self.align_text(subtitle, available_width, align))
         else:
             subtitle_aligned_text = ''
 
-        horiz_border_top = self.cp.apply_style('purple', self.horiz_border)
-        horiz_border_bottom = self.cp.apply_style('orange', self.horiz_border)
+        horiz_border_top = self.pc.apply_style('purple', self.horiz_border)
+        horiz_border_bottom = self.pc.apply_style('orange', self.horiz_border)
 
-        title_vert_border_left = self.cp.apply_style('orange', self.vert_border) + self.vert_padding
-        title_vert_border_right = self.vert_padding + self.cp.apply_style('purple', self.vert_border)
+        title_vert_border_left = self.pc.apply_style('orange', self.vert_border) + self.vert_padding
+        title_vert_border_right = self.vert_padding + self.pc.apply_style('purple', self.vert_border)
 
-        subtitle_vert_border_left = self.cp.apply_style('orange', self.vert_border) + self.vert_padding
-        subtitle_vert_border_right = self.vert_padding + self.cp.apply_style('purple', self.vert_border)
+        subtitle_vert_border_left = self.pc.apply_style('orange', self.vert_border) + self.vert_padding
+        subtitle_vert_border_right = self.vert_padding + self.pc.apply_style('purple', self.vert_border)
 
         formatted_title_line = f"{title_vert_border_left}{title_aligned_text}{title_vert_border_right}"
         if subtitle:
@@ -1663,39 +1658,39 @@ class FormattedTextBox:
 
 
     def build_styled_border_box(self, horiz_border_top=True, horiz_border_top_style=None,
-                         horiz_border_bottom=True, horiz_border_bottom_style=None,
-                         vert_border_left=True, vert_border_left_style=None,
-                         vert_border_right=True, vert_border_right_style=None):
+                                horiz_border_bottom=True, horiz_border_bottom_style=None,
+                                vert_border_left=True, vert_border_left_style=None,
+                                vert_border_right=True, vert_border_right_style=None):
 
         if horiz_border_top:
-            horiz_border_top = self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border)
+            horiz_border_top = self.horiz_border if not horiz_border_top_style else self.pc.apply_style(horiz_border_top_style, self.horiz_border)
         else:
             horiz_border_top = None
 
         if horiz_border_bottom:
-            horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style, self.horiz_border)
+            horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.pc.apply_style(horiz_border_bottom_style, self.horiz_border)
         else:
             horiz_border_bottom = None
 
         if self.vert_char == ' ':
             if vert_border_left:
-                vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.cp.apply_bg_color(vert_border_left_style, self.vert_border) + self.vert_padding
+                vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.pc.apply_bg_color(vert_border_left_style, self.vert_border) + self.vert_padding
             else:
                 vert_border_left = self.vert_padding
 
             if vert_border_right:
-                vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.cp.apply_bg_color(vert_border_right_style, self.vert_border)
+                vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.pc.apply_bg_color(vert_border_right_style, self.vert_border)
             else:
                 vert_border_right = self.vert_padding
 
         else:
             if vert_border_left:
-                vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.cp.apply_style(vert_border_left_style, self.vert_border) + self.vert_padding
+                vert_border_left = self.vert_border + self.vert_padding if not vert_border_left_style else self.pc.apply_style(vert_border_left_style, self.vert_border) + self.vert_padding
             else:
                 vert_border_left = self.vert_padding
 
             if vert_border_right:
-                vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.cp.apply_style(vert_border_right_style, self.vert_border)
+                vert_border_right = self.vert_padding + self.vert_border if not vert_border_right_style else self.vert_padding + self.pc.apply_style(vert_border_right_style, self.vert_border)
             else:
                 vert_border_right = self.vert_padding
 
@@ -1739,25 +1734,25 @@ class FormattedTextBox:
         subtext_lines = self.split_text_to_lines(subtext, available_width) if subtext else []
 
         if horiz_border_top:
-            horiz_border_top = self.horiz_border if not horiz_border_top_style else self.cp.apply_style(horiz_border_top_style, self.horiz_border)
+            horiz_border_top = self.horiz_border if not horiz_border_top_style else self.pc.apply_style(horiz_border_top_style, self.horiz_border)
             print(horiz_border_top)
 
         if first_line_blank:
             blank_text = ' '
             blank_aligned_text = self.align_text(blank_text, available_width, text_align)
             if self.vert_border:
-                blank_text_vert_border_left = self.vert_border + self.vert_padding if not text_vert_border_l_style else self.cp.apply_style(text_vert_border_l_style, self.vert_border) + self.vert_padding
-                blank_text_vert_border_right = self.vert_padding + self.vert_border + self.vert_padding if not text_vert_border_r_style else self.vert_padding + self.cp.apply_style(text_vert_border_r_style, self.vert_border)
+                blank_text_vert_border_left = self.vert_border + self.vert_padding if not text_vert_border_l_style else self.pc.apply_style(text_vert_border_l_style, self.vert_border) + self.vert_padding
+                blank_text_vert_border_right = self.vert_padding + self.vert_border + self.vert_padding if not text_vert_border_r_style else self.vert_padding + self.pc.apply_style(text_vert_border_r_style, self.vert_border)
                 print(f"{blank_text_vert_border_left}{blank_aligned_text}{blank_text_vert_border_right}")
             else:
                 print(f"{self.vert_padding}{blank_aligned_text}{self.vert_padding}")
 
 
         for line in text_lines:
-            aligned_text = self.cp.apply_style(text_style, self.align_text(line, available_width, text_align))
+            aligned_text = self.pc.apply_style(text_style, self.align_text(line, available_width, text_align))
             if self.vert_border:
-                text_vert_border_left = self.vert_border + self.vert_padding if not text_vert_border_l_style else self.cp.apply_style(text_vert_border_l_style, self.vert_border) + self.vert_padding
-                text_vert_border_right = self.vert_padding + self.vert_border + self.vert_padding if not text_vert_border_r_style else self.vert_padding + self.cp.apply_style(text_vert_border_r_style, self.vert_border)
+                text_vert_border_left = self.vert_border + self.vert_padding if not text_vert_border_l_style else self.pc.apply_style(text_vert_border_l_style, self.vert_border) + self.vert_padding
+                text_vert_border_right = self.vert_padding + self.vert_border + self.vert_padding if not text_vert_border_r_style else self.vert_padding + self.pc.apply_style(text_vert_border_r_style, self.vert_border)
                 print(f"{text_vert_border_left}{aligned_text}{text_vert_border_right}")
             else:
                 txt_vert_border_left = self.vert_padding
@@ -1765,16 +1760,16 @@ class FormattedTextBox:
                 print(f"{self.vert_padding}{aligned_text}{self.vert_padding}")
 
         for line in subtext_lines:
-            aligned_subtext = self.cp.apply_style(subtext_style, self.align_text(line, available_width, subtext_align))
+            aligned_subtext = self.pc.apply_style(subtext_style, self.align_text(line, available_width, subtext_align))
             if self.vert_border:
-                subtext_vert_border_left = self.vert_border + self.vert_padding if not subtext_vert_border_l_style else self.cp.apply_style(subtext_vert_border_l_style, self.vert_border) + self.vert_padding
-                subtext_vert_border_right = self.vert_padding + self.vert_border if not subtext_vert_border_r_style else self.vert_padding + self.cp.apply_style(subtext_vert_border_r_style, self.vert_border)
+                subtext_vert_border_left = self.vert_border + self.vert_padding if not subtext_vert_border_l_style else self.pc.apply_style(subtext_vert_border_l_style, self.vert_border) + self.vert_padding
+                subtext_vert_border_right = self.vert_padding + self.vert_border if not subtext_vert_border_r_style else self.vert_padding + self.pc.apply_style(subtext_vert_border_r_style, self.vert_border)
                 print(f"{subtext_vert_border_left}{aligned_subtext}{subtext_vert_border_right}")
             else:
                 print(f"{self.vert_padding}{aligned_subtext}{self.vert_padding}")
 
         if horiz_border_bottom:
-            horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.cp.apply_style(horiz_border_bottom_style, self.horiz_border)
+            horiz_border_bottom = self.horiz_border if not horiz_border_bottom_style else self.pc.apply_style(horiz_border_bottom_style, self.horiz_border)
             print(horiz_border_bottom)
 
 
@@ -1807,7 +1802,7 @@ class FormattedTextBox:
                     line = ' '
                     aligned_text = self.align_text(line, available_width, text_align)
                 else:
-                    aligned_text = self.cp.apply_style(text_style, self.align_text(line, available_width, text_align))
+                    aligned_text = self.pc.apply_style(text_style, self.align_text(line, available_width, text_align))
 
                 final_text = self.construct_text(vert_border_left, vert_border_right, aligned_text)
 
@@ -1826,7 +1821,7 @@ class FormattedTextBox:
                                  table_strs_vert_border_left=True,
                                  table_strs_vert_border_right=True,
                                  default_table_alignment='center',
-                                 horiz_border_double=False):
+                                 horiz_border_height=1):
 
         # Set default values for parameters if not provided
         if not text_styles:
@@ -1843,7 +1838,7 @@ class FormattedTextBox:
         lines_list = [self.split_text_to_lines(text, available_width) for text in texts]
 
         if horiz_border_top:
-            print(horiz_border_top * 2) if horiz_border_double else print(horiz_border_top)
+            print(horiz_border_top * horiz_border_height)
 
         for lines, text_style, text_align in zip(lines_list, text_styles, text_alignments):
             for line in lines:
@@ -1851,14 +1846,14 @@ class FormattedTextBox:
                     line = ' '
                     aligned_text = self.align_text(line, available_width, text_align)
                 else:
-                    aligned_text = self.cp.apply_style(text_style, self.align_text(line, available_width, text_align))
+                    aligned_text = self.pc.apply_style(text_style, self.align_text(line, available_width, text_align))
 
                 final_text = self.construct_text(vert_border_left, vert_border_right, aligned_text)
 
                 print(final_text)
 
         if horiz_border_bottom:
-            print(horiz_border_bottom * 2) if horiz_border_double else print(horiz_border_bottom)
+            print(horiz_border_bottom * horiz_border_height)
             blank_text = ' '.center(available_width)
             print(f'{vert_border_left}{blank_text}{vert_border_right}')
 
@@ -2131,8 +2126,8 @@ class FormattedTextBox:
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 
-        horiz_border = self.cp.apply_style('purple', self.horiz_border)
-        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+        horiz_border = self.pc.apply_style('purple', self.horiz_border)
+        vert_border = self.pc.apply_style('orange', self.vert_border) if self.vert_border else ''
 
         if horiz_border_top:
             print(horiz_border)
@@ -2149,9 +2144,9 @@ class FormattedTextBox:
                 col_align = col_alignments[col_num] if col_alignments else 'center'
                 if line_num < len(col_lines[col_num]):
                     line = col_lines[col_num][line_num]
-                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align))
+                    aligned_text = self.pc.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align))
                 else:
-                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num])
+                    aligned_text = self.pc.apply_style(col_style, ' ' * col_widths[col_num])
                 row.append(aligned_text)
             if vert_border_left and vert_border_right:
                 print(f"{vert_border}{' '.join(row)}{vert_border}")
@@ -2214,8 +2209,8 @@ class FormattedTextBox:
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 
-        horiz_border = self.cp.apply_style('purple', self.horiz_border)
-        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+        horiz_border = self.pc.apply_style('purple', self.horiz_border)
+        vert_border = self.pc.apply_style('orange', self.vert_border) if self.vert_border else ''
 
         if horiz_border_top:
             print(horiz_border)
@@ -2232,12 +2227,12 @@ class FormattedTextBox:
                 col_align = col_alignments[col_num] if col_alignments else 'center'
                 if line_num < len(col_lines[col_num]):
                     line = col_lines[col_num][line_num]
-                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
+                    aligned_text = self.pc.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
                     #aligned_text = self.align_text(line, col_widths[col_num], col_align)
-                    #styled_text = self.cp.apply_style(col_style, aligned_text.strip())
+                    #styled_text = self.pc.apply_style(col_style, aligned_text.strip())
                     #final_text = styled_text + ' ' * (col_widths[col_num] - len(aligned_text.strip()))
                 else:
-                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
+                    aligned_text = self.pc.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
                     #final_text = ' ' * col_widths[col_num]
                 row.append(aligned_text)
                 #row.append(final_text)
@@ -2297,8 +2292,8 @@ class FormattedTextBox:
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 
-        horiz_border = self.cp.apply_style('purple', self.horiz_border)
-        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+        horiz_border = self.pc.apply_style('purple', self.horiz_border)
+        vert_border = self.pc.apply_style('orange', self.vert_border) if self.vert_border else ''
 
         if horiz_border_top:
             print(horiz_border)
@@ -2315,9 +2310,9 @@ class FormattedTextBox:
                 col_align = col_alignments[col_num] if col_alignments else 'center'
                 if line_num < len(col_lines[col_num]):
                     line = col_lines[col_num][line_num]
-                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
+                    aligned_text = self.pc.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
                 else:
-                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
+                    aligned_text = self.pc.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
                 row.append(aligned_text)
             row_text = f"{self.vert_padding}{col_sep}{self.vert_padding}".join(row)
             if vert_border_left and vert_border_right:
@@ -2375,8 +2370,8 @@ class FormattedTextBox:
         if total_col_width > available_width:
             raise ValueError("Total width of columns exceeds available width.")
 
-        horiz_border = self.cp.apply_style('purple', self.horiz_border)
-        vert_border = self.cp.apply_style('orange', self.vert_border) if self.vert_border else ''
+        horiz_border = self.pc.apply_style('purple', self.horiz_border)
+        vert_border = self.pc.apply_style('orange', self.vert_border) if self.vert_border else ''
 
         if horiz_border_top:
             print(horiz_border)
@@ -2391,9 +2386,9 @@ class FormattedTextBox:
                 col_align = col_alignments[col_num] if col_alignments else 'center'
                 if line_num < len(col_lines[col_num]):
                     line = col_lines[col_num][line_num]
-                    aligned_text = self.cp.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
+                    aligned_text = self.pc.apply_style(col_style, self.align_text(line, col_widths[col_num], col_align), fill_space=False)
                 else:
-                    aligned_text = self.cp.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
+                    aligned_text = self.pc.apply_style(col_style, ' ' * col_widths[col_num], fill_space=False)
                 row.append(aligned_text)
             row_text = f"{self.vert_padding}{col_sep * col_sep_width}{self.vert_padding}".join(row)
             if vert_border_left and vert_border_right:
@@ -2470,7 +2465,7 @@ class PrintsCharmingError(Exception):
 
     def __init__(self,
                  message: str,
-                 cp: 'PrintsCharming',
+                 pc: 'PrintsCharming',
                  apply_style: Callable[[str, str], str],
                  tb_style_name: str = 'default',
                  format_specific_exception: bool = False
@@ -2478,7 +2473,7 @@ class PrintsCharmingError(Exception):
 
         super().__init__(message)
         self.message = message
-        self.cp = cp
+        self.pc = pc
         self.apply_style = apply_style
         self.tb_style_name = tb_style_name
         self.format_specific_exception = format_specific_exception

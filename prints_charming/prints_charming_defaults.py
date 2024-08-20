@@ -133,6 +133,7 @@ DEFAULT_STYLES: Dict[str, TextStyle] = {
         "dfff"        : TextStyle(color="dfff", bg_color="purple", reverse=True),
         "vwhite"       : TextStyle(color="vwhite"),
         "header"       : TextStyle(color="vcyan"),
+        "header_main"  : TextStyle(color="vcyan", bold=True, italic=True),
         "header_text"  : TextStyle(color="purple", bg_color="gray", bold=True, italic=True),
         "header_text2" : TextStyle(color="gray", bg_color="purple", bold=True),
         "task"         : TextStyle(color="blue", bold=True),
