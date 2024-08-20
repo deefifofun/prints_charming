@@ -116,7 +116,7 @@ class PrintsCharming:
     shared_styles: Optional[Dict[str, TextStyle]] = None
     shared_logging_styles: Optional[Dict[str, TextStyle]] = None
 
-    # This method is entirely optional and not required for the basic usage of the PrintsCharming class.
+    # This method is entirely optional and not required for the usage of the PrintsCharming class.
     @classmethod
     def set_shared_maps(cls,
                         shared_color_map: Optional[Dict[str, str]] = None,
