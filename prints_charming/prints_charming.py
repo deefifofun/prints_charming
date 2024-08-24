@@ -2675,6 +2675,8 @@ class WinUtils:
             logging.error(f"Error enabling ANSI handling: {e}")
             return False
 
+
+
     @staticmethod
     def restore_console_mode(handle_type=-11):
         """
