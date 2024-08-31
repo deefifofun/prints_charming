@@ -14,7 +14,11 @@ from dataclasses import dataclass, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from .logging_utils import logger
 from .prints_charming_defaults import DEFAULT_CONFIG, DEFAULT_COLOR_MAP, DEFAULT_EFFECT_MAP, DEFAULT_STYLES, DEFAULT_LOGGING_STYLES
-from .textstyle import TextStyle
+from .prints_style import PrintsStyle
+
+
+
+
 
 
 def get_terminal_width():
@@ -31,14 +35,17 @@ def get_all_subclass_names(cls, trailing_char=None):
 
 
 
-
+# Marked for removal soon!
+# Use from prints_charming.logging import CustomFormatter, CustomLogHandler.
+# Check prints_charming.examples.main for examples.
 class PrintsCharmingLogHandler(logging.Handler):
     TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
-    def __init__(self, pc: 'PrintsCharming' = None, styles: Dict[str, TextStyle] = None, timestamp_style: str = 'timestamp',
+    def __init__(self, pc: 'PrintsCharming' = None, styles: Dict[str, PrintsStyle] = None, timestamp_style: str = 'timestamp',
                  level_styles: Optional[Dict[str, str]] = None, timestamp_format: str = None):
         super().__init__()
-        self.pc = pc or PrintsCharming(styles=styles)
+        self.pc = pc or PrintsCharming(styles=styles if styles else DEFAULT_LOGGING_STYLES.copy())
+        self.apply_style = self.pc.apply_style
         self.timestamp_style = timestamp_style
         self.level_styles = level_styles or {
             'DEBUG': 'debug',
@@ -73,16 +80,17 @@ class PrintsCharmingLogHandler(logging.Handler):
 
         return message
 
+
     def handle_log_event(self, text: str, log_level: str):
         timestamp = datetime.now().strftime(self.timestamp_format)
 
         log_level_style = self.level_styles.get(log_level, 'default')
 
         # Get styled components
-        styled_log_level_prefix = self.pc.apply_logging_style(log_level_style, f"LOG[{log_level}]")
-        styled_timestamp = self.pc.apply_logging_style(self.timestamp_style, timestamp)
-        styled_level = self.pc.apply_logging_style(log_level_style, log_level)
-        styled_text = self.pc.apply_logging_style(log_level_style, text)
+        styled_log_level_prefix = self.apply_style(log_level_style, f"LOG[{log_level}]")
+        styled_timestamp = self.apply_style(self.timestamp_style, timestamp)
+        styled_level = self.apply_style(log_level_style, log_level)
+        styled_text = self.apply_style(log_level_style, text)
 
         # Create the final styled message
         log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
@@ -97,9 +105,10 @@ class PrintsCharming:
     _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
+
     """
     This module provides a PrintsCharming class for handling colored text printing tasks.
-    It also includes TextStyle, a dataclass for managing text styles. In the COLOR_MAP "v" before a color stands for "vibrant".
+    It also includes PrintsStyle, a dataclass for managing text styles. In the COLOR_MAP "v" before a color stands for "vibrant".
 
     Note: This module is developed and tested on Linux and is intended for use in Linux terminals.
 
@@ -113,8 +122,9 @@ class PrintsCharming:
     shared_color_map: Optional[Dict[str, str]] = None
     shared_bg_color_map: Optional[Dict[str, str]] = None
     shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
-    shared_styles: Optional[Dict[str, TextStyle]] = None
-    shared_logging_styles: Optional[Dict[str, TextStyle]] = None
+    shared_styles: Optional[Dict[str, PrintsStyle]] = None
+    shared_logging_styles: Optional[Dict[str, PrintsStyle]] = None
+    shared_internal_logging_styles: Optional[Dict[str, PrintsStyle]] = DEFAULT_LOGGING_STYLES.copy()
 
     # This method is entirely optional and not required for the usage of the PrintsCharming class.
     @classmethod
@@ -122,8 +132,8 @@ class PrintsCharming:
                         shared_color_map: Optional[Dict[str, str]] = None,
                         shared_bg_color_map: Optional[Dict[str, str]] = None,
                         shared_effect_map: Optional[Dict[str, str]] = None,
-                        shared_styles: Optional[Dict[str, TextStyle]] = None,
-                        shared_logging_styles: Optional[Dict[str, TextStyle]] = None):
+                        shared_styles: Optional[Dict[str, PrintsStyle]] = None,
+                        shared_logging_styles: Optional[Dict[str, PrintsStyle]] = None):
         """
         Set shared maps across all instances of the PrintsCharming class.
 
@@ -218,10 +228,10 @@ class PrintsCharming:
                  color_map: Optional[Dict[str, str]] = None,
                  bg_color_map: Optional[Dict[str, str]] = None,
                  effect_map: Optional[Dict[str, str]] = None,
-                 styles: Optional[Dict[str, TextStyle]] = None,
-                 printscharming_variables: Optional[Dict[str, List[str]]] = None,
+                 styles: Optional[Dict[str, PrintsStyle]] = None,
+                 styled_strings: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
-                 logging_styles: Optional[Dict[str, TextStyle]] = None,
+                 logging_styles: Optional[Dict[str, PrintsStyle]] = None,
                  autoconf_win: bool = False
                  ) -> None:
 
@@ -267,15 +277,21 @@ class PrintsCharming:
 
         self.reset = PrintsCharming.RESET
 
-
-        self.variable_map: Dict[str, str] = {}
-        self.word_map: Dict[str, Dict[str, str]] = {}
-        self.phrase_map: Dict[str, Dict[str, str]] = {}
         self.conceal_map: Dict[str, Dict[str, str]] = {}
-        self.substring_map = {}
+        self.styled_phrase_map: Dict[str, Dict[str, str]] = {}
+        self.styled_word_map: Dict[str, Dict[str, str]] = {}
+        self.styled_substring_map: Dict[str, Dict[str, str]] = {}
+        self.styled_variable_map: Dict[str, str] = {}
 
-        if printscharming_variables:
-            self.add_variables_from_dict(printscharming_variables)
+        self.enable_conceal_map = False
+        self.enable_styled_phrase_map = False
+        self.enable_styled_word_map = False
+        self.enable_styled_substring_map = False
+        self.enable_styled_variable_map = False
+
+
+        if styled_strings:
+            self.add_strings_from_dict(styled_strings)
 
         self.style_conditions = style_conditions
         self.style_conditions_map = {}
@@ -590,10 +606,10 @@ class PrintsCharming:
 
 
 
-    def create_style_code(self, style: Union[TextStyle, Dict[str, Any]]):
+    def create_style_code(self, style: Union[PrintsStyle, Dict[str, Any]]):
         style_codes = []
 
-        if isinstance(style, TextStyle):
+        if isinstance(style, PrintsStyle):
             # Add foreground color
             if style.color and style.color in self.color_map:
                 style_codes.append(self.color_map[style.color])
@@ -624,20 +640,27 @@ class PrintsCharming:
         return "".join(style_codes)
 
 
-    def add_style(self, name: str, style: TextStyle):
+    def add_style(self, name: str, style: PrintsStyle):
         self.styles[name] = style
         if self.styles[name].color in self.color_map:
             style_code = self.create_style_code(self.styles[name])
             self.style_codes[name] = style_code
 
 
+    def add_styles(self, styles: dict[str, PrintsStyle]) -> None:
+        for style_name, style in styles.items():
+            if style.color in self.color_map:
+                self.add_style(style_name, style)
+
+
     def get_style_code(self, style_name):
         return self.style_codes.get(style_name, self.style_codes['default'])
 
 
-    def apply_style(self, style_name, text, fill_space=True):
+    def apply_style(self, style_name, text, fill_space=True, reset=True):
         #self.debug("Applying style_name: {} to text: {}", self.apply_logging_style('info', style_name), self.apply_logging_style('info', text))
         #self.debug("Applying style_name: %s to text: %s", self.apply_logging_style('info', style_name), self.apply_logging_style('info', text))
+        text = str(text)
         if text.isspace() and fill_space:
             style_code = self.bg_color_map.get(
                 style_name,
@@ -650,7 +673,7 @@ class PrintsCharming:
             style_code = self.style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
 
         # Append the style code at the beginning of the text and the reset code at the end
-        styled_text = f"{style_code}{text}{self.reset}"
+        styled_text = f"{style_code}{text}{self.reset if reset else ''}"
 
         #escaped_string = self.escape_ansi_codes(styled_text)
         #self.debug('escaped_string: {}', escaped_string)
@@ -679,7 +702,7 @@ class PrintsCharming:
             style_code = self.bg_color_map.get(
                 style_name,
                 self.bg_color_map.get(
-                    self.styles.get(style_name, TextStyle(bg_color="default_bg")).bg_color
+                    self.styles.get(style_name, PrintsStyle(bg_color="default_bg")).bg_color
                 )
             )
         else:
@@ -697,6 +720,7 @@ class PrintsCharming:
 
     def apply_color(self, color_name, text, fill_space=True):
 
+        text = str(text)
         if text.isspace() and fill_space:
             color_code = self.bg_color_map.get(
                 color_name,
@@ -715,21 +739,21 @@ class PrintsCharming:
 
 
     def apply_bg_color(self, color_name, text):
-        bg_color_code = self.bg_color_map.get(color_name)
+        bg_color_code = self.get_bg_color_code(color_name)
         bg_color_block = f"{bg_color_code}{text}{self.reset}"
 
         return bg_color_block
 
 
-    def add_substring(self, substr: str, style_name: str) -> None:
-        substr = str(substr)
+    def add_substring(self, substring: str, style_name: str) -> None:
+        substring = str(substring)
         if style_name in self.styles:
 
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
                 attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
 
-            self.substring_map[substr] = {
+            self.styled_substring_map[substring] = {
                 "style": style_name,
                 "style_code": self.style_codes[style_name],
                 "attribs": attribs
@@ -738,133 +762,238 @@ class PrintsCharming:
             print(f"Style {style_name} not found in styles dictionary.")
 
 
-    def add_variable(self, variable: str, style_name: str) -> None:
-
+    def add_string(self, string: str, style_name: str) -> None:
         """
-        Adds a variable with a specific style.
-    
-        :param variable: The variable to be styled.
-        :param style_name: The name of the style to apply.
-        """
+                Adds a string to the styled_string_map with a specific style.
 
-        variable = str(variable)
+                :param string: The string to be styled.
+                :param style_name: The name of the style to apply.
+                """
+
+        string = str(string)
         if style_name in self.styles:
-            style_code = self.style_codes.get(style_name)
-            styled_string = f"{style_code}{variable}{self.reset}"
+            style_code = self.get_style_code(style_name)
+            styled_string = f"{style_code}{string}{self.reset}"
 
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
                 attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
 
-
             if style_name == 'conceal':
-                self.conceal_map[variable] = {
+                self.conceal_map[string] = {
                     "style": style_name,
                     "styled": styled_string
                 }
-            contains_inner_space = ' ' in variable.strip()
+                if not self.enable_conceal_map:
+                    self.enable_conceal_map = True
+
+            contains_inner_space = ' ' in string.strip()
             if contains_inner_space:
-                self.phrase_map[variable] = {
+                self.styled_phrase_map[string] = {
                     "style": style_name,
                     "style_code": style_code,
                     "styled": styled_string,
                     "attribs": attribs
                 }
+                if not self.enable_styled_phrase_map:
+                    self.enable_styled_phrase_map = True
+
             else:
-                self.word_map[variable] = {
-                    "style" : style_name,
+                self.styled_word_map[string] = {
+                    "style": style_name,
                     "style_code": style_code,
                     "styled": styled_string,
                     "attribs": attribs
                 }
+                if not self.enable_styled_word_map:
+                    self.enable_styled_word_map = True
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
 
-    def add_variables(self, variables: List[str], style_name: str) -> None:
+    def add_strings(self, strings: List[str], style_name: str) -> None:
         if style_name in self.styles:
             style_code = self.style_codes[style_name]
-            for variable in variables:
-                self.add_variable(variable, style_name)
+            for string in strings:
+                self.add_string(string, style_name)
 
 
-    def add_variables_from_dict(self, style_variables_dict: Dict[str, List[str]]) -> None:
-        for style_name, variables in style_variables_dict.items():
+    def add_strings_from_dict(self, strings_dict: Dict[str, List[str]]) -> None:
+        for style_name, strings in strings_dict.items():
             if style_name in self.styles:
-                self.add_variables(variables, style_name)
+                self.add_strings(strings, style_name)
             else:
                 print(f"Style {style_name} not found in styles dictionary.")
 
 
-    def remove_variable(self, variable: str) -> None:
-        if variable in self.word_map:
-            del self.word_map[variable]
-        if variable in self.phrase_map:
-            del self.phrase_map[variable]
-        elif variable in self.conceal_map[variable]:
-            del self.conceal_map[variable]
+    def remove_string(self, string: str) -> None:
+        if string in self.styled_word_map:
+            del self.styled_word_map[string]
+        if string in self.styled_phrase_map:
+            del self.styled_phrase_map[string]
+        elif string in self.conceal_map[string]:
+            del self.conceal_map[string]
 
 
-    def conceal_text(self, text_to_conceal, replace=False):
+    def conceal_text(self, text_to_conceal, replace=False, style_name=None):
         if replace:
-            style_code = self.style_codes['vyellow']
-            concealed_text = f"{style_code}***concealed_api_key***{self.reset}"
+            style_code = self.get_style_code(style_name)
+            if not style_code:
+                style_code = self.style_codes.get('default')
+            concealed_text = f"{style_code}***concealed_text***{self.reset}"
         else:
-            style_code = self.style_codes['conceal']
+            style_code = self.style_codes.get('conceal')
+            if not style_code:
+                style_code = PrintsCharming.shared_effect_map.get('conceal')
             concealed_text = f"{style_code}{text_to_conceal}{self.reset}"
 
         return concealed_text
 
 
-    def print_variables(self, vars_and_styles: Union[Dict[str, Tuple[Any, str]], Tuple[List[Any], List[str]]],
-                        text: str, text_style: str = None) -> None:
 
-        if isinstance(vars_and_styles, dict):  # Approach 1: Using Dictionary
-            for placeholder, (variable, var_style) in vars_and_styles.items():
-                styled_var_code = self.style_codes[var_style]
-                sub = f"{styled_var_code}{str(variable)}{self.reset}"
-                text = text.replace(f"{{{placeholder}}}", sub)
+    def print_variables(self, text: str, text_style: str = None, **kwargs) -> None:
+        # Apply styles to each variable in kwargs
+        for key, value in kwargs.items():
+            variable, var_style = value
+            styled_var = f"{self.style_codes[var_style]}{str(variable)}{self.reset}"
+            kwargs[key] = styled_var
 
-        elif isinstance(vars_and_styles, tuple) and len(vars_and_styles) == 2:  # Approach 2: Using Lists
-            variables, styles = vars_and_styles
-            for i, (variable, var_style) in enumerate(zip(variables, styles)):
-                styled_var_code = self.style_codes[var_style]
-                sub = f"{styled_var_code}{str(variable)}{self.reset}"
-                text = text.replace(f"var{i + 1}", sub)
+        # Replace placeholders with styled variables
+        text = text.format(**kwargs)
 
         self.print(text, style=text_style, skip_ansi_check=True)
 
-    def style_spaces_by_index(self, text: str, style_mapping: Dict[Union[int, Tuple[int, int]], str], bg_only=True) -> str:
-        # Process each character instead of words
-        styled_text = list(text)
-
-        for i, char in enumerate(styled_text, start=1):  # Start indexing from 1
-            for key in style_mapping:
-                style_name = style_mapping[key]
-                style_code = self.style_codes[style_name] if not bg_only else self.bg_color_map[style_name]
-                if isinstance(key, tuple):
-                    start, end = key
-                    if start <= i <= end and style_name in self.styles:  # Inclusive end
-                        styled_text[i - 1] = f"{style_code}{char}{self.reset}"
-                elif isinstance(key, int):
-                    if not bg_only:
-                        if key == i and style_name in self.styles:
-                            styled_text[i - 1] = f"{style_code}{char}{self.reset}"
-                    else:
-                        if key == i and style_name in self.bg_color_map:
-                            styled_text[i - 1] = f"{style_code}{char}{self.reset}"
-        styled_spaces = "".join(styled_text)
-
-        return styled_spaces
 
 
-    def style_words_by_index(self, text: str, style_mapping: Dict[Union[int, Tuple[int, int]], str]) -> str:
+    def segment_with_splitter_and_style(self, text: str, splitter_match: str, splitter_swap: Union[str, bool], splitter_show: bool, splitter_style: Union[str, List[str]], splitter_arms: bool, string_style: List[str]) -> str:
+        if isinstance(splitter_style, str):
+            splitter_styles = [splitter_style]
+        else:
+            splitter_styles = splitter_style
+
+        # Determine the actual splitter to use
+        actual_splitter = splitter_swap if splitter_swap else splitter_match
+
+        # Split the text based on the splitter_match
+        segments = text.split(splitter_match)
+        styled_segments = []
+
+        for i, segment in enumerate(segments):
+            # Apply string style to the segment
+            segment_style = string_style[i % len(string_style)] if string_style else 'default'
+            styled_segment = f"{self.style_codes[segment_style]}{segment}{self.reset}"
+            #styled_segment = segment  # Start with the original segment
+
+            if splitter_show and i > 0:
+
+                if len(splitter_styles) == 1:
+                    styled_splitter = f"{self.style_codes[splitter_styles[0]]}{actual_splitter}{self.reset}"
+                else:
+                    styled_splitter = f"{self.style_codes[splitter_styles[i % len(splitter_styles)]]}{actual_splitter}{self.reset}"
+                    #styled_segment = styled_splitter + styled_segment
+
+                # Apply the appropriate style to the splitter and padding if splitter_arms is True
+                if splitter_arms:
+                    styled_segment = styled_splitter + styled_segment
+                else:
+                    styled_segment = actual_splitter + styled_segment
+
+            styled_segments.append(styled_segment)
+
+        return ''.join(styled_segments)
+
+
+
+    def segment_and_style2(self, text: str, styles_dict: Dict[str, Union[str, int, List[Union[str, int]]]]) -> str:
+        words = text.split()
+        word_indices = {word: i for i, word in enumerate(words)}  # Map words to their indices
+        operations = []
+
+        final_style = None
+
+        # Prepare operations by iterating over the styles_dict
+        for style, value in styles_dict.items():
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, int):
+                        operations.append((item - 1, style))  # Convert 1-based index to 0-based
+                    elif item in word_indices:
+                        operations.append((word_indices[item], style))
+            else:
+                if isinstance(value, int):
+                    operations.append((value - 1, style))  # Convert 1-based index to 0-based
+                elif value in word_indices:
+                    operations.append((word_indices[value], style))
+                elif value == '':  # Handle the final style indicated by an empty string
+                    final_style = style
+
+        # Sort operations by index
+        operations.sort()
+
+        # Initialize the styled words with the entire text unstyled
+        styled_words = words.copy()
+
+        # Apply styles in the correct order
+        for i, (index, style) in enumerate(operations):
+            prev_index = operations[i - 1][0] + 1 if i > 0 else 0
+            for j in range(prev_index, index + 1):
+                styled_words[j] = f"{self.style_codes[style]}{words[j]}{self.reset}"
+
+        # Apply the final style to any remaining words after the last operation
+        if final_style:
+            last_index = operations[-1][0] if operations else 0
+            for j in range(last_index + 1, len(words)):
+                styled_words[j] = f"{self.style_codes[final_style]}{words[j]}{self.reset}"
+
+        return " ".join(styled_words)
+
+
+
+    def segment_and_style(self, text: str, styles_dict: Dict[str, Union[str, int]]) -> str:
+        words = text.split()
+        previous_index = 0
+        value_style = None
+
+        # Iterate over the styles_dict items
+        for style, key in styles_dict.items():
+            if key:  # If key is provided (not an empty string or None)
+                if isinstance(key, int):  # Handle key as an index
+                    key_index = key - 1  # Convert 1-based index to 0-based
+                else:  # Handle key as a word (string)
+                    try:
+                        key_index = words.index(str(key), previous_index)
+                    except ValueError:
+                        continue  # If key is not found, skip to the next item
+
+                # Apply the style to the words between previous_index and key_index
+                for i in range(previous_index, key_index):
+                    words[i] = f"{self.style_codes[style]}{words[i]}{self.reset}"
+
+                # Apply the style to the key word itself
+                words[key_index] = f"{self.style_codes[style]}{words[key_index]}{self.reset}"
+
+                # Update previous_index to the current key_index + 1 for the next iteration
+                previous_index = key_index + 1
+            else:
+                # This handles the case where the key is empty, meaning style from the last key to the end
+                value_style = style
+
+        # Apply the final style to the remaining words after the last key
+        if value_style:
+            for i in range(previous_index, len(words)):
+                words[i] = f"{self.style_codes[value_style]}{words[i]}{self.reset}"
+
+        return " ".join(words)
+
+
+
+    def style_words_by_index(self, text: str, style: Dict[Union[int, Tuple[int, int]], str]) -> str:
 
         words = text.split()
 
         for i, word in enumerate(words, start=1):  # Start indexing from 1
-            for key in style_mapping:
-                style_name = style_mapping[key]
+            for key in style:
+                style_name = style[key]
                 style_code = self.style_codes[style_name]
                 if isinstance(key, tuple):
                     start, end = key
@@ -890,10 +1019,6 @@ class PrintsCharming:
 
     def print(self,
               *args: Any,
-              text: str = None,
-              var: Any = None,
-              tstyle: str = None,
-              vstyle: str = None,
               style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None,
               color: str = None,
               bg_color: str = None,
@@ -950,25 +1075,10 @@ class PrintsCharming:
             return
 
 
-        # Handle variable replacement
-        if var is not None:
-            variable = str(var)
-            var_style_code = self.style_codes[vstyle]
-            if text is not None:
-                text = text.replace('var', f"{var_style_code}{variable}{self.reset}")
-                style = tstyle
-            else:
-                text = f"{var_style_code}{variable}{self.reset}"
-
-        # If text was modified, it takes precedence
-        if text is not None:
-            converted_args = [text] + converted_args
-
-
         text = sep.join(converted_args)
-        self.debug('<text>{}</text>', text)
+        #self.debug('<text>{}</text>', text)
 
-        if self.config["style_words_by_index"] and isinstance(style, dict):
+        if isinstance(style, dict):
             text = self.style_words_by_index(text, style)
 
         if self.config["kwargs"] and kwargs:
@@ -1067,8 +1177,9 @@ class PrintsCharming:
         sentence_ending_characters = ".,!?:;"
 
 
+        #if self.enable_styled_phrase_map:
         # Step 1: Handle phrases
-        for phrase, details in self.phrase_map.items():
+        for phrase, details in self.styled_phrase_map.items():
             if phrase in text:
                 styled_phrase = details.get('styled', phrase)
 
@@ -1108,25 +1219,25 @@ class PrintsCharming:
 
 
                 # Check if the word is in the word_map
-                if stripped_word in self.word_map:
+                if stripped_word in self.styled_word_map:
 
                     if trailing_chars:
-                        style_start = self.word_map.get(stripped_word, {}).get('style_code', '')
+                        style_start = self.styled_word_map.get(stripped_word, {}).get('style_code', '')
                         styled_word_or_space = f'{style_start}{word}{self.reset}'
                     else:
-                        styled_word_or_space = self.word_map.get(stripped_word, {}).get('styled', stripped_word)
+                        styled_word_or_space = self.styled_word_map.get(stripped_word, {}).get('styled', stripped_word)
 
                     styled_words_and_spaces[i] = styled_word_or_space
 
                     # Add the index before the starting index
                     if i > 0:
                         if i - 1 not in boundary_indices_dict:
-                            boundary_indices_dict[i - 1] = self.word_map.get(stripped_word, {}).get('attribs')
+                            boundary_indices_dict[i - 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
 
                     # Add the index after the ending index
                     if i + 1 < len(words_and_spaces):
                         if i + 1 not in boundary_indices_dict:
-                            boundary_indices_dict[i + 1] = self.word_map.get(stripped_word, {}).get('attribs')
+                            boundary_indices_dict[i + 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
 
                     # Update the indexes_used_by_words set
                     indexes_used_by_words.add(i)
@@ -1134,7 +1245,7 @@ class PrintsCharming:
 
                 else:
                     # Check if the word contains any substring in the substring_map
-                    for substring, details in self.substring_map.items():
+                    for substring, details in self.styled_substring_map.items():
                         if substring in word:
                             style_start = details.get('style_code', '')
                             style_end = self.reset
@@ -1170,6 +1281,7 @@ class PrintsCharming:
                 else:
 
                     style_instance_dict = asdict(style_instance)
+
                     keys_to_compare = ['color', 'bg_color']
                     if share_alike_sep_ul:
                         keys_to_compare.append('underline')
@@ -2403,6 +2515,62 @@ class FormattedTextBox:
         if horiz_border_bottom:
             print(horiz_border)
 
+
+"""
+class InteractiveMenu:
+    def __init__(self, options, pc=None, styles=None, key_bindings=None, state=None, config=None):
+        self.styles = styles or {
+            'selected': PrintsStyle(color='vcyan'),
+            'unselected': PrintsStyle(),
+            'confirmed': PrintsStyle(color='vgreen'),
+            'multi_selected': PrintsStyle(color='vyellow')
+        }
+        self.pc = pc or PrintsCharming()
+        self.control_map = self.pc.CONTROL_MAP  # Use control map from PrintsCharming instance
+        self.options = options
+
+        self.key_bindings = key_bindings or {}
+        self.state = state or {
+            'selected_index': 0,
+            'selected_items': set(),  # For multi-selection
+            'search_query': "",
+        }
+        self.config = config or {
+            'multi_select': False,
+            'editable': False,
+            'searchable': False,
+            'hierarchical': False,
+            'scrollable': False,
+            'confirm_required': False,
+        }
+
+    def display_menu(self):
+        start_index, end_index = self.get_scroll_indices()
+        for i, option in enumerate(self.options[start_index:end_index]):
+            global_index = i + start_index
+            style = self.determine_style(global_index)
+            self.pc.print(f"{global_index + 1}. {option}", style=style)
+
+    def get_scroll_indices(self):
+        if not self.config['scrollable']:
+            return 0, len(self.options)
+        max_display = 10  # Example: Display 10 items at a time
+        start_index = max(0, self.state['selected_index'] - max_display // 2)
+        end_index = min(len(self.options), start_index + max_display)
+        return start_index, end_index
+
+    def determine_style(self, global_index):
+        if global_index == self.state['selected_index']:
+            return self.styles['selected']
+        elif global_index in self.state['selected_items']:
+            return self.styles['multi_selected']
+        else:
+            return self.styles['unselected']
+
+    def run(self):
+        raise NotImplementedError("Subclasses should implement this method to provide specific behavior.")
+
+"""
 
 
 class InteractiveMenu:

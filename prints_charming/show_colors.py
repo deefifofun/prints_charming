@@ -6,7 +6,7 @@ import sys
 
 if not sys.platform == 'win32':
     import readline
-from .prints_charming import PrintsCharming, TextStyle, TableManager
+from .prints_charming import PrintsCharming, PrintsStyle, TableManager
 
 
 RESET = PrintsCharming.RESET
@@ -217,10 +217,18 @@ def generate_custom_color_map():
             file.write(f"{dict_name} = {final_color_map_str}\n\n")
         print(f"COLOR_MAP saved to {file_path} as dictionary name: '{dict_name}'.")
 
+        return file_path, dict_name, final_color_map
+
+
+def main():
+    file_path, dict_name, final_color_map = generate_custom_color_map()
+    custom_pc = PrintsCharming(color_map=final_color_map)
+    custom_pc.print('This is blue.', color='blue')
+
 
 
 if __name__ == "__main__":
-    generate_custom_color_map()
+    main()
 
 
 
