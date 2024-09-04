@@ -5,7 +5,6 @@ from .prints_charming import (
     PrintsCharming,
     PrintsCharmingLogHandler,
     FormattedTextBox,
-    InteractiveMenu,
     PrintsCharmingError,
     ColorNotFoundError,
     InvalidLengthError,
@@ -23,6 +22,7 @@ from .prints_charming_defaults import (
     DEFAULT_LEVEL_STYLES
 )
 
+from .interactive_menu import InteractiveMenu
 from .table_manager import TableManager
 from .win_utils import WinUtils
 
