@@ -4,12 +4,11 @@ from functools import partial
 
 from prints_charming import (
     get_terminal_width,
-    PrintsStyle,
+    PStyle,
     PrintsCharming,
     prints_charming_defaults,
     TableManager,
-    FormattedTextBox,
-    FormattedTextBox,
+    FrameBuilder,
     InteractiveMenu,
     PrintsCharmingError,
     ColorNotFoundError,
@@ -24,78 +23,78 @@ import logging
 import inspect
 
 shared_styles = {
-    "default": PrintsStyle(),
-    "class_name": PrintsStyle(color="dfff"),
-    "method_name": PrintsStyle(color="lpurple"),
-    "top_level_label": PrintsStyle(bold=True, italic=True),
-    "sub_level_label": PrintsStyle(color='lblue'),
-    "numbers": PrintsStyle(color="yellow"),
-    'main_bullets': PrintsStyle(color="purple"),
-    "sub_bullets": PrintsStyle(color="pink"),
-    "sub_proj": PrintsStyle(color="cyan"),
-    "sub_bullet_title": PrintsStyle(color="orange"),
-    "sub_bullet_sentence": PrintsStyle(color="vblue"),
-    "default_bg": PrintsStyle(bg_color="black"),
-    "white": PrintsStyle(color="white"),
-    "gray": PrintsStyle(color="gray"),
-    "dgray": PrintsStyle(color="dgray"),
-    "black": PrintsStyle(color="black"),
-    "green": PrintsStyle(color="green", bold=True),
-    "vgreen": PrintsStyle(color="vgreen", bold=True),
-    "log_true": PrintsStyle(color='vgreen'),
-    "bg_color_green": PrintsStyle(color="white", bg_color='green'),
-    "red": PrintsStyle(color="red"),
-    "vred": PrintsStyle(color="vred", bold=True),
-    "blue": PrintsStyle(color="blue"),
-    "lblue": PrintsStyle(color="lblue"),
-    "vblue": PrintsStyle(color="vblue"),
-    "yellow": PrintsStyle(color="yellow"),
-    "vyellow": PrintsStyle(color="vyellow"),
-    "lbrown": PrintsStyle(color="lbrown"),
-    "brown": PrintsStyle(color="brown"),
-    "vbrown": PrintsStyle(color="vbrown"),
-    "vorange": PrintsStyle(color="vorange"),
-    "lplum": PrintsStyle(color="lplum"),
-    "plum": PrintsStyle(color="plum"),
-    "vplum": PrintsStyle(color="vplum"),
-    "lmagenta": PrintsStyle(color="lmagenta"),
-    "magenta": PrintsStyle(color="magenta", bold=True),
-    "vmagenta": PrintsStyle(color="vmagenta"),
-    "lpink": PrintsStyle(color="lpink"),
-    "pink": PrintsStyle(color="pink", ),
-    "vpink": PrintsStyle(color="vpink"),
-    "purple": PrintsStyle(color="purple"),
-    "dpurple": PrintsStyle(color="dpurple"),
-    "cyan": PrintsStyle(color="cyan"),
-    "vcyan": PrintsStyle(color="vcyan"),
-    "orange": PrintsStyle(color="orange"),
-    "orangewhite": PrintsStyle(color="green", bg_color='dgray', underline=True),
-    "lav": PrintsStyle(color="lav"),
-    "lpurple": PrintsStyle(color="lpurple"),
-    "plat": PrintsStyle(color="plat"),
-    "silver": PrintsStyle(color="dfff", bg_color="dsilver"),
-    "dfff": PrintsStyle(color="dfff", bg_color="purple", reverse=True),
-    "vwhite": PrintsStyle(color="vwhite"),
-    "header": PrintsStyle(color="vcyan"),
-    "header_text": PrintsStyle(color="purple", bg_color="gray", bold=True, italic=True),
-    "header_text2": PrintsStyle(color="gray", bg_color="purple", bold=True),
-    "task": PrintsStyle(color="blue", bold=True),
-    "path": PrintsStyle(color="blue"),
-    "filename": PrintsStyle(color="yellow"),
-    "line_info": PrintsStyle(color="yellow", bold=True),
-    "line_number": PrintsStyle(color="orange", bold=True),
-    "function_name": PrintsStyle(color="yellow", italic=True),
-    "error_message": PrintsStyle(color="vred", bold=True, dim=True),
-    "code": PrintsStyle(color="yellow"),
-    "dict_key": PrintsStyle(color="lblue"),
-    "dict_value": PrintsStyle(color="white"),
-    "true": PrintsStyle(color="vgreen"),
-    "false": PrintsStyle(color="vred"),
-    'none': PrintsStyle(color="lpurple"),
-    "int": PrintsStyle(color="cyan"),
-    "float": PrintsStyle(color="vcyan"),
-    "other": PrintsStyle(color="lav"),
-    "conceal": PrintsStyle(conceal=True),
+    "default": PStyle(),
+    "class_name": PStyle(color="dfff"),
+    "method_name": PStyle(color="lpurple"),
+    "top_level_label": PStyle(bold=True, italic=True),
+    "sub_level_label": PStyle(color='lblue'),
+    "numbers": PStyle(color="yellow"),
+    'main_bullets': PStyle(color="purple"),
+    "sub_bullets": PStyle(color="pink"),
+    "sub_proj": PStyle(color="cyan"),
+    "sub_bullet_title": PStyle(color="orange"),
+    "sub_bullet_sentence": PStyle(color="vblue"),
+    "default_bg": PStyle(bg_color="black"),
+    "white": PStyle(color="white"),
+    "gray": PStyle(color="gray"),
+    "dgray": PStyle(color="dgray"),
+    "black": PStyle(color="black"),
+    "green": PStyle(color="green", bold=True),
+    "vgreen": PStyle(color="vgreen", bold=True),
+    "log_true": PStyle(color='vgreen'),
+    "bg_color_green": PStyle(color="white", bg_color='green'),
+    "red": PStyle(color="red"),
+    "vred": PStyle(color="vred", bold=True),
+    "blue": PStyle(color="blue"),
+    "lblue": PStyle(color="lblue"),
+    "vblue": PStyle(color="vblue"),
+    "yellow": PStyle(color="yellow"),
+    "vyellow": PStyle(color="vyellow"),
+    "lbrown": PStyle(color="lbrown"),
+    "brown": PStyle(color="brown"),
+    "vbrown": PStyle(color="vbrown"),
+    "vorange": PStyle(color="vorange"),
+    "lplum": PStyle(color="lplum"),
+    "plum": PStyle(color="plum"),
+    "vplum": PStyle(color="vplum"),
+    "lmagenta": PStyle(color="lmagenta"),
+    "magenta": PStyle(color="magenta", bold=True),
+    "vmagenta": PStyle(color="vmagenta"),
+    "lpink": PStyle(color="lpink"),
+    "pink": PStyle(color="pink", ),
+    "vpink": PStyle(color="vpink"),
+    "purple": PStyle(color="purple"),
+    "dpurple": PStyle(color="dpurple"),
+    "cyan": PStyle(color="cyan"),
+    "vcyan": PStyle(color="vcyan"),
+    "orange": PStyle(color="orange"),
+    "orangewhite": PStyle(color="green", bg_color='dgray', underline=True),
+    "lav": PStyle(color="lav"),
+    "lpurple": PStyle(color="lpurple"),
+    "plat": PStyle(color="plat"),
+    "silver": PStyle(color="dfff", bg_color="dsilver"),
+    "dfff": PStyle(color="dfff", bg_color="purple", reverse=True),
+    "vwhite": PStyle(color="vwhite"),
+    "header": PStyle(color="vcyan"),
+    "header_text": PStyle(color="purple", bg_color="gray", bold=True, italic=True),
+    "header_text2": PStyle(color="gray", bg_color="purple", bold=True),
+    "task": PStyle(color="blue", bold=True),
+    "path": PStyle(color="blue"),
+    "filename": PStyle(color="yellow"),
+    "line_info": PStyle(color="yellow", bold=True),
+    "line_number": PStyle(color="orange", bold=True),
+    "function_name": PStyle(color="yellow", italic=True),
+    "error_message": PStyle(color="vred", bold=True, dim=True),
+    "code": PStyle(color="yellow"),
+    "dict_key": PStyle(color="lblue"),
+    "dict_value": PStyle(color="white"),
+    "true": PStyle(color="vgreen"),
+    "false": PStyle(color="vred"),
+    'none': PStyle(color="lpurple"),
+    "int": PStyle(color="cyan"),
+    "float": PStyle(color="vcyan"),
+    "other": PStyle(color="lav"),
+    "conceal": PStyle(conceal=True),
 }
 
 styled_strings = {
@@ -114,29 +113,29 @@ styled_strings = {
 }
 
 logging_styles = {
-    "default": PrintsStyle(),
-    "timestamp": PrintsStyle(color="vwhite"),
-    "filename": PrintsStyle(color="cyan", bold=True),
-    'record_name': PrintsStyle(color="orange"),
-    "hostname": PrintsStyle(color="white"),
-    "class_name": PrintsStyle(color="dfff"),
-    "method_name": PrintsStyle(color="vwhite"),
-    "line_number": PrintsStyle(color="vcyan"),
-    "highlight_arg": PrintsStyle(color="vcyan"),
-    "args": PrintsStyle(color="dfff", italic=True),
-    "debug": PrintsStyle(color="blue"),
-    "info": PrintsStyle(color="green"),
-    "warning": PrintsStyle(color="yellow"),
-    "error": PrintsStyle(color="red"),
-    "critical": PrintsStyle(color="vred", bold=True, italic=True),
-    "dict_key": PrintsStyle(color="lblue"),
-    "dict_value": PrintsStyle(color="white"),
-    "true": PrintsStyle(color="vgreen"),
-    "false": PrintsStyle(color="vred"),
-    'none': PrintsStyle(color="lpurple"),
-    "int": PrintsStyle(color="cyan"),
-    "float": PrintsStyle(color="vcyan"),
-    "other": PrintsStyle(color="lav"),
+    "default": PStyle(),
+    "timestamp": PStyle(color="vwhite"),
+    "filename": PStyle(color="cyan", bold=True),
+    'record_name': PStyle(color="orange"),
+    "hostname": PStyle(color="white"),
+    "class_name": PStyle(color="dfff"),
+    "method_name": PStyle(color="vwhite"),
+    "line_number": PStyle(color="vcyan"),
+    "highlight_arg": PStyle(color="vcyan"),
+    "args": PStyle(color="dfff", italic=True),
+    "debug": PStyle(color="blue"),
+    "info": PStyle(color="green"),
+    "warning": PStyle(color="yellow"),
+    "error": PStyle(color="red"),
+    "critical": PStyle(color="vred", bold=True, italic=True),
+    "dict_key": PStyle(color="lblue"),
+    "dict_value": PStyle(color="white"),
+    "true": PStyle(color="vgreen"),
+    "false": PStyle(color="vred"),
+    'none': PStyle(color="lpurple"),
+    "int": PStyle(color="cyan"),
+    "float": PStyle(color="vcyan"),
+    "other": PStyle(color="lav"),
 }
 
 
@@ -198,53 +197,53 @@ class FunctionStyles:
 
         # Placeholder for future groupings
         self.default_styles = {
-            "default": PrintsStyle(),
-            "top_level_label": PrintsStyle(bold=True, italic=True),
-            "sub_level_label": PrintsStyle(color='lblue'),
-            "numbers": PrintsStyle(color="yellow"),
-            'main_bullets': PrintsStyle(color="purple"),
-            "sub_bullets": PrintsStyle(color="pink"),
-            "sub_proj": PrintsStyle(color="cyan"),
-            "sub_bullet_title": PrintsStyle(color="orange"),
-            "sub_bullet_sentence": PrintsStyle(color="dblue"),
-            "default_bg": PrintsStyle(bg_color="black"),
-            "white": PrintsStyle(color="white"),
-            "gray": PrintsStyle(color="gray"),
-            "dgray": PrintsStyle(color="dgray"),
-            "black": PrintsStyle(color="black"),
-            "green": PrintsStyle(color="green", bold=True),
-            "vgreen": PrintsStyle(color="vgreen", bold=True),
-            "log_true": PrintsStyle(color='vgreen'),
-            "bg_color_green": PrintsStyle(color="white", bg_color='green'),
-            "red": PrintsStyle(color="red"),
-            "vred": PrintsStyle(color="vred", bold=True),
-            "blue": PrintsStyle(color="blue"),
-            "dblue": PrintsStyle(color="dblue"),
-            "lblue": PrintsStyle(color="lblue"),
-            "vblue": PrintsStyle(color="vblue"),
-            "yellow": PrintsStyle(color="yellow"),
-            "vyellow": PrintsStyle(color="vyellow"),
-            "lpurple": PrintsStyle(color="lpurple"),
-            "header": PrintsStyle(color="vcyan"),
-            "header_text": PrintsStyle(color="purple", bg_color="gray", bold=True, italic=True),
-            "header_text2": PrintsStyle(color="gray", bg_color="purple", bold=True),
-            "task": PrintsStyle(color="blue", bold=True),
-            "path": PrintsStyle(color="blue"),
-            "filename": PrintsStyle(color="yellow"),
-            "line_info": PrintsStyle(color="yellow", bold=True),
-            "line_number": PrintsStyle(color="orange", bold=True),
-            "function_name": PrintsStyle(color="yellow", italic=True),
-            "error_message": PrintsStyle(color="vred", bold=True, dim=True),
-            "code": PrintsStyle(color="yellow"),
-            "dict_key": PrintsStyle(color="lblue"),
-            "dict_value": PrintsStyle(color="white"),
-            "true": PrintsStyle(color="vgreen"),
-            "false": PrintsStyle(color="vred"),
-            'none': PrintsStyle(color="lpurple"),
-            "int": PrintsStyle(color="cyan"),
-            "float": PrintsStyle(color="vcyan"),
-            "other": PrintsStyle(color="lav"),
-            "conceal": PrintsStyle(conceal=True),
+            "default": PStyle(),
+            "top_level_label": PStyle(bold=True, italic=True),
+            "sub_level_label": PStyle(color='lblue'),
+            "numbers": PStyle(color="yellow"),
+            'main_bullets': PStyle(color="purple"),
+            "sub_bullets": PStyle(color="pink"),
+            "sub_proj": PStyle(color="cyan"),
+            "sub_bullet_title": PStyle(color="orange"),
+            "sub_bullet_sentence": PStyle(color="dblue"),
+            "default_bg": PStyle(bg_color="black"),
+            "white": PStyle(color="white"),
+            "gray": PStyle(color="gray"),
+            "dgray": PStyle(color="dgray"),
+            "black": PStyle(color="black"),
+            "green": PStyle(color="green", bold=True),
+            "vgreen": PStyle(color="vgreen", bold=True),
+            "log_true": PStyle(color='vgreen'),
+            "bg_color_green": PStyle(color="white", bg_color='green'),
+            "red": PStyle(color="red"),
+            "vred": PStyle(color="vred", bold=True),
+            "blue": PStyle(color="blue"),
+            "dblue": PStyle(color="dblue"),
+            "lblue": PStyle(color="lblue"),
+            "vblue": PStyle(color="vblue"),
+            "yellow": PStyle(color="yellow"),
+            "vyellow": PStyle(color="vyellow"),
+            "lpurple": PStyle(color="lpurple"),
+            "header": PStyle(color="vcyan"),
+            "header_text": PStyle(color="purple", bg_color="gray", bold=True, italic=True),
+            "header_text2": PStyle(color="gray", bg_color="purple", bold=True),
+            "task": PStyle(color="blue", bold=True),
+            "path": PStyle(color="blue"),
+            "filename": PStyle(color="yellow"),
+            "line_info": PStyle(color="yellow", bold=True),
+            "line_number": PStyle(color="orange", bold=True),
+            "function_name": PStyle(color="yellow", italic=True),
+            "error_message": PStyle(color="vred", bold=True, dim=True),
+            "code": PStyle(color="yellow"),
+            "dict_key": PStyle(color="lblue"),
+            "dict_value": PStyle(color="white"),
+            "true": PStyle(color="vgreen"),
+            "false": PStyle(color="vred"),
+            'none': PStyle(color="lpurple"),
+            "int": PStyle(color="cyan"),
+            "float": PStyle(color="vcyan"),
+            "other": PStyle(color="lav"),
+            "conceal": PStyle(conceal=True),
         }
 
     def welcome(self, style_cat: str, sub_cat: str = None) -> str:
@@ -366,7 +365,7 @@ def my_custom_error(pc):
 
 def formatted_text_box_stuff():
     pc = PrintsCharming(config={"enable_logging": True}, style_conditions=StyleConditionsManager(), styled_strings=styled_strings, logging_styles=logging_styles)
-    builder = FormattedTextBox(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
+    builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
 
     horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style='purple',
                                                                                                                  horiz_border_bottom_style='orange',
@@ -631,7 +630,7 @@ def random_examples():
     # Print with default style reversed foreground and background colors
     pc.print("Hello, world!", reverse=True)
 
-    my_style_code = pc.create_style_code(PrintsStyle(color='green', bg_color='white', underline=True))
+    my_style_code = pc.create_style_code(PStyle(color='green', bg_color='white', underline=True))
 
     my_style_code2 = pc.create_style_code(dict(color='orange', bg_color='white'))
 
@@ -862,7 +861,7 @@ def more_stuff():
     print(f'function: more_stuff')
     print(styled_mini_border)
 
-    builder = FormattedTextBox(pc=pc, horiz_char='|', vert_width=2, vert_padding=1, vert_char='|')
+    builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=2, vert_padding=1, vert_char='|')
     solid_horiz_rule = builder.terminal_width * ' '
     avail_width = builder.get_available_width()
 
@@ -1006,7 +1005,7 @@ def print_styles(pc, builder):
 
 def print_colors_and_styles():
     pc = PrintsCharming(logging_styles=logging_styles)
-    builder = FormattedTextBox(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
+    builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     print_foreground_colors(pc, builder)
     print_background_colors(pc, builder)
@@ -1118,7 +1117,7 @@ def create_style_table_data(pc: PrintsCharming):
         styled_text_example = "Styled Text Example"
         # Filter the enabled attributes and format the definition
         enabled_attribs = {k: v for k, v in vars(style_definition).items() if v not in (None, False)}
-        enabled_definition = f"PrintsStyle({', '.join(f'{k}={repr(v)}' for k, v in enabled_attribs.items())})"
+        enabled_definition = f"PStyle({', '.join(f'{k}={repr(v)}' for k, v in enabled_attribs.items())})"
         table_data.append([style_name, styled_text_example, enabled_definition])
     return table_data
 
@@ -1139,8 +1138,8 @@ def welcome():
     style_conditions = StyleConditionsManager()
     pc = PrintsCharming(logging_styles=logging_styles, style_conditions=style_conditions)
 
-    # Create an instance of FormattedTextBox
-    builder = FormattedTextBox(pc=pc, horiz_char=' ', vert_width=2, vert_padding=1, vert_char=' ')
+    # Create an instance of FrameBuilder
+    builder = FrameBuilder(pc=pc, horiz_char=' ', vert_width=2, vert_padding=1, vert_char=' ')
 
     available_width = builder.get_available_width()
     available_half_width = available_width // 2
@@ -1166,7 +1165,7 @@ def welcome():
     styles_table_data = create_style_table_data(pc)
     styles_table = table_manager.generate_table(
         table_data=styles_table_data,
-        table_name="PrintsStyle Style Map",
+        table_name="PStyle Style Map",
         show_table_name=True,
         border_char="=",
         col_sep=" | ",
@@ -1359,7 +1358,7 @@ def welcome():
 
     print(more_complex_table_str)
 
-    builder = FormattedTextBox(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
+    builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
     horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style=style_conditions.welcome_style('top'),
                                                                                                                  vert_border_left_style=style_conditions.welcome_style('left'),
                                                                                                                  vert_border_right_style=style_conditions.welcome_style(
@@ -1378,8 +1377,8 @@ def experiment():
 
     table_manager = TableManager(pc=pc)
 
-    # Create an instance of FormattedTextBox
-    builder = FormattedTextBox(pc=pc, horiz_char=' ', vert_width=2, vert_padding=1, vert_char=' ')
+    # Create an instance of FrameBuilder
+    builder = FrameBuilder(pc=pc, horiz_char=' ', vert_width=2, vert_padding=1, vert_char=' ')
 
     (horiz_border_top,
      vert_border_left,
@@ -1461,7 +1460,7 @@ def main():
     welcome()
 
     pc = PrintsCharming(logging_styles=logging_styles)
-    builder = FormattedTextBox(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
+    builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     pc.add_string('function', 'blue')
 

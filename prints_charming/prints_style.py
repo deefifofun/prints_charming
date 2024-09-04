@@ -3,7 +3,7 @@ from typing import Optional
 
 
 @dataclass
-class PrintsStyle:
+class PStyle:
 
     """
     A class to manage text styles including color, background color, and various text effects.
