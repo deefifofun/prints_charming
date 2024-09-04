@@ -24,9 +24,10 @@ from .prints_charming_defaults import (
 )
 
 from .table_manager import TableManager
+from .win_utils import WinUtils
 
 
 __all__ = ['PrintsStyle', 'PrintsCharming', 'TableManager', 'FormattedTextBox', 'InteractiveMenu',
-           'PrintsCharmingError', 'ColorNotFoundError', 'InvalidLengthError', 'set_custom_excepthook',
+           'PrintsCharmingError', 'WinUtils', 'ColorNotFoundError', 'InvalidLengthError', 'set_custom_excepthook',
            'get_terminal_width', 'DEFAULT_CONFIG', 'DEFAULT_COLOR_MAP', 'DEFAULT_EFFECT_MAP', 'DEFAULT_STYLES',
            'DEFAULT_LOGGING_STYLES', 'DEFAULT_LEVEL_STYLES']

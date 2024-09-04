@@ -8,13 +8,14 @@ import traceback
 import re
 import logging
 import inspect
-import ctypes
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from .logging_utils import logger
 from .prints_charming_defaults import DEFAULT_CONFIG, DEFAULT_COLOR_MAP, DEFAULT_EFFECT_MAP, DEFAULT_STYLES, DEFAULT_LOGGING_STYLES
 from .prints_style import PrintsStyle
+if sys.platform == 'win32':
+    from .win_utils import WinUtils
 
 
 
@@ -316,6 +317,7 @@ class PrintsCharming:
     @staticmethod
     def enable_win_console_ansi_handling():
         try:
+            import ctypes
             k32 = ctypes.windll.kernel32
             handle = k32.GetStdHandle(-11)
             ENABLE_PROCESSED_OUTPUT = 0x0001
@@ -1403,187 +1405,6 @@ class PrintsCharming:
 def get_default_printer() -> Any:
     p = PrintsCharming()
     return p.print
-
-
-
-
-class TableManager:
-    def __init__(self, pc: PrintsCharming = None, style_themes: dict = None, conditional_styles: dict = None):
-        self.pc = pc or PrintsCharming()
-        self.style_themes = style_themes
-        self.conditional_styles = conditional_styles
-        self.tables = {}
-
-        self.border_char = "-"
-        self.col_sep = " | "
-        self.title_style = "header_text"
-
-
-    def generate_table(self,
-                       table_data: List[List[Any]],
-                       table_name: str = None,
-                       show_table_name: bool = False,
-                       table_style: str = "default",
-                       border_char: str = "-",
-                       col_sep: str = " | ",
-                       border_style: Optional[str] = None,
-                       col_sep_style: Optional[str] = None,
-                       header_style: Optional[str] = None,
-                       header_column_styles: Optional[Dict[int, str]] = None,
-                       col_alignments: Optional[List[str]] = None,
-                       column_styles: Optional[Dict[int, str]] = None,
-                       cell_style: Optional[str or list] = None,
-                       target_text_box: bool = False,
-                       conditional_styles: Optional[Dict[str, List[Dict[str, Union[str, int]]]]] = None,
-                       double_space: bool = False,
-                       use_styles=True
-                       ) -> str:
-
-        """
-        Generates a table with optional styling and alignment as a string.
-
-        :param table_data: A list of lists representing the rows of the table.
-        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
-        :param cell_style: Style name for the table cells.
-        :param header_style: Style name for the header row.
-        :param header_column_styles: A dictionary mapping column indices to style names for the header row.
-        :param border_style: Style name for the table borders.
-        :param column_styles: A dictionary mapping column indices to style names.
-        :param conditional_styles: A dictionary defining conditional styles based on cell values.
-        :return: A string representing the formatted table.
-        """
-
-        if use_styles:
-            styled_col_sep = self.pc.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
-        else:
-            styled_col_sep = self.pc.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
-
-        # 1. Automatic Column Sizing
-        max_col_lengths = [0] * len(table_data[0])
-        for row in table_data:
-            for i, cell in enumerate(row):
-                cell_length = len(str(cell))
-                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
-
-        # 2. Column Alignment
-        table_output = []
-        header = table_data[0]
-
-        for row_idx, row in enumerate(table_data):
-            aligned_row = []
-            for i, cell in enumerate(row):
-                cell_str = str(cell)
-                max_length = max_col_lengths[i]
-
-                # Determine the alignment for this cell
-                alignment = 'left'  # Default
-                if col_alignments and i < len(col_alignments):
-                    alignment = col_alignments[i]
-                elif isinstance(cell, (int, float)):
-                    alignment = 'right'
-
-                # Apply the alignment
-                if alignment == 'left':
-                    aligned_cell = cell_str.ljust(max_length)
-                elif alignment == 'center':
-                    aligned_cell = cell_str.center(max_length)
-                elif alignment == 'right':
-                    aligned_cell = cell_str.rjust(max_length)
-                else:
-                    aligned_cell = cell_str.ljust(max_length)  # Fallback
-
-                # Apply the style
-                if row_idx == 0:
-                    # Apply header styles
-                    if header_column_styles and i in header_column_styles:
-                        aligned_cell = self.pc.apply_style(header_column_styles[i], aligned_cell)
-                    elif header_style:
-                        aligned_cell = self.pc.apply_style(header_style, aligned_cell)
-                else:
-                    if header[i] == 'Color Name':
-                        aligned_cell = self.pc.apply_color(cell_str, aligned_cell)
-                    elif header[i] == 'Foreground Text':
-                        color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.pc.apply_color(color_name, aligned_cell)
-                    elif header[i] == 'Background Block':
-                        color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.pc.return_bg(color_name, length=max_length)
-
-                    # Apply conditional styles if provided
-                    elif conditional_styles and header[i] in conditional_styles:
-                        for condition in conditional_styles[header[i]]:
-                            if condition["type"] == "below" and isinstance(cell, (int, float)) and cell < condition["value"]:
-                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
-                            elif condition["type"] == "above_or_equal" and isinstance(cell, (int, float)) and cell >= condition["value"]:
-                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
-                            elif condition["type"] == "equals" and cell_str == condition["value"]:
-                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
-                            elif condition["type"] == "in_list" and cell_str in condition["value"]:
-                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
-                            elif condition["type"] == "not_in_list" and cell_str not in condition["value"]:
-                                aligned_cell = self.pc.apply_style(condition["style"], aligned_cell)
-                    elif column_styles and i in column_styles:
-                        # Apply column-specific styles if provided
-                        aligned_cell = self.pc.apply_style(column_styles[i], aligned_cell)
-                    elif cell_style:
-                        if isinstance(cell_style, list):
-                            # Apply alternating styles based on the row index
-                            style_to_apply = cell_style[0] if row_idx % 2 == 1 else cell_style[1]
-                            aligned_cell = self.pc.apply_style(style_to_apply, aligned_cell)
-                        else:
-                            aligned_cell = self.pc.apply_style(cell_style, aligned_cell)
-
-
-                # Add aligned and styled cell to the row
-                aligned_row.append(aligned_cell)
-
-            # Create a row string and add to table output
-            if target_text_box:
-                row_str = self.pc.apply_style(col_sep_style, col_sep.lstrip()) + styled_col_sep.join(aligned_row) + self.pc.apply_style(col_sep_style, col_sep.rstrip())
-            else:
-                row_str = styled_col_sep + styled_col_sep.join(aligned_row) + styled_col_sep
-            table_output.append(row_str)
-
-        # 3. Generate Borders and Rows
-        table_str = ""
-        border_line = ""  # Initialize border_line to ensure it always has a value
-        if border_style:
-            border_length = sum(max_col_lengths) + len(max_col_lengths) * len(col_sep) + len(col_sep) - 2
-            border_line = self.pc.apply_style(border_style, border_char * border_length)
-            #print(f' {border_line}')
-            if target_text_box:
-                table_str += f'{border_line}\n'
-            else:
-                table_str += f' {border_line}\n'
-
-        if show_table_name and table_name:
-            centered_table_name = self.pc.apply_style(self.title_style, table_name.center(border_length))
-            table_str += f'{centered_table_name}\n'
-            if border_style:
-                table_str += f'{border_line}\n'
-
-        for i, row in enumerate(table_output):
-            #print(row)
-            table_str += row + "\n"
-            if i != 0 and double_space:
-                table_str += "\n"
-            #if double_space:
-                #table_str += "\n"
-            if i == 0 and (header_style or header_column_styles) and border_style:
-                #print(f' {border_line}')
-                if target_text_box:
-                    table_str += f'{border_line}\n'
-                else:
-                    table_str += f' {border_line}\n'
-
-        if border_style:
-            #print(f' {border_line}')
-            if target_text_box:
-                table_str += f'{border_line}\n'
-            else:
-                table_str += f' {border_line}\n'
-
-        return table_str
 
 
 
@@ -2794,86 +2615,6 @@ def set_custom_excepthook_with_logging():
 
 
 
-class WinUtils:
-    # Constants for handle types
-    STD_INPUT_HANDLE = -10
-    STD_OUTPUT_HANDLE = -11
-    STD_ERROR_HANDLE = -12
-
-    # Console mode flags
-    ENABLE_PROCESSED_OUTPUT = 0x0001
-    ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
-    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
-
-    @staticmethod
-    def enable_win_console_ansi_handling(handle_type=-11, mode=None):
-        """
-        Enables ANSI escape code handling for the specified console handle.
-
-        Parameters:
-        handle_type (int): The type of console handle (-10: stdin, -11: stdout, -12: stderr).
-        mode (int): Custom mode flags to set. If None, the default mode enabling ANSI will be used.
-        """
-        try:
-            k32 = ctypes.windll.kernel32
-
-            # Get the console handle
-            handle = k32.GetStdHandle(handle_type)
-
-            # Save the original console mode
-            original_mode = ctypes.c_uint32()
-            if not k32.GetConsoleMode(handle, ctypes.byref(original_mode)):
-                logging.error("Failed to get original console mode")
-                return False
-
-            if mode is None:
-                # Default mode enabling ANSI escape code handling
-                mode = (WinUtils.ENABLE_PROCESSED_OUTPUT |
-                        WinUtils.ENABLE_WRAP_AT_EOL_OUTPUT |
-                        WinUtils.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
-
-            # Set the new console mode
-            if not k32.SetConsoleMode(handle, mode):
-                logging.error("Failed to set console mode")
-                return False
-
-            logging.info(f"Console mode set to {mode}")
-            return True
-        except Exception as e:
-            logging.error(f"Error enabling ANSI handling: {e}")
-            return False
-
-
-
-    @staticmethod
-    def restore_console_mode(handle_type=-11):
-        """
-        Restores the original console mode for the specified console handle.
-
-        Parameters:
-        handle_type (int): The type of console handle (-10: stdin, -11: stdout, -12: stderr).
-        """
-        try:
-            k32 = ctypes.windll.kernel32
-
-            # Get the console handle
-            handle = k32.GetStdHandle(handle_type)
-
-            # Restore the original console mode
-            original_mode = ctypes.c_uint32()
-            if not k32.GetConsoleMode(handle, ctypes.byref(original_mode)):
-                logging.error("Failed to get original console mode")
-                return False
-
-            if not k32.SetConsoleMode(handle, original_mode.value):
-                logging.error("Failed to restore console mode")
-                return False
-
-            logging.info("Original console mode restored")
-            return True
-        except Exception as e:
-            logging.error(f"Error restoring console mode: {e}")
-            return False
 
 
 
