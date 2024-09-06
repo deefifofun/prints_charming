@@ -1,16 +1,17 @@
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-
-from prints_charming import (
-    PrintsCharming,
+from .prints_charming_defaults import (
     DEFAULT_CONFIG,
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES,
-    get_terminal_width
+    DEFAULT_LOGGING_STYLES
 )
+
+from .prints_charming import PrintsCharming
+from .utils import get_terminal_width
+
 
 
 

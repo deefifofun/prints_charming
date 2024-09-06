@@ -3,8 +3,7 @@ import time
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from prints_charming import (
-    PrintsCharming,
+from .prints_charming_defaults import (
     DEFAULT_CONFIG,
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
@@ -12,6 +11,7 @@ from prints_charming import (
     DEFAULT_LOGGING_STYLES
 )
 
+from .prints_charming import PrintsCharming
 
 
 
@@ -34,13 +34,13 @@ class InteractiveMenu:
 
     def navigate(self, direction):
         self.selected_index = (self.selected_index + direction) % len(self.options)
-        print(PrintsCharming.CONTROL_MAP['clear_screen'], PrintsCharming.CONTROL_MAP['cursor_home'])
+        print(PrintsCharming.shared_ctl_map['clear_screen'], PrintsCharming.shared_ctl_map['cursor_home'])
 
         self.display_highlighted_menu()
 
     def run(self):
-        print(PrintsCharming.CONTROL_MAP['alt_buffer'])
-        print(PrintsCharming.CONTROL_MAP['cursor_home'])  # Move to top-left corner
+        print(PrintsCharming.shared_ctl_map['alt_buffer'])
+        print(PrintsCharming.shared_ctl_map['cursor_home'])  # Move to top-left corner
         # Display instructions
         styled_instructions = self.pc.apply_style(style_name='vgreen', text='Instructions:')
         print(styled_instructions)
@@ -63,7 +63,7 @@ class InteractiveMenu:
                 time.sleep(2)
                 break
 
-        print(PrintsCharming.CONTROL_MAP['normal_buffer'])
+        print(PrintsCharming.shared_ctl_map['normal_buffer'])
         self.pc.print(f"Selected: {self.options[self.selected_index]}", style=self.confirmed_style)
 
 

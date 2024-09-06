@@ -1,7 +1,8 @@
+# prints_charming_defaults.py
+
 import logging
 from typing import Dict
-from prints_charming import PStyle
-
+from .prints_style import PStyle
 
 
 
@@ -79,6 +80,7 @@ DEFAULT_EFFECT_MAP: Dict[str, str] = {
 
 DEFAULT_STYLES: Dict[str, PStyle] = {
         "default"      : PStyle(),
+        "default_bg"   : PStyle(bg_color="black"),
         "class_name": PStyle(color="dfff"),
         "method_name": PStyle(color="lpurple"),
         "top_level_label": PStyle(bold=True, italic=True),
@@ -89,7 +91,6 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "sub_proj"     : PStyle(color="cyan"),
         "sub_bullet_title": PStyle(color="orange"),
         "sub_bullet_sentence": PStyle(color="dblue"),
-        "default_bg"   : PStyle(bg_color="black"),
         "white"        : PStyle(color="white"),
         "gray"         : PStyle(color="gray"),
         "dgray"        : PStyle(color="dgray"),
@@ -155,20 +156,37 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "int": PStyle(color="cyan"),
         "float": PStyle(color="vcyan"),
         "other": PStyle(color="lav"),
-        "conceal": PStyle(conceal=True),
+        "conceal": PStyle(conceal=True)
 }
+
+
+DEFAULT_ERROR_STYLES: Dict[str, PStyle] = {
+        "header"       : PStyle(color="vcyan"),
+        "path"         : PStyle(color="blue"),
+        "filename"     : PStyle(color="yellow"),
+        "line_info"    : PStyle(color="yellow", bold=True),
+        "line_number"  : PStyle(color="orange", bold=True),
+        "function_name": PStyle(color="yellow", italic=True),
+        "error_message": PStyle(color="vred", bold=True, dim=True),
+}
+
 
 DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
         "default": PStyle(),
-        "timestamp": PStyle(color="white"),
+        "timestamp": PStyle(color="vwhite"),
+        "filename": PStyle(color="cyan", bold=True),
+        'record_name': PStyle(color="orange"),
+        "hostname": PStyle(color="white"),
         "class_name": PStyle(color="dfff"),
-        "method_name": PStyle(color="lpurple"),
-        "line_number": PStyle(color="lav"),
+        "method_name": PStyle(color="vwhite"),
+        "line_number": PStyle(color="vcyan"),
+        "highlight_arg": PStyle(color="vcyan"),
+        "args": PStyle(color="dfff", italic=True),
         "debug": PStyle(color="blue"),
         "info": PStyle(color="green"),
         "warning": PStyle(color="yellow"),
         "error": PStyle(color="red"),
-        "critical": PStyle(color="vred"),
+        "critical": PStyle(color="vred", bold=True, italic=True),
         "dict_key": PStyle(color="lblue"),
         "dict_value": PStyle(color="white"),
         "true": PStyle(color="vgreen"),
@@ -177,6 +195,7 @@ DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
         "int": PStyle(color="cyan"),
         "float": PStyle(color="vcyan"),
         "other": PStyle(color="lav"),
+        "conceal": PStyle(conceal=True)
 }
 
 
@@ -187,4 +206,24 @@ DEFAULT_LEVEL_STYLES = {
     logging.ERROR: 'error',
     logging.CRITICAL: 'critical'
 }
+
+
+DEFAULT_CONTROL_MAP: Dict[str, str] = {
+        "alt_buffer": "\033[?1049h",
+        "normal_buffer": "\033[?1049l",
+        "alt_buffer_no_save": "\033[?47h",  # Switch to alternate buffer without saving the cursor
+        "normal_buffer_no_save": "\033[?47l",  # Switch back to normal buffer without restoring the cursor
+        "clear_line": "\033[2K",
+        "clear_screen": "\033[2J",
+        "cursor_position": "\033[{row};{col}H",
+        "cursor_home": "\033[H",  # Move cursor to the home position (top-left corner)
+        "move_cursor_up": "\033[{n}A",
+        "move_cursor_down": "\033[{n}B",
+        "move_cursor_right": "\033[{n}C",
+        "move_cursor_left": "\033[{n}D",
+        "save_cursor_position": "\033[s",
+        "restore_cursor_position": "\033[u",
+}
+
+
 

@@ -3,11 +3,11 @@
 import logging
 
 # Use the library's name as the logger's name
-logger = logging.getLogger('prints_charming')
-logger.setLevel(logging.NOTSET)  # Allow users to configure the level
+shared_logger = logging.getLogger('prints_charming')
+shared_logger.setLevel(logging.NOTSET)  # allow users to configure the level
 
-# Check if handlers are already set to avoid duplicates
-if not logger.hasHandlers():
+# Ensure the logger only gets configured once
+if not shared_logger.hasHandlers():
     fh = logging.FileHandler('spam.log')
     fh.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler()
@@ -15,6 +15,8 @@ if not logger.hasHandlers():
 
     formatter = logging.Formatter('%(message)s')
     console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    shared_logger.addHandler(console_handler)
+
+
 
 

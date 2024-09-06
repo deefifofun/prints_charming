@@ -2,11 +2,14 @@
 
 from functools import partial
 
+
 from prints_charming import (
     get_terminal_width,
     PStyle,
     PrintsCharming,
-    prints_charming_defaults,
+    DEFAULT_COLOR_MAP,
+    DEFAULT_STYLES,
+    DEFAULT_LOGGING_STYLES,
     TableManager,
     FrameBuilder,
     InteractiveMenu,
@@ -15,77 +18,80 @@ from prints_charming import (
     set_custom_excepthook
 )
 
-from prints_charming.logging import CustomFormatter, CustomLogHandler
+from prints_charming.logging import PrintsCharmingFormatter, PrintsCharmingLogHandler, setup_logger
 
 import os
 import sys
 import logging
 import inspect
 
+
+
+
 shared_styles = {
-    "default": PStyle(),
+    "default"      : PStyle(),
+    "default_bg": PStyle(bg_color="black"),
     "class_name": PStyle(color="dfff"),
     "method_name": PStyle(color="lpurple"),
     "top_level_label": PStyle(bold=True, italic=True),
     "sub_level_label": PStyle(color='lblue'),
-    "numbers": PStyle(color="yellow"),
-    'main_bullets': PStyle(color="purple"),
-    "sub_bullets": PStyle(color="pink"),
-    "sub_proj": PStyle(color="cyan"),
+    "numbers"      : PStyle(color="yellow"),
+    'main_bullets' : PStyle(color="purple"),
+    "sub_bullets"  : PStyle(color="pink"),
+    "sub_proj"     : PStyle(color="cyan"),
     "sub_bullet_title": PStyle(color="orange"),
     "sub_bullet_sentence": PStyle(color="vblue"),
-    "default_bg": PStyle(bg_color="black"),
-    "white": PStyle(color="white"),
-    "gray": PStyle(color="gray"),
-    "dgray": PStyle(color="dgray"),
-    "black": PStyle(color="black"),
-    "green": PStyle(color="green", bold=True),
-    "vgreen": PStyle(color="vgreen", bold=True),
-    "log_true": PStyle(color='vgreen'),
+    "white"        : PStyle(color="white"),
+    "gray"         : PStyle(color="gray"),
+    "dgray"        : PStyle(color="dgray"),
+    "black"        : PStyle(color="black"),
+    "green"        : PStyle(color="green", bold=True),
+    "vgreen"       : PStyle(color="vgreen", bold=True),
+    "log_true"     : PStyle(color='vgreen'),
     "bg_color_green": PStyle(color="white", bg_color='green'),
-    "red": PStyle(color="red"),
-    "vred": PStyle(color="vred", bold=True),
-    "blue": PStyle(color="blue"),
-    "lblue": PStyle(color="lblue"),
-    "vblue": PStyle(color="vblue"),
-    "yellow": PStyle(color="yellow"),
-    "vyellow": PStyle(color="vyellow"),
-    "lbrown": PStyle(color="lbrown"),
-    "brown": PStyle(color="brown"),
-    "vbrown": PStyle(color="vbrown"),
-    "vorange": PStyle(color="vorange"),
-    "lplum": PStyle(color="lplum"),
-    "plum": PStyle(color="plum"),
-    "vplum": PStyle(color="vplum"),
-    "lmagenta": PStyle(color="lmagenta"),
-    "magenta": PStyle(color="magenta", bold=True),
-    "vmagenta": PStyle(color="vmagenta"),
-    "lpink": PStyle(color="lpink"),
-    "pink": PStyle(color="pink", ),
-    "vpink": PStyle(color="vpink"),
-    "purple": PStyle(color="purple"),
-    "dpurple": PStyle(color="dpurple"),
-    "cyan": PStyle(color="cyan"),
-    "vcyan": PStyle(color="vcyan"),
-    "orange": PStyle(color="orange"),
-    "orangewhite": PStyle(color="green", bg_color='dgray', underline=True),
-    "lav": PStyle(color="lav"),
-    "lpurple": PStyle(color="lpurple"),
-    "plat": PStyle(color="plat"),
-    "silver": PStyle(color="dfff", bg_color="dsilver"),
-    "dfff": PStyle(color="dfff", bg_color="purple", reverse=True),
-    "vwhite": PStyle(color="vwhite"),
-    "header": PStyle(color="vcyan"),
-    "header_text": PStyle(color="purple", bg_color="gray", bold=True, italic=True),
-    "header_text2": PStyle(color="gray", bg_color="purple", bold=True),
-    "task": PStyle(color="blue", bold=True),
-    "path": PStyle(color="blue"),
-    "filename": PStyle(color="yellow"),
-    "line_info": PStyle(color="yellow", bold=True),
-    "line_number": PStyle(color="orange", bold=True),
+    "red"          : PStyle(color="red"),
+    "vred"         : PStyle(color="vred", bold=True),
+    "blue"         : PStyle(color="blue"),
+    "lblue"          : PStyle(color="lblue"),
+    "vblue"         : PStyle(color="vblue"),
+    "yellow"       : PStyle(color="yellow"),
+    "vyellow"      : PStyle(color="vyellow"),
+    "lbrown"       : PStyle(color="lbrown"),
+    "brown"        : PStyle(color="brown"),
+    "vbrown"         : PStyle(color="vbrown"),
+    "vorange"      : PStyle(color="vorange"),
+    "lplum"        : PStyle(color="lplum"),
+    "plum"         : PStyle(color="plum"),
+    "vplum"        : PStyle(color="vplum"),
+    "lmagenta"     : PStyle(color="lmagenta"),
+    "magenta"      : PStyle(color="magenta", bold=True),
+    "vmagenta"     : PStyle(color="vmagenta"),
+    "lpink"        : PStyle(color="lpink"),
+    "pink"         : PStyle(color="pink",),
+    "vpink"        : PStyle(color="vpink"),
+    "purple"       : PStyle(color="purple"),
+    "dpurple"      : PStyle(color="dpurple"),
+    "cyan"         : PStyle(color="cyan"),
+    "vcyan"        : PStyle(color="vcyan"),
+    "orange"       : PStyle(color="orange"),
+    "orangewhite"  : PStyle(color="green", bg_color='dgray', underline=True),
+    "lav"          : PStyle(color="lav"),
+    "lpurple"      : PStyle(color="lpurple"),
+    "plat"         : PStyle(color="plat"),
+    "silver"       : PStyle(color="dfff", bg_color="dsilver"),
+    "dfff"        : PStyle(color="dfff", bg_color="purple", reverse=True),
+    "vwhite"       : PStyle(color="vwhite"),
+    "header"       : PStyle(color="vcyan"),
+    "header_text"  : PStyle(color="purple", bg_color="gray", bold=True, italic=True),
+    "header_text2" : PStyle(color="gray", bg_color="purple", bold=True),
+    "task"         : PStyle(color="blue", bold=True),
+    "path"         : PStyle(color="blue"),
+    "filename"     : PStyle(color="yellow"),
+    "line_info"    : PStyle(color="yellow", bold=True),
+    "line_number"  : PStyle(color="orange", bold=True),
     "function_name": PStyle(color="yellow", italic=True),
     "error_message": PStyle(color="vred", bold=True, dim=True),
-    "code": PStyle(color="yellow"),
+    "code"         : PStyle(color="yellow"),
     "dict_key": PStyle(color="lblue"),
     "dict_value": PStyle(color="white"),
     "true": PStyle(color="vgreen"),
@@ -97,12 +103,15 @@ shared_styles = {
     "conceal": PStyle(conceal=True),
 }
 
+
+
+
 styled_strings = {
     "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "ABOVE THRESHOLD", "wss://advanced-trade-ws.coinbase.com", "Starting", "True", "C++", "substring"],
     "green": ["apple"],
     "vred": ["Error", "Failed", "None", "Skipping.", "Canceling", "Canceled", "Hobbies", "Skills", "False"],
     "blue": ["CoinbaseWebsocketClient", "server", "Python"],
-    "yellow": ["1", "returned", "Flask", "Some", ],
+    "yellow": ["1", "returned", "Flask", "Some",],
     "vyellow": ["File modified:", "File modified AGAIN", "subscribed", "=", "JavaScript"],
     "magenta": ["within 10 seconds.", "how", "React"],
     "cyan": ["|", "#", "are", "your", "Project Management System"],
@@ -111,6 +120,7 @@ styled_strings = {
     # Uncomment the next line to hide API keys or sensitive information
     # "conceal": [os.environ[key] for key in os.environ if "API" in key],
 }
+
 
 logging_styles = {
     "default": PStyle(),
@@ -139,14 +149,10 @@ logging_styles = {
 }
 
 
-# use pc = PrintsCharming(color_map=color_map, styles=styles) if you want to use custom colors and/or styles
-
-# To run this script as a module inside the package. Navigate to the top-level directory and run
-# python -m prints_charming.examples.main
-
 
 def make_box():
     pass
+
 
 
 def get_current_function_name():
@@ -159,7 +165,6 @@ class BorderBoxStyles:
         self.themes = {
 
         }
-
 
 class FunctionStyles:
 
@@ -198,6 +203,7 @@ class FunctionStyles:
         # Placeholder for future groupings
         self.default_styles = {
             "default": PStyle(),
+            "default_bg": PStyle(bg_color="black"),
             "top_level_label": PStyle(bold=True, italic=True),
             "sub_level_label": PStyle(color='lblue'),
             "numbers": PStyle(color="yellow"),
@@ -206,7 +212,6 @@ class FunctionStyles:
             "sub_proj": PStyle(color="cyan"),
             "sub_bullet_title": PStyle(color="orange"),
             "sub_bullet_sentence": PStyle(color="dblue"),
-            "default_bg": PStyle(bg_color="black"),
             "white": PStyle(color="white"),
             "gray": PStyle(color="gray"),
             "dgray": PStyle(color="dgray"),
@@ -264,6 +269,7 @@ class FunctionStyles:
             raise ValueError(f"Unknown style type: {style_cat}")
 
 
+
 class StyleConditionsManager:
 
     def __init__(self, conditions=None):
@@ -307,6 +313,7 @@ class StyleConditionsManager:
         return "purple" if position in ['top', 'right'] else "orange"
 
 
+
 class CustomError(PrintsCharmingError):
     """Custom error for specific use cases."""
 
@@ -317,6 +324,7 @@ class CustomError(PrintsCharmingError):
     def handle_exception(self):
         super().handle_exception()
         print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
+
 
 
 def custom_style_function(text: str, label_style: str, label_delimiter: str, pc) -> str:
@@ -350,6 +358,9 @@ def custom_style_function(text: str, label_style: str, label_delimiter: str, pc)
     return '\n'.join(lines)
 
 
+
+
+
 def my_custom_error(pc):
     print(styled_mini_border)
     print(f'function: my_custom_erro:')
@@ -363,8 +374,9 @@ def my_custom_error(pc):
         e.handle_exception()
 
 
+
 def formatted_text_box_stuff():
-    pc = PrintsCharming(config={"enable_logging": True}, style_conditions=StyleConditionsManager(), styled_strings=styled_strings, logging_styles=logging_styles)
+    pc = PrintsCharming(config={"enable_logging": True}, style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
     builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
 
     horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style='purple',
@@ -475,6 +487,8 @@ def formatted_text_box_stuff():
     print(orange_horiz_border)
     print()
 
+
+
     print()
     print()
     print()
@@ -494,10 +508,16 @@ def formatted_text_box_stuff():
     print()
 
 
+
+
 def progress_bar(pc):
+
     print("Starting process...")
     pc.print_progress_bar()
     print("\nProcess complete.")
+
+
+
 
 
 # Dynamic Value Functions
@@ -505,21 +525,24 @@ def progress_bar(pc):
 def get_dynamic_name():
     return "John Doe"
 
-
 def get_dynamic_age():
     return 20
 
-
 def get_dynamic_balance():
     return 5
-
 
 def get_dynamic_occupation():
     return "Software Developer"
 
 
+
+
+
 def kwargs_replace_and_style_placeholders_examples():
-    pc = PrintsCharming(style_conditions=StyleConditionsManager(), styled_strings=styled_strings, logging_styles=logging_styles)
+
+
+    pc = PrintsCharming(style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
+
 
     # Assign dynamic values to my_kwargs
     my_kwargs = {
@@ -529,12 +552,15 @@ def kwargs_replace_and_style_placeholders_examples():
         "occupation": get_dynamic_occupation(),
     }
 
+
     my_text = "Hello, {name}. You are {age} years old, your occupation is {occupation}, and you have {balance} USD in your account."
 
     pc.print(my_text, **my_kwargs)  # print my_text directly thru the PrintCharming print method
 
     colored_text = pc.replace_and_style_placeholders(text=my_text, kwargs=my_kwargs)  # return the styled text from the method
     print(colored_text)  # print the styled text with standard python print
+
+
 
     structured_text = """
                 Name: {name}
@@ -564,14 +590,15 @@ def kwargs_replace_and_style_placeholders_examples():
 
     pc.print(structured_text, **my_kwargs)  # print with the PrintsCharming print method. This will be directed to the replace_and_style_placeholders method because of the kwargs
 
+
     styled_structured_text = pc.replace_and_style_placeholders(text=structured_text, kwargs=my_kwargs)  # return the styled text from the method
+
 
     print(f'reg print command styled_structured_text:')
     print(styled_structured_text)
 
     print(f'pc.print(structured_text):')
-    pc.print(structured_text,
-             color='silver')  # print with the PrintsCharming print method. This will not be directed to the replace_and_style_placeholders method because no kwargs
+    pc.print(structured_text, color='silver')  # print with the PrintsCharming print method. This will not be directed to the replace_and_style_placeholders method because no kwargs
 
     print()
     print()
@@ -585,6 +612,8 @@ def kwargs_replace_and_style_placeholders_examples():
 
     print(f'result of custom function with replace_and_style_placeholders method:')
     print(custom_replace_and_style_placeholders)
+
+
 
 
 def add_styled_substrings_to_instance(pc):
@@ -604,7 +633,7 @@ def random_examples():
     # words/phrases/substrings/variables/numbers/other/styles/etc/highly dynamic and like i said configurable if you understand the rules and relationships...legit documentation
     # to come. In the meantime you can keep as is or mess around with the PrintsCharming print method parameters.
 
-    pc = PrintsCharming(styled_strings=styled_strings, logging_styles=logging_styles)
+    pc = PrintsCharming(styled_strings=styled_strings)
 
     add_styled_substrings_to_instance(pc)
 
@@ -612,9 +641,7 @@ def random_examples():
 
     print()
 
-    pc.print(
-        f'Here    are    some examples of substrings.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple')
+    pc.print(f'Here    are    some examples of substrings.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!', color='purple')
     print()
 
     term_width = os.get_terminal_size().columns
@@ -680,6 +707,9 @@ def random_examples():
     pc.print("This is a task.", style="task", color="green", underline=True)
 
 
+
+
+
 def print_horizontal_bg_strip(pc):
     print(styled_mini_border)
     print(f'function: print_horizontal_bg_strip:')
@@ -691,6 +721,7 @@ def print_horizontal_bg_strip(pc):
         pc.print_bg('tree_color')
     except ColorNotFoundError as e:
         e.handle_exception()
+
 
 
 def print_variable_examples(pc):
@@ -708,6 +739,10 @@ def print_variable_examples(pc):
     print()
 
 
+
+
+
+
 def auto_styling_examples(pc, text):
     print(styled_mini_border)
     print(f'function: auto_styling_examples:')
@@ -718,17 +753,15 @@ def auto_styling_examples(pc, text):
     pc.print("Let's first print, Hello, world! styled as described above and right here.", style="yellow")
     pc.print(f"{text} Remember we assigned, 'Hello, world!' to the 'text' variable above. Let's pretend we are Connected to wss://advanced-trade-ws.coinbase.com", color="blue")
     pc.print("These words are going to be styled by their indexes, Hello, world!", style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 10): "purple", (11, 12): "pink"})
-    pc.print("Hello, world! These words are going to be styled by their indexes, Hello, world!",
-             style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 11): "purple", (13, 14): "pink"}, color='red')
-    pc.print("Hello, world! Only these words are going to be styled by their indexes, Hello, world!",
-             style={(3, 4): "orange", (5, 7): "blue", (8, 9): "yellow", (10, 13): "purple", (14, 15): "pink"})
+    pc.print("Hello, world! These words are going to be styled by their indexes, Hello, world!", style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 11): "purple", (13, 14): "pink"}, color='red')
+    pc.print("Hello, world! Only these words are going to be styled by their indexes, Hello, world!", style={(3, 4): "orange", (5, 7): "blue", (8, 9): "yellow", (10, 13): "purple", (14, 15): "pink"})
     pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple! these words are default. server")
-    pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple these words are magenta. server",
-             style='magenta')
+    pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple these words are magenta. server", style='magenta')
     pc.print("Hello", "how are you?", sep="---", color='green')
     pc.print("This string is not connected to another", color='blue')
     pc.print("This string is connected to another", "string", color='vyellow')
     print()
+
 
 
 def split_string_by_words(string, words):
@@ -745,6 +778,7 @@ def split_string_by_words(string, words):
         if current_part:
             result.append(' '.join(current_part))
         return result
+
 
 
 def index_styling_examples(pc):
@@ -768,6 +802,7 @@ def index_styling_examples(pc):
     print()
     print()
 
+
     text = f'This is a sentence where the way we determine 1 how and 2 where the text gets styled depends on: where the word: that is the dictionary key falls within this text.'
 
     splits = dict(green='sentence', red='2', orange='gets', blue='word:', yellow='')
@@ -775,6 +810,7 @@ def index_styling_examples(pc):
     print(styled_sentence)
 
     print()
+
 
     splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
     styled_sentence2 = pc.segment_and_style2(text, splits2)
@@ -791,6 +827,7 @@ def index_styling_examples(pc):
     string_style = ['yellow', 'orange', 'purple', 'vgreen', 'blue']
     styled_sentence3 = pc.segment_with_splitter_and_style(splitter_text, splitter_match, splitter_swap, splitter_show, splitter_style, splitter_arms, string_style)
     print(styled_sentence3)
+
 
 
 def variable_examples(pc):
@@ -827,7 +864,10 @@ def variable_examples(pc):
     return text
 
 
+
+
 def simple_use_case(pc):
+
     print(styled_mini_border)
     pc.print(f'function: simple_use_case:')
     print(styled_mini_border)
@@ -854,8 +894,14 @@ def simple_use_case(pc):
     print()
 
 
+
+
+
+
+
 def more_stuff():
-    pc = PrintsCharming(logging_styles=logging_styles)
+
+    pc = PrintsCharming()
 
     print(styled_mini_border)
     print(f'function: more_stuff')
@@ -933,7 +979,9 @@ def more_stuff():
     col_alignments = ['center', 'center']
     builder.print_multi_column_box3(columns, col_widths, col_styles, col_alignments, col_sep='|', col_widths_percent=True)
 
+
     print(pc.apply_style('orange', solid_horiz_rule))
+
 
     columns = ["Column 1 text\nLine 2. This should def be line2", "Column 2 text\nAnother line"]
     col_widths = ['', 25]
@@ -941,6 +989,8 @@ def more_stuff():
     col_alignments = ['center', 'center']
     builder.print_multi_column_box4(columns, col_widths, col_styles, col_alignments, col_sep='||', col_sep_width=1)
     print()
+
+
 
 
 def print_foreground_colors(pc, builder):
@@ -960,8 +1010,9 @@ def print_foreground_colors(pc, builder):
         pc.print()
         pc.print(f'{fg_vert_border_left}{fg_text_center_aligned}{fg_vert_border_right}')
 
-        # pc.print(f"This is one of the prints_charming foreground colors in the color map. ### Name: {color_name}", color=color_name)
+        #pc.print(f"This is one of the prints_charming foreground colors in the color map. ### Name: {color_name}", color=color_name)
     pc.print()
+
 
 
 def print_background_colors(pc, builder):
@@ -985,8 +1036,7 @@ def print_styles(pc, builder):
     pc.print()
     for style_name in pc.styles.keys():
         if builder.vert_char == ' ':
-            color = style_name if builder.pc.bg_color_map.get(style_name) else builder.pc.styles.get(style_name).bg_color if not builder.pc.styles.get(
-                style_name).reverse else builder.pc.styles.get(style_name).color
+            color = style_name if builder.pc.bg_color_map.get(style_name) else builder.pc.styles.get(style_name).bg_color if not builder.pc.styles.get(style_name).reverse else builder.pc.styles.get(style_name).color
             if not color:
                 color = builder.pc.styles.get(style_name).color
             print_styles_vert_border_left = builder.pc.apply_bg_color(color, builder.vert_border) + builder.vert_padding
@@ -1003,13 +1053,21 @@ def print_styles(pc, builder):
         pc.print(f'{print_styles_vert_border_left}{text_center_aligned}{print_styles_vert_border_right}')
 
 
+
+
 def print_colors_and_styles():
-    pc = PrintsCharming(logging_styles=logging_styles)
+    pc = PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     print_foreground_colors(pc, builder)
     print_background_colors(pc, builder)
     print_styles(pc, builder)
+
+
+
+
+
+
 
 
 def log_level_style_function(log_level):
@@ -1021,7 +1079,6 @@ def log_level_style_function(log_level):
     }
     return level_styles.get(log_level, None)
 
-
 def source_style_function(source):
     if "auth-service" in source:
         return "cyan"  # Highlight authentication service logs
@@ -1030,7 +1087,6 @@ def source_style_function(source):
     elif "inventory-service" in source:
         return "green"  # Highlight inventory service logs
     return None
-
 
 def message_style_function(message):
     if "successful" in message.lower():
@@ -1044,20 +1100,20 @@ def message_style_function(message):
     return None
 
 
+
+
 def accuracy_style_function(accuracy):
     if accuracy > 0.9:
         return "vgreen"  # Very good accuracy
     elif 0.8 < accuracy <= 0.9:
-        return "green"  # Good accuracy
+        return "green"   # Good accuracy
     else:
-        return "red"  # Poor accuracy
-
+        return "red"     # Poor accuracy
 
 def precision_style_function(precision):
     if precision < 0.75:
-        return "red"  # Low precision
-    return None  # No style for acceptable precision
-
+        return "red"     # Low precision
+    return None          # No style for acceptable precision
 
 def recall_style_function(recall):
     if recall > 0.9:
@@ -1065,19 +1121,17 @@ def recall_style_function(recall):
     elif 0.75 < recall <= 0.9:
         return "yellow"  # Medium recall
     else:
-        return "red"  # Low recall
-
+        return "red"     # Low recall
 
 def f1_score_style_function(f1_score, row):
     accuracy = row[1]  # Assume accuracy is the second column
     if abs(f1_score - accuracy) <= 0.05:
-        return "blue"  # F1 score close to accuracy
+        return "blue"   # F1 score close to accuracy
     return None
-
 
 def training_time_style_function(training_time):
     if training_time > 300:
-        return "orange"  # Long training time
+        return "orange" # Long training time
     return None
 
 
@@ -1090,14 +1144,12 @@ def age_style_function(age):
         return "vgreen"
     return None
 
-
 def name_style_function(name):
     if name in ["Prince Charming", "John Smith"]:
         return "blue"
     elif name in ["Cinderella", "Anastasia", "Drizella", "Ariel"]:
         return "pink"
     return None
-
 
 def occupation_style_function(occupation):
     if occupation in ['Prince', 'Princess']:
@@ -1109,6 +1161,7 @@ def occupation_style_function(occupation):
     elif occupation not in ['Prince', 'Princess']:
         return "gray"
     return None
+
 
 
 def create_style_table_data(pc: PrintsCharming):
@@ -1131,12 +1184,14 @@ def create_color_table_data(pc: PrintsCharming):
     return table_data
 
 
+
 def welcome():
+
     # None of these parameters are required for simple use cases as will be shown soon. You can simply init PrintsCharming with pc_instance = PrintsCharming()
     # To interactively create your own color_map where you can pick and name your own colors and default color do python -m prints_charming.show_colors. The point of this is to
     # show various ways to align text and tables and objects within boxes and tables. More on it later and some of the box methods will be weeded out.
     style_conditions = StyleConditionsManager()
-    pc = PrintsCharming(logging_styles=logging_styles, style_conditions=style_conditions)
+    pc = PrintsCharming(style_conditions=style_conditions)
 
     # Create an instance of FrameBuilder
     builder = FrameBuilder(pc=pc, horiz_char=' ', vert_width=2, vert_padding=1, vert_char=' ')
@@ -1145,6 +1200,7 @@ def welcome():
     available_half_width = available_width // 2
     available_third_width = available_width // 3
     available_fourth_width = available_width // 4
+
 
     table_manager = TableManager(pc=pc)
 
@@ -1176,6 +1232,8 @@ def welcome():
         double_space=True,
     )
 
+
+
     (horiz_border_top,
      vert_border_left,
      vert_border_right,
@@ -1183,6 +1241,7 @@ def welcome():
                                                             vert_border_left_style=style_conditions.function_styles.welcome('border2', 'left'),
                                                             vert_border_right_style=style_conditions.function_styles.welcome('border2', 'right'),
                                                             horiz_border_bottom_style=style_conditions.function_styles.welcome('border2', 'bottom'))
+
 
     texts = []
     blank_line = 'invisible_text'
@@ -1202,6 +1261,7 @@ def welcome():
                                      horiz_border_height=1)
 
     print()
+
 
     # Print the table within a border box
     builder.print_border_boxed_table(colors_table,
@@ -1225,6 +1285,8 @@ def welcome():
 
     print()
     print(horiz_border_top)
+
+
 
     texts = []
     blank_line = 'invisible_text'  # I want to instead use blank_line = ' '
@@ -1254,6 +1316,7 @@ def welcome():
         ["John Smith", 17, "Normie"]
     ]
 
+
     simple_table = table_manager.generate_table(table_data=table_data, header_style="magenta", border_style="vgreen", col_sep_style="vgreen", target_text_box=True,
                                                 cell_style="header_text")
     print(simple_table)
@@ -1261,6 +1324,7 @@ def welcome():
     less_simple_table = table_manager.generate_table(table_data=table_data, header_style="magenta", border_style="vgreen", col_sep_style="vgreen", target_text_box=True,
                                                      cell_style=["orange", "purple"])
     print(less_simple_table)
+
 
     builder.print_border_boxed_tables2([less_simple_table, less_simple_table, less_simple_table, less_simple_table],
                                        horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom,
@@ -1271,6 +1335,7 @@ def welcome():
         "Name": name_style_function,
         "Occupation": occupation_style_function
     }
+
 
     complex_table = table_manager.generate_table(
         table_data=table_data,
@@ -1283,6 +1348,7 @@ def welcome():
         cell_style=["orange", "purple"],
         conditional_style_functions=conditional_style_functions1
     )
+
 
     print(complex_table)
 
@@ -1321,6 +1387,9 @@ def welcome():
 
     print(really_complex_table_str)
 
+
+
+
     more_complex_table_data = [
         ["Timestamp", "Log Level", "Source", "Message"],
         ["2024-08-31 12:00:01", "INFO", "auth-service", "User login successful: user123"],
@@ -1358,6 +1427,12 @@ def welcome():
 
     print(more_complex_table_str)
 
+
+
+
+
+
+
     builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
     horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style=style_conditions.welcome_style('top'),
                                                                                                                  vert_border_left_style=style_conditions.welcome_style('left'),
@@ -1371,9 +1446,10 @@ def welcome():
     builder.print_border_boxed_table(less_simple_table, horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom, text_style="default", text_align="left")
 
 
+
 def experiment():
     style_conditions = StyleConditionsManager()
-    pc = PrintsCharming(logging_styles=logging_styles, style_conditions=style_conditions)
+    pc = PrintsCharming(style_conditions=style_conditions)
 
     table_manager = TableManager(pc=pc)
 
@@ -1389,11 +1465,11 @@ def experiment():
                                                             horiz_border_bottom_style='vblue')
 
 
-def setup_logger(pc, name=None):
+def setup_logger2(pc, name=None):
     logger = logging.getLogger(__name__) if not name else logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
-    formatter = CustomFormatter(
+    formatter = PrintsCharmingFormatter(
         pc=pc,
         datefmt='%Y-%m-%d %H:%M:%S.',
         level_styles={
@@ -1405,10 +1481,12 @@ def setup_logger(pc, name=None):
         }
     )
 
-    handler = CustomLogHandler(pc, formatter=formatter)
+    handler = PrintsCharmingLogHandler(pc, formatter=formatter)
     logger.addHandler(handler)
 
     return logger
+
+
 
 
 class NewClass():
@@ -1417,7 +1495,8 @@ class NewClass():
         self.class_name = self.__class__.__name__
         self.instance_name = instance_name
         self.arg1 = arg1
-        self.logger = setup_logger(pc, name=self.class_name)
+        self.logger = setup_logger(pc=pc, name=self.class_name)
+
 
     def highlight(self, text, style_name='highlight_arg'):
         return self.pc.apply_style(style_name, text)
@@ -1429,10 +1508,15 @@ class NewClass():
         return self.class_name, self.instance_name, self.arg1
 
 
+
+
+
 def play_around_with_logging():
+
     pc = PrintsCharming(styles=logging_styles.copy())
 
-    my_logger = setup_logger(pc)
+
+    my_logger = setup_logger(pc, name='scratch')
 
     init_message = f"my_logger initialized with pc configuration:\n{pc.print_dict(pc.config)}"
     my_logger.debug(init_message)
@@ -1444,11 +1528,25 @@ def play_around_with_logging():
     my_logger.warning("Warning message.")
     my_logger.error("Error encountered.")
     my_logger.critical("Critical issue.")
-    print()
+
 
     new_class = NewClass(pc, 'new_instance', 'my_arg')
     class_name, instance_name, arg1 = new_class.get_names()
     my_logger.debug(f"Successfully retrieved class_name: {class_name}, instance_name: {instance_name}, and instance arg1: {arg1}.")
+
+
+    my_logger2 = setup_logger()
+
+    my_logger2.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
+
+    my_logger2.debug("Debugging information.")
+    my_logger2.info("General info.")
+    my_logger2.warning("Warning message.")
+    my_logger2.error("Error encountered.")
+    my_logger2.critical("Critical issue.")
+    print()
+
+
 
 
 def main():
@@ -1459,7 +1557,7 @@ def main():
 
     welcome()
 
-    pc = PrintsCharming(logging_styles=logging_styles)
+    pc = PrintsCharming(config={"internal_logging": True})
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     pc.add_string('function', 'blue')
@@ -1481,11 +1579,13 @@ def main():
 
 
 if __name__ == "__main__":
-    PrintsCharming.set_shared_maps(shared_color_map=prints_charming_defaults.DEFAULT_COLOR_MAP)
+    PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP)
     quick_pc = PrintsCharming()
     mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     styled_mini_border = quick_pc.apply_color('orange', mini_border)
     main()
+
+
 
     menu_options = ["Option 1", "Option 2", "Option 3"]
     menu = InteractiveMenu(menu_options, selected_style='vcyan', unselected_style='default', confirmed_style='vgreen')

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from prints_charming import PrintsStyle, PrintsCharming
+from prints_charming import PStyle, PrintsCharming
 from datetime import datetime
 import time
 
@@ -9,18 +9,18 @@ import time
 # python -m prints_charming.examples.logging-granular
 
 styles = {
-    "default"      : PrintsStyle(),
-    "white"        : PrintsStyle(color="white", italic=True),
-    "green"        : PrintsStyle(color="green"),
-    "vgreen"       : PrintsStyle(color="vgreen"),
-    "red"          : PrintsStyle(color="red"),
-    "vred"         : PrintsStyle(color="vred"),
-    "blue"         : PrintsStyle(color="blue"),
-    "yellow"       : PrintsStyle(color="yellow"),
-    "vyellow"      : PrintsStyle(color="vyellow"),
-    "cyan"         : PrintsStyle(color="cyan"),
-    "vcyan"        : PrintsStyle(color="vcyan"),
-    "orange"       : PrintsStyle(color="orange"),
+    "default"      : PStyle(),
+    "white"        : PStyle(color="white", italic=True),
+    "green"        : PStyle(color="green"),
+    "vgreen"       : PStyle(color="vgreen"),
+    "red"          : PStyle(color="red"),
+    "vred"         : PStyle(color="vred"),
+    "blue"         : PStyle(color="blue"),
+    "yellow"       : PStyle(color="yellow"),
+    "vyellow"      : PStyle(color="vyellow"),
+    "cyan"         : PStyle(color="cyan"),
+    "vcyan"        : PStyle(color="vcyan"),
+    "orange"       : PStyle(color="orange"),
 }
 
 class PrintsCharmingBasicLogHandler(logging.Handler):

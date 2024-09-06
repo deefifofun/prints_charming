@@ -6,7 +6,8 @@ from .prints_charming_defaults import (
     DEFAULT_EFFECT_MAP,
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
-    DEFAULT_LEVEL_STYLES
+    DEFAULT_LEVEL_STYLES,
+    DEFAULT_CONTROL_MAP
 )
 
 from .utils import (
@@ -34,6 +35,7 @@ from .table_manager import TableManager
 
 
 from .win_utils import WinUtils
+
 
 
 __all__ = ['PStyle', 'PrintsCharming', 'DEFAULT_CONFIG', 'DEFAULT_COLOR_MAP', 'DEFAULT_EFFECT_MAP',

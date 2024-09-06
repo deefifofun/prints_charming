@@ -11,7 +11,6 @@ import inspect
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from .logging_utils import logger
 
 from .exceptions import (
     InvalidLengthError,
@@ -23,80 +22,18 @@ from .prints_charming_defaults import (
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES
+    DEFAULT_LOGGING_STYLES,
+    DEFAULT_CONTROL_MAP
 )
 
 from .prints_style import PStyle
+
+from .logging_utils import shared_logger
 
 if sys.platform == 'win32':
     from .win_utils import WinUtils
 
 
-
-
-
-
-# Marked for removal soon!
-# Use from prints_charming.logging import CustomFormatter, CustomLogHandler.
-# Check prints_charming.examples.main for examples.
-class PrintsCharmingLogHandler(logging.Handler):
-    TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
-
-    def __init__(self, pc: 'PrintsCharming' = None, styles: Dict[str, PStyle] = None, timestamp_style: str = 'timestamp',
-                 level_styles: Optional[Dict[str, str]] = None, timestamp_format: str = None):
-        super().__init__()
-        self.pc = pc or PrintsCharming(styles=styles if styles else DEFAULT_LOGGING_STYLES.copy())
-        self.apply_style = self.pc.apply_style
-        self.timestamp_style = timestamp_style
-        self.level_styles = level_styles or {
-            'DEBUG': 'debug',
-            'INFO': 'info',
-            'WARNING': 'warning',
-            'ERROR': 'error',
-            'CRITICAL': 'critical'
-        }
-        self.pc.log_level_styles = self.level_styles
-        self.timestamp_format = timestamp_format or self.TIMESTAMP_FORMAT
-
-    def emit(self, record: logging.LogRecord):
-        try:
-            # Format the message using a custom method
-            formatted_message = self.format_message(record.msg, record.args)
-
-            # Pass the formatted message to the handle_log_event method
-            self.handle_log_event(formatted_message, log_level=record.levelname)
-
-        except Exception as e:
-            self.handleError(record)
-            print(f"Unexpected error during logging: {e}")
-
-    def format_message(self, message: str, args):
-
-        if args:
-            try:
-                message = message.format(*args)
-            except (IndexError, KeyError, ValueError) as e:
-                self.pc.logger.error(f"Error formatting log message: {e}")
-                return message
-
-        return message
-
-
-    def handle_log_event(self, text: str, log_level: str):
-        timestamp = datetime.now().strftime(self.timestamp_format)
-
-        log_level_style = self.level_styles.get(log_level, 'default')
-
-        # Get styled components
-        styled_log_level_prefix = self.apply_style(log_level_style, f"LOG[{log_level}]")
-        styled_timestamp = self.apply_style(self.timestamp_style, timestamp)
-        styled_level = self.apply_style(log_level_style, log_level)
-        styled_text = self.apply_style(log_level_style, text)
-
-        # Create the final styled message
-        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
-
-        print(log_message)
 
 
 
@@ -122,8 +59,10 @@ class PrintsCharming:
     shared_bg_color_map: Optional[Dict[str, str]] = None
     shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
     shared_styles: Optional[Dict[str, PStyle]] = None
-    shared_logging_styles: Optional[Dict[str, PStyle]] = None
-    shared_internal_logging_styles: Optional[Dict[str, PStyle]] = DEFAULT_LOGGING_STYLES.copy()
+    shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
+
+    # This style map is shared across all instances for package wide internal logging purposes.
+    _shared_internal_logging_styles: Optional[Dict[str, PStyle]] = DEFAULT_LOGGING_STYLES.copy()
 
     # This method is entirely optional and not required for the usage of the PrintsCharming class.
     @classmethod
@@ -132,7 +71,7 @@ class PrintsCharming:
                         shared_bg_color_map: Optional[Dict[str, str]] = None,
                         shared_effect_map: Optional[Dict[str, str]] = None,
                         shared_styles: Optional[Dict[str, PStyle]] = None,
-                        shared_logging_styles: Optional[Dict[str, PStyle]] = None):
+                        shared_ctl_map: Optional[Dict[str, str]] = None):
         """
         Set shared maps across all instances of the PrintsCharming class.
 
@@ -171,8 +110,6 @@ class PrintsCharming:
                                   **This should not be changed unless you are certain of what you're doing.**
         :param shared_styles: (Optional) A dictionary of shared styles. This allows for the consistent application
                               of text styles across all instances.
-        :param shared_logging_styles: (Optional) A dictionary of shared logging styles, useful for ensuring uniform
-                                      logging output across instances.
         """
 
         # Setting the shared maps to be used globally across instances
@@ -188,37 +125,17 @@ class PrintsCharming:
         if shared_styles:
             cls.shared_styles = shared_styles
 
-        if shared_logging_styles:
-            cls.shared_logging_styles = shared_logging_styles
-
-
-
-
-    CONTROL_MAP: Dict[str, str] = {
-        "alt_buffer": "\033[?1049h",
-        "normal_buffer": "\033[?1049l",
-        "alt_buffer_no_save": "\033[?47h",  # Switch to alternate buffer without saving the cursor
-        "normal_buffer_no_save": "\033[?47l",  # Switch back to normal buffer without restoring the cursor
-        "clear_line": "\033[2K",
-        "clear_screen": "\033[2J",
-        "cursor_position": "\033[{row};{col}H",
-        "cursor_home": "\033[H",  # Move cursor to the home position (top-left corner)
-        "move_cursor_up": "\033[{n}A",
-        "move_cursor_down": "\033[{n}B",
-        "move_cursor_right": "\033[{n}C",
-        "move_cursor_left": "\033[{n}D",
-        "save_cursor_position": "\033[s",
-        "restore_cursor_position": "\033[u",
-    }
+        if shared_ctl_map:
+            cls.shared_ctl_map = shared_ctl_map
 
 
 
     @classmethod
     def clear_line(cls, use_carriage_return: bool = True):
         if use_carriage_return:
-            print("\r" + cls.CONTROL_MAP["clear_line"], end='')
+            print("\r" + cls.shared_ctl_map["clear_line"], end='')
         else:
-            print(cls.CONTROL_MAP["clear_line"], end='')
+            print(cls.shared_ctl_map["clear_line"], end='')
 
 
 
@@ -230,7 +147,6 @@ class PrintsCharming:
                  styles: Optional[Dict[str, PStyle]] = None,
                  styled_strings: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
-                 logging_styles: Optional[Dict[str, PStyle]] = None,
                  autoconf_win: bool = False
                  ) -> None:
 
@@ -244,7 +160,6 @@ class PrintsCharming:
         :param styles: supply your own styles dictionary. Default is a copy of the DEFAULT_STYLES dictionary unless cls.shared_styles is defined.
         :param printscharming_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
         :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
-        :param logging_styles: A separate dict for logging_styles.
         :param autoconf_win: If your using legacy windows cmd prompt and not getting colored/styled text then change this to True to make things work.
         """
 
@@ -267,11 +182,12 @@ class PrintsCharming:
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
         }
 
-        self.logging_styles = logging_styles or PrintsCharming.shared_logging_styles or DEFAULT_LOGGING_STYLES.copy()
+
+        self._internal_logging_styles = PrintsCharming._shared_internal_logging_styles
 
 
-        self.logging_style_codes: Dict[str, str] = {
-            name: self.create_style_code(style) for name, style in self.logging_styles.items() if self.logging_styles[name].color in self.color_map
+        self._internal_logging_style_codes: Dict[str, str] = {
+            name: self.create_style_code(style) for name, style in self._internal_logging_styles.items() if self._internal_logging_styles[name].color in self.color_map
         }
 
         self.reset = PrintsCharming.RESET
@@ -305,9 +221,16 @@ class PrintsCharming:
             else:
                 self.win_utils = WinUtils
 
+        # Instance-level flag to control logging
+        self.internal_logging_enabled = self.config.get("internal_logging", False)
+
+        # Use shared logger but don't disable it
+        self.logger = shared_logger
+        self.setup_internal_logging(self.config.get("log_level", "DEBUG"))
+
         # Setup logging
-        self.logger = None
-        self.setup_logging(self.config["internal_logging"], self.config["log_level"])
+        #self.logger = None
+        #self.setup_logging(self.config["internal_logging"], self.config["log_level"])
 
 
 
@@ -333,99 +256,6 @@ class PrintsCharming:
 
 
 
-    def setup_logging(self, internal_logging: bool, log_level: str, log_format: str = '%(message)s'):
-        self.logger = logger
-        self.logger.propagate = False  # Prevent propagation to root logger
-        if internal_logging:
-            self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
-            if not self.logger.hasHandlers():
-                console_handler = logging.StreamHandler()
-                console_handler.setFormatter(logging.Formatter(log_format))
-                self.logger.addHandler(console_handler)
-                self.logger.disabled = False
-
-            logging_enabled_init_message = f"Internal Logging Enabled:\n{self.print_dict(self.config)}"
-            self.debug(logging_enabled_init_message)
-
-        else:
-            self.logger.disabled = True
-
-
-
-    def update_logging(self, log_format: str = '%(message)s'):
-        self.logger.handlers = []  # Clear existing handlers
-        self.setup_logging(self.config["internal_logging"], self.config["log_level"], log_format)
-
-
-
-    def log(self, level: str, message: str, *args, **kwargs) -> None:
-        if not self.config['internal_logging']:
-            return
-
-        level = getattr(logging, level, None)
-
-        if args:
-            try:
-                message = message.format(*args)
-            except (IndexError, KeyError, ValueError) as e:
-                self.logger.error(f"Error formatting log message: {e}")
-                return
-
-        if kwargs:
-            message = message.format(**kwargs)
-
-        timestamp = time.time()
-        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self._TIMESTAMP_FORMAT)
-
-        timestamp_style = 'timestamp'
-
-        level_styles = {
-            10: 'debug',
-            20: 'info',
-            30: 'warning',
-            40: 'error',
-            50: 'critical',
-        }
-
-        log_level_style = level_styles.get(level, 'default')
-
-        styled_log_level_prefix = self.apply_logging_style(log_level_style, f"LOG[{logging.getLevelName(level)}]")
-        styled_timestamp = self.apply_logging_style(timestamp_style, formatted_timestamp)
-        styled_level = self.apply_logging_style(log_level_style, logging.getLevelName(level))
-        styled_text = self.apply_logging_style(log_level_style, message)
-
-        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
-        self.logger.log(level, log_message)
-
-
-    def debug(self, message: str, *args, **kwargs) -> None:
-        # Get the current stack frame
-        current_frame = inspect.currentframe()
-        # Get the caller frame
-        caller_frame = current_frame.f_back
-        # Extract the relevant information
-        class_name = self.apply_logging_style('class_name', self.__class__.__name__)
-        method_name = self.apply_logging_style('method_name', caller_frame.f_code.co_name)
-        line_number = self.apply_logging_style('line_number', caller_frame.f_lineno)
-
-        # Include the extracted information in the log message
-        message = f"{class_name}.{method_name}:{line_number} - {message}"
-
-        self.log('DEBUG', message, *args, **kwargs)
-
-    def info(self, message: str, *args, **kwargs) -> None:
-        self.log('INFO', message, *args, **kwargs)
-
-    def warning(self, message: str, *args, **kwargs) -> None:
-        self.log('WARNING', message, *args, **kwargs)
-
-    def error(self, message: str, *args, **kwargs) -> None:
-        self.log('ERROR', message, *args, **kwargs)
-
-    def critical(self, message: str, *args, **kwargs) -> None:
-        self.log('CRITICAL', message, *args, **kwargs)
-
-
     def print_dict(self, d, indent=4):
         def pprint_dict(d, level=0):
             result = ""
@@ -443,7 +273,7 @@ class PrintsCharming:
                 elif isinstance(value, float):
                     result += self.apply_style('float', str(value)) + "\n"
                 elif isinstance(value, str) and value.isupper() and value.lower() in ['debug', 'info', 'warning', 'error', 'critical']:
-                    result += self.apply_logging_style(value.lower(), str(value)) + "\n"
+                    result += self._apply_style_internal(value.lower(), str(value)) + "\n"
 
                 else:
                     result += f"{value}\n"
@@ -691,13 +521,10 @@ class PrintsCharming:
         return f'{code}{text}{self.reset}'
 
 
-    def get_logging_style_code(self, style_name):
-        return self.logging_style_codes.get(style_name, self.style_codes['default'])
-
-
-    def apply_logging_style(self, style_name, text):
+    def _apply_style_internal(self, style_name, text, reset=True):
         # This method does not log debug messages to avoid recursion
 
+        text = str(text)
         if isinstance(text, str) and text.isspace():
             style_code = self.bg_color_map.get(
                 style_name,
@@ -706,10 +533,10 @@ class PrintsCharming:
                 )
             )
         else:
-            style_code = self.logging_style_codes[style_name]
+            style_code = self._internal_logging_style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
 
         # Append the style code at the beginning of the text and the reset code at the end
-        styled_text = f"{style_code}{text}{self.reset}"
+        styled_text = f"{style_code}{text}{self.reset if reset else ''}"
 
         return styled_text
 
@@ -1398,6 +1225,116 @@ class PrintsCharming:
             print(closing_brace)
         else:
             print(f"{closing_brace},")
+
+
+    """
+    def setup_logging(self, internal_logging: bool, log_level: str, log_format: str = '%(message)s'):
+        self.logger = shared_logger
+        self.logger.propagate = False  # Prevent propagation to root logger
+        if internal_logging:
+            self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
+            if not self.logger.hasHandlers():
+                console_handler = logging.StreamHandler()
+                console_handler.setFormatter(logging.Formatter(log_format))
+                self.logger.addHandler(console_handler)
+                self.logger.disabled = False
+
+            logging_enabled_init_message = f"Internal Logging Enabled:\n{self.print_dict(self.config)}"
+            self.debug(logging_enabled_init_message)
+
+        else:
+            self.logger.disabled = True
+
+
+    def update_logging(self, log_format: str = '%(message)s'):
+        self.logger.handlers = []  # Clear existing handlers
+        self.setup_logging(self.config["internal_logging"], self.config["log_level"], log_format)
+
+    """
+
+    # This is for internal logging within this class!!!
+    def setup_internal_logging(self, log_level: str, log_format: str = '%(message)s'):
+        """
+        Setup logger, configure it with appropriate log level and format.
+        """
+        # Configure the shared logger's level
+        self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
+
+        # Logging is controlled by the instance, not by disabling the logger itself
+        if self.internal_logging_enabled:
+            self.info("Internal Logging Enabled for this instance.")
+            logging_enabled_init_message = f"Instance config dict:\n{self.print_dict(self.config)}"
+            self.debug(logging_enabled_init_message)
+
+
+
+    def log(self, level: str, message: str, *args, **kwargs) -> None:
+        if not self.config['internal_logging']:
+            return
+
+        level = getattr(logging, level, None)
+
+        if args:
+            try:
+                message = message.format(*args)
+            except (IndexError, KeyError, ValueError) as e:
+                self.logger.error(f"Error formatting log message: {e}")
+                return
+
+        if kwargs:
+            message = message.format(**kwargs)
+
+        timestamp = time.time()
+        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self._TIMESTAMP_FORMAT)
+
+        timestamp_style = 'timestamp'
+
+        level_styles = {
+            10: 'debug',
+            20: 'info',
+            30: 'warning',
+            40: 'error',
+            50: 'critical',
+        }
+
+        log_level_style = level_styles.get(level, 'default')
+
+        styled_log_level_prefix = self._apply_style_internal(log_level_style, f"LOG[{logging.getLevelName(level)}]")
+        styled_timestamp = self._apply_style_internal(timestamp_style, formatted_timestamp)
+        styled_level = self._apply_style_internal(log_level_style, logging.getLevelName(level))
+        styled_text = self._apply_style_internal(log_level_style, message)
+
+        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
+        self.logger.log(level, log_message)
+
+
+    def debug(self, message: str, *args, **kwargs) -> None:
+        # Get the current stack frame
+        current_frame = inspect.currentframe()
+        # Get the caller frame
+        caller_frame = current_frame.f_back
+        # Extract the relevant information
+        class_name = self._apply_style_internal('class_name', self.__class__.__name__)
+        method_name = self._apply_style_internal('method_name', caller_frame.f_code.co_name)
+        line_number = self._apply_style_internal('line_number', caller_frame.f_lineno)
+
+        # Include the extracted information in the log message
+        message = f"{class_name}.{method_name}:{line_number} - {message}"
+
+        self.log('DEBUG', message, *args, **kwargs)
+
+    def info(self, message: str, *args, **kwargs) -> None:
+        self.log('INFO', message, *args, **kwargs)
+
+    def warning(self, message: str, *args, **kwargs) -> None:
+        self.log('WARNING', message, *args, **kwargs)
+
+    def error(self, message: str, *args, **kwargs) -> None:
+        self.log('ERROR', message, *args, **kwargs)
+
+    def critical(self, message: str, *args, **kwargs) -> None:
+        self.log('CRITICAL', message, *args, **kwargs)
+
 
 
 def get_default_printer() -> Any:
