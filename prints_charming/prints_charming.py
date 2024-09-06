@@ -286,7 +286,7 @@ class PrintsCharming:
     def escape_ansi_codes(self, ansi_string):
         self.debug("Escaping ANSI codes in string: {}", ansi_string)
         escaped_ansi_string = ansi_string.replace("\033", "\\033")
-        #self.debug("Escaped ANSI codes in string: {}", escaped_ansi_string)
+        self.debug("Escaped ANSI codes in string: {}", escaped_ansi_string)
         return escaped_ansi_string
 
 

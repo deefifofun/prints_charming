@@ -48,7 +48,6 @@ styled_strings = {
 
 
 
-
 def make_box():
     pass
 
@@ -100,55 +99,7 @@ class FunctionStyles:
         }
 
         # Placeholder for future groupings
-        self.default_styles = {
-            "default": PStyle(),
-            "default_bg": PStyle(bg_color="black"),
-            "top_level_label": PStyle(bold=True, italic=True),
-            "sub_level_label": PStyle(color='lblue'),
-            "numbers": PStyle(color="yellow"),
-            'main_bullets': PStyle(color="purple"),
-            "sub_bullets": PStyle(color="pink"),
-            "sub_proj": PStyle(color="cyan"),
-            "sub_bullet_title": PStyle(color="orange"),
-            "sub_bullet_sentence": PStyle(color="dblue"),
-            "white": PStyle(color="white"),
-            "gray": PStyle(color="gray"),
-            "dgray": PStyle(color="dgray"),
-            "black": PStyle(color="black"),
-            "green": PStyle(color="green", bold=True),
-            "vgreen": PStyle(color="vgreen", bold=True),
-            "log_true": PStyle(color='vgreen'),
-            "bg_color_green": PStyle(color="white", bg_color='green'),
-            "red": PStyle(color="red"),
-            "vred": PStyle(color="vred", bold=True),
-            "blue": PStyle(color="blue"),
-            "dblue": PStyle(color="dblue"),
-            "lblue": PStyle(color="lblue"),
-            "vblue": PStyle(color="vblue"),
-            "yellow": PStyle(color="yellow"),
-            "vyellow": PStyle(color="vyellow"),
-            "lpurple": PStyle(color="lpurple"),
-            "header": PStyle(color="vcyan"),
-            "header_text": PStyle(color="purple", bg_color="gray", bold=True, italic=True),
-            "header_text2": PStyle(color="gray", bg_color="purple", bold=True),
-            "task": PStyle(color="blue", bold=True),
-            "path": PStyle(color="blue"),
-            "filename": PStyle(color="yellow"),
-            "line_info": PStyle(color="yellow", bold=True),
-            "line_number": PStyle(color="orange", bold=True),
-            "function_name": PStyle(color="yellow", italic=True),
-            "error_message": PStyle(color="vred", bold=True, dim=True),
-            "code": PStyle(color="yellow"),
-            "dict_key": PStyle(color="lblue"),
-            "dict_value": PStyle(color="white"),
-            "true": PStyle(color="vgreen"),
-            "false": PStyle(color="vred"),
-            'none': PStyle(color="lpurple"),
-            "int": PStyle(color="cyan"),
-            "float": PStyle(color="vcyan"),
-            "other": PStyle(color="lav"),
-            "conceal": PStyle(conceal=True),
-        }
+        self.default_styles = DEFAULT_STYLES.copy()
 
     def welcome(self, style_cat: str, sub_cat: str = None) -> str:
         # Mapping of style categories to their corresponding dictionaries
@@ -416,19 +367,18 @@ def progress_bar(pc):
     print("\nProcess complete.")
 
 
-
-
-
 # Dynamic Value Functions
-
 def get_dynamic_name():
     return "John Doe"
+
 
 def get_dynamic_age():
     return 20
 
+
 def get_dynamic_balance():
     return 5
+
 
 def get_dynamic_occupation():
     return "Software Developer"
@@ -438,7 +388,6 @@ def get_dynamic_occupation():
 
 
 def kwargs_replace_and_style_placeholders_examples():
-
 
     pc = PrintsCharming(style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
 
@@ -524,12 +473,12 @@ def add_styled_substrings_to_instance(pc):
 
 
 def random_examples():
-    # Create a preconfigured instance of ColorPrinter
+    # Create a preconfigured instance of PrintsCharming
     # The first couple print statements though ugly demonstrate the nuanced and highly customizable and unbreakable relationship between color, bg_color, underlines, overlines, etc
     # and how they are configured to behave in the spacing between words dependent on the share_alike parameters in the print statement, which default to what made the most sense to
     # me but is highly customizable for different use cases. Like when spacing/gaps/etc between words are filled with bg, underline etc they need to share fg_colors for underline,
     # bg_colors for bg_color in the space/gap/sep, the rules and relationships depend on the different styles associated with the indexes of the different
-    # words/phrases/substrings/variables/numbers/other/styles/etc/highly dynamic and like i said configurable if you understand the rules and relationships...legit documentation
+    # words/phrases/substrings/variables/numbers/other/styles/etc/highly dynamic and like i said configurable...legit documentation
     # to come. In the meantime you can keep as is or mess around with the PrintsCharming print method parameters.
 
     pc = PrintsCharming(styled_strings=styled_strings)
@@ -607,8 +556,6 @@ def random_examples():
 
 
 
-
-
 def print_horizontal_bg_strip(pc):
     print(styled_mini_border)
     print(f'function: print_horizontal_bg_strip:')
@@ -640,8 +587,6 @@ def print_variable_examples(pc):
 
 
 
-
-
 def auto_styling_examples(pc, text):
     print(styled_mini_border)
     print(f'function: auto_styling_examples:')
@@ -662,21 +607,6 @@ def auto_styling_examples(pc, text):
     print()
 
 
-
-def split_string_by_words(string, words):
-    strings = string.split()
-    for i, word in enumerate(strings, start=1):  # Start indexing from 1
-        result = []
-        current_part = []
-        for word in words:
-            if word in words:
-                if current_part:
-                    result.append(' '.join(current_part))
-                    current_part = []
-            current_part.append(word)
-        if current_part:
-            result.append(' '.join(current_part))
-        return result
 
 
 
@@ -791,9 +721,6 @@ def simple_use_case(pc):
     pc.print("# Show that 'Hello, world!' isn't color or style defined.")
     pc.print("Hello, world!")
     print()
-
-
-
 
 
 
@@ -953,7 +880,6 @@ def print_styles(pc, builder):
 
 
 
-
 def print_colors_and_styles():
     pc = PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
@@ -961,11 +887,6 @@ def print_colors_and_styles():
     print_foreground_colors(pc, builder)
     print_background_colors(pc, builder)
     print_styles(pc, builder)
-
-
-
-
-
 
 
 
@@ -978,6 +899,7 @@ def log_level_style_function(log_level):
     }
     return level_styles.get(log_level, None)
 
+
 def source_style_function(source):
     if "auth-service" in source:
         return "cyan"  # Highlight authentication service logs
@@ -986,6 +908,7 @@ def source_style_function(source):
     elif "inventory-service" in source:
         return "green"  # Highlight inventory service logs
     return None
+
 
 def message_style_function(message):
     if "successful" in message.lower():
@@ -1009,10 +932,12 @@ def accuracy_style_function(accuracy):
     else:
         return "red"     # Poor accuracy
 
+
 def precision_style_function(precision):
     if precision < 0.75:
         return "red"     # Low precision
     return None          # No style for acceptable precision
+
 
 def recall_style_function(recall):
     if recall > 0.9:
@@ -1022,11 +947,13 @@ def recall_style_function(recall):
     else:
         return "red"     # Low recall
 
+
 def f1_score_style_function(f1_score, row):
     accuracy = row[1]  # Assume accuracy is the second column
     if abs(f1_score - accuracy) <= 0.05:
         return "blue"   # F1 score close to accuracy
     return None
+
 
 def training_time_style_function(training_time):
     if training_time > 300:
@@ -1043,12 +970,14 @@ def age_style_function(age):
         return "vgreen"
     return None
 
+
 def name_style_function(name):
     if name in ["Prince Charming", "John Smith"]:
         return "blue"
     elif name in ["Cinderella", "Anastasia", "Drizella", "Ariel"]:
         return "pink"
     return None
+
 
 def occupation_style_function(occupation):
     if occupation in ['Prince', 'Princess']:
@@ -1327,11 +1256,6 @@ def welcome():
     print(more_complex_table_str)
 
 
-
-
-
-
-
     builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
     horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style=style_conditions.welcome_style('top'),
                                                                                                                  vert_border_left_style=style_conditions.welcome_style('left'),
@@ -1414,7 +1338,6 @@ def play_around_with_logging():
 
     pc = PrintsCharming(styles=DEFAULT_LOGGING_STYLES.copy())
 
-
     my_logger = setup_logger(pc, name='scratch')
 
     init_message = f"my_logger initialized with pc configuration:\n{pc.print_dict(pc.config)}"
@@ -1433,6 +1356,7 @@ def play_around_with_logging():
     class_name, instance_name, arg1 = new_class.get_names()
     my_logger.debug(f"Successfully retrieved class_name: {class_name}, instance_name: {instance_name}, and instance arg1: {arg1}.")
 
+    ###########################################################################################################
 
     my_logger2 = setup_logger()
 
@@ -1484,8 +1408,7 @@ if __name__ == "__main__":
     styled_mini_border = quick_pc.apply_color('orange', mini_border)
     main()
 
-
-
+    # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["Option 1", "Option 2", "Option 3"]
     menu = InteractiveMenu(menu_options, selected_style='vcyan', unselected_style='default', confirmed_style='vgreen')
     menu.run()

@@ -8,7 +8,7 @@ shared_logger.setLevel(logging.NOTSET)  # allow users to configure the level
 
 # Ensure the logger only gets configured once
 if not shared_logger.hasHandlers():
-    fh = logging.FileHandler('spam.log')
+    fh = logging.FileHandler('prints_charming.log')
     fh.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.NOTSET)  # Default to inherit the logger's level
