@@ -28,7 +28,7 @@ from .prints_charming_defaults import (
 
 from .prints_style import PStyle
 
-from .logging_utils import shared_logger
+from .internal_logging_utils import shared_logger
 
 if sys.platform == 'win32':
     from .win_utils import WinUtils

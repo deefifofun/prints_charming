@@ -1358,6 +1358,7 @@ def play_around_with_logging():
 
     ###########################################################################################################
 
+    print()
     my_logger2 = setup_logger()
 
     my_logger2.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')

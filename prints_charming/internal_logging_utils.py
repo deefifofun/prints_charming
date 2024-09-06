@@ -1,4 +1,4 @@
-# logging_utils.py
+# internal_logging_utils.py
 
 import logging
 
