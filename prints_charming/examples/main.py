@@ -28,83 +28,6 @@ import inspect
 
 
 
-shared_styles = {
-    "default"      : PStyle(),
-    "default_bg": PStyle(bg_color="black"),
-    "class_name": PStyle(color="dfff"),
-    "method_name": PStyle(color="lpurple"),
-    "top_level_label": PStyle(bold=True, italic=True),
-    "sub_level_label": PStyle(color='lblue'),
-    "numbers"      : PStyle(color="yellow"),
-    'main_bullets' : PStyle(color="purple"),
-    "sub_bullets"  : PStyle(color="pink"),
-    "sub_proj"     : PStyle(color="cyan"),
-    "sub_bullet_title": PStyle(color="orange"),
-    "sub_bullet_sentence": PStyle(color="vblue"),
-    "white"        : PStyle(color="white"),
-    "gray"         : PStyle(color="gray"),
-    "dgray"        : PStyle(color="dgray"),
-    "black"        : PStyle(color="black"),
-    "green"        : PStyle(color="green", bold=True),
-    "vgreen"       : PStyle(color="vgreen", bold=True),
-    "log_true"     : PStyle(color='vgreen'),
-    "bg_color_green": PStyle(color="white", bg_color='green'),
-    "red"          : PStyle(color="red"),
-    "vred"         : PStyle(color="vred", bold=True),
-    "blue"         : PStyle(color="blue"),
-    "lblue"          : PStyle(color="lblue"),
-    "vblue"         : PStyle(color="vblue"),
-    "yellow"       : PStyle(color="yellow"),
-    "vyellow"      : PStyle(color="vyellow"),
-    "lbrown"       : PStyle(color="lbrown"),
-    "brown"        : PStyle(color="brown"),
-    "vbrown"         : PStyle(color="vbrown"),
-    "vorange"      : PStyle(color="vorange"),
-    "lplum"        : PStyle(color="lplum"),
-    "plum"         : PStyle(color="plum"),
-    "vplum"        : PStyle(color="vplum"),
-    "lmagenta"     : PStyle(color="lmagenta"),
-    "magenta"      : PStyle(color="magenta", bold=True),
-    "vmagenta"     : PStyle(color="vmagenta"),
-    "lpink"        : PStyle(color="lpink"),
-    "pink"         : PStyle(color="pink",),
-    "vpink"        : PStyle(color="vpink"),
-    "purple"       : PStyle(color="purple"),
-    "dpurple"      : PStyle(color="dpurple"),
-    "cyan"         : PStyle(color="cyan"),
-    "vcyan"        : PStyle(color="vcyan"),
-    "orange"       : PStyle(color="orange"),
-    "orangewhite"  : PStyle(color="green", bg_color='dgray', underline=True),
-    "lav"          : PStyle(color="lav"),
-    "lpurple"      : PStyle(color="lpurple"),
-    "plat"         : PStyle(color="plat"),
-    "silver"       : PStyle(color="dfff", bg_color="dsilver"),
-    "dfff"        : PStyle(color="dfff", bg_color="purple", reverse=True),
-    "vwhite"       : PStyle(color="vwhite"),
-    "header"       : PStyle(color="vcyan"),
-    "header_text"  : PStyle(color="purple", bg_color="gray", bold=True, italic=True),
-    "header_text2" : PStyle(color="gray", bg_color="purple", bold=True),
-    "task"         : PStyle(color="blue", bold=True),
-    "path"         : PStyle(color="blue"),
-    "filename"     : PStyle(color="yellow"),
-    "line_info"    : PStyle(color="yellow", bold=True),
-    "line_number"  : PStyle(color="orange", bold=True),
-    "function_name": PStyle(color="yellow", italic=True),
-    "error_message": PStyle(color="vred", bold=True, dim=True),
-    "code"         : PStyle(color="yellow"),
-    "dict_key": PStyle(color="lblue"),
-    "dict_value": PStyle(color="white"),
-    "true": PStyle(color="vgreen"),
-    "false": PStyle(color="vred"),
-    'none': PStyle(color="lpurple"),
-    "int": PStyle(color="cyan"),
-    "float": PStyle(color="vcyan"),
-    "other": PStyle(color="lav"),
-    "conceal": PStyle(conceal=True),
-}
-
-
-
 
 styled_strings = {
     "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "ABOVE THRESHOLD", "wss://advanced-trade-ws.coinbase.com", "Starting", "True", "C++", "substring"],
@@ -122,31 +45,7 @@ styled_strings = {
 }
 
 
-logging_styles = {
-    "default": PStyle(),
-    "timestamp": PStyle(color="vwhite"),
-    "filename": PStyle(color="cyan", bold=True),
-    'record_name': PStyle(color="orange"),
-    "hostname": PStyle(color="white"),
-    "class_name": PStyle(color="dfff"),
-    "method_name": PStyle(color="vwhite"),
-    "line_number": PStyle(color="vcyan"),
-    "highlight_arg": PStyle(color="vcyan"),
-    "args": PStyle(color="dfff", italic=True),
-    "debug": PStyle(color="blue"),
-    "info": PStyle(color="green"),
-    "warning": PStyle(color="yellow"),
-    "error": PStyle(color="red"),
-    "critical": PStyle(color="vred", bold=True, italic=True),
-    "dict_key": PStyle(color="lblue"),
-    "dict_value": PStyle(color="white"),
-    "true": PStyle(color="vgreen"),
-    "false": PStyle(color="vred"),
-    'none': PStyle(color="lpurple"),
-    "int": PStyle(color="cyan"),
-    "float": PStyle(color="vcyan"),
-    "other": PStyle(color="lav"),
-}
+
 
 
 
@@ -1513,7 +1412,7 @@ class NewClass():
 
 def play_around_with_logging():
 
-    pc = PrintsCharming(styles=logging_styles.copy())
+    pc = PrintsCharming(styles=DEFAULT_LOGGING_STYLES.copy())
 
 
     my_logger = setup_logger(pc, name='scratch')

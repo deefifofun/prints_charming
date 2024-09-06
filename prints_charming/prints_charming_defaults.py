@@ -199,6 +199,7 @@ DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
 }
 
 
+
 DEFAULT_LEVEL_STYLES = {
     logging.DEBUG: 'debug',
     logging.INFO: 'info',
