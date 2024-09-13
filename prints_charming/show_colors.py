@@ -6,7 +6,9 @@ import sys
 
 if not sys.platform == 'win32':
     import readline
-from .prints_charming import PrintsCharming, PrintsStyle, TableManager
+from .prints_charming import PrintsCharming
+from .prints_style import PStyle
+from .table_manager import TableManager
 
 
 RESET = PrintsCharming.RESET

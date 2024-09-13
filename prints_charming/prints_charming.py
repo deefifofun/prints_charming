@@ -193,7 +193,7 @@ class PrintsCharming:
         self.reset = PrintsCharming.RESET
 
         self.conceal_map: Dict[str, Dict[str, str]] = {}
-        self.styled_phrase_map: Dict[str, Dict[str, str]] = {}
+        self.styled_phrase_map: Dict[str, Dict[str, Union[str, int]]] = {}
         self.styled_word_map: Dict[str, Dict[str, str]] = {}
         self.styled_substring_map: Dict[str, Dict[str, str]] = {}
         self.styled_variable_map: Dict[str, str] = {}
@@ -512,6 +512,8 @@ class PrintsCharming:
         return styled_text
 
 
+
+
     def apply_index_style(self, strs_list, styles_list, return_list=False):
         styled_strs = [self.apply_style(style, str(text)) for style, text in zip(styles_list, strs_list)]
         return ' '.join(styled_strs) if not return_list else styled_strs
@@ -585,6 +587,8 @@ class PrintsCharming:
                 "style_code": self.style_codes[style_name],
                 "attribs": attribs
             }
+            if not self.enable_styled_substring_map:
+                self.enable_styled_substring_map = True
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
@@ -616,7 +620,10 @@ class PrintsCharming:
 
             contains_inner_space = ' ' in string.strip()
             if contains_inner_space:
+                phrase_words_and_spaces = re.findall(r'\S+|\s+', string)
                 self.styled_phrase_map[string] = {
+                    "phrase_words_and_spaces": phrase_words_and_spaces,
+                    "phrase_length": len(phrase_words_and_spaces),
                     "style": style_name,
                     "style_code": style_code,
                     "styled": styled_string,
@@ -833,6 +840,184 @@ class PrintsCharming:
         return " ".join(words)
 
 
+    def apply_custom_python_highlighting(self, code_block):
+        reset_code = self.reset
+
+        # Pattern to match ANSI escape sequences (like 38;5;248m) and exclude them from further styling
+        ansi_escape_sequence_pattern = r'\033\[[0-9;]*m'
+
+        # Simple regex patterns for Python elements
+        builtin_pattern = r'\b(print|input|len|range|map|filter|open|help)\b'
+        keyword_pattern = r'\b(def|return|print|class|if|else|elif|for|while|import|from|as|in|try|except|finally|not|and|or|is|with|lambda|yield)\b'
+        string_pattern = r'(\".*?\"|\'.*?\')'
+        comment_pattern = r'(#.*?$)'
+        variable_pattern = r'(\b\w+)\s*(=)'  # Capture variables being assigned and preserve spaces
+        fstring_pattern = r'\{(\w+)\}'
+        number_pattern = r'(?<!\033\[|\d;)\b\d+(\.\d+)?\b'  # Exclude sequences like 5 in "38;5;248m"
+
+        # Pattern for matching function signatures
+        function_pattern = r'(\b\w+)(\()([^\)]*)(\))(\s*:)'
+        function_call_pattern = r'(\b\w+)(\()([^\)]*)(\))'  # Function calls without a trailing colon
+        #param_pattern = r'(\w+)(\s*=\s*)(\w+)?'  # For parameters with default values
+        param_pattern = r'(\w+)(\s*=\s*)([^\),]+)'  # This pattern captures the parameters and their default values
+        cls_param_pattern = r'\bcls\b'   # For detecting 'cls' parameter
+        self_param_pattern = r'\bself\b'  # For detecting 'self' parameter
+
+        # Exclude ANSI escape sequences from number styling
+        code_block = re.sub(ansi_escape_sequence_pattern, lambda match: match.group(0), code_block)
+
+        # Apply styles to comments, strings, builtins, keywords
+        code_block = re.sub(comment_pattern, f'{self.style_codes.get('python_comment', '')}\\g<0>{reset_code}', code_block, flags=re.MULTILINE)
+        code_block = re.sub(string_pattern, f'{self.style_codes.get('python_string', '')}\\g<0>{reset_code}', code_block)
+        code_block = re.sub(builtin_pattern, f'{self.style_codes.get('python_builtin', '')}\\g<0>{reset_code}', code_block)
+        code_block = re.sub(keyword_pattern, f'{self.style_codes.get('python_keyword', '')}\\g<0>{reset_code}', code_block)
+
+        # Now apply number styling to numbers that are not part of ANSI sequences
+        code_block = re.sub(number_pattern, f'{self.style_codes.get('python_number', '')}\\g<0>{reset_code}', code_block)
+
+        # Apply styles to variables
+        code_block = re.sub(variable_pattern, f'{self.style_codes.get('python_variable', '')}\\1{reset_code} \\2', code_block)
+
+        # Apply f-string variable styling inside curly braces
+        code_block = re.sub(fstring_pattern, f'{self.style_codes.get('python_fstring_variable', '')}{{\\1}}{reset_code}', code_block)
+
+        # Function to style parameters
+        def param_replacer(param_match):
+            param_name = re.sub(ansi_escape_sequence_pattern, '', param_match.group(1))  # Exclude ANSI sequences
+            equal_sign = param_match.group(2).strip()
+            default_value = param_match.group(3)
+
+            styled_param_name = f'{self.style_codes["python_param"]}{param_name}{reset_code}'
+            styled_equal_sign = f'{self.style_codes["python_operator"]}{equal_sign}{reset_code}'
+            styled_default_value = f'{self.style_codes["python_default_value"]}{default_value}{reset_code}'
+            params = f'{styled_param_name}{styled_equal_sign}{styled_default_value}'
+
+            return params
+
+        # Match function signatures and apply styles to different parts
+        def function_replacer(match):
+            function_name = re.sub(ansi_escape_sequence_pattern, '', match.group(1))  # Function name
+            parenthesis_open = re.sub(ansi_escape_sequence_pattern, '', match.group(2))
+            params = re.sub(ansi_escape_sequence_pattern, '', match.group(3))  # Parameters
+            parenthesis_close = re.sub(ansi_escape_sequence_pattern, '', match.group(4))
+            colon = match.group(5) if len(match.groups()) == 5 else ''
+
+            # Apply styles and reset codes
+            styled_function_name = f'{self.style_codes["python_function_name"]}{function_name}{reset_code}'
+            styled_parenthesis_open = f'{self.style_codes["python_parenthesis"]}{parenthesis_open}{reset_code}'
+            styled_params = re.sub(cls_param_pattern, f'{self.style_codes["python_self_param"]}cls{reset_code}', params)
+            styled_params = re.sub(self_param_pattern, f'{self.style_codes["python_self_param"]}self{reset_code}', styled_params)
+            styled_params = re.sub(param_pattern, param_replacer, styled_params)
+            styled_parenthesis_close = f'{self.style_codes["python_parenthesis"]}{parenthesis_close}{reset_code}'
+            styled_colon = f'{self.style_codes["python_colon"]}{colon}{reset_code}'
+
+            function_sig = f'{styled_function_name}{styled_parenthesis_open}{styled_params}{styled_parenthesis_close}{styled_colon}'
+
+            self.debug(f'{function_sig}')
+
+            return function_sig
+
+
+        # Apply the function_replacer for function signatures
+        code_block = re.sub(function_pattern, function_replacer, code_block)
+        self.debug(f'\n\n{code_block}\n')
+
+        # Match and style function calls (function calls don't have trailing colons)
+        def function_call_replacer(match):
+            #function_name = f'{function_name_style_code}{match.group(1)}{reset_code}'  # Function name in calls
+            function_name = re.sub(ansi_escape_sequence_pattern, '', match.group(1))  # Function name
+            #parenthesis_open = f'{parenthesis_style_code}{match.group(2)}{reset_code}'
+            parenthesis_open = re.sub(ansi_escape_sequence_pattern, '', match.group(2))
+            #params = match.group(3)
+            params = re.sub(ansi_escape_sequence_pattern, '', match.group(3))  # Exclude ANSI sequences
+            #parenthesis_close = f'{parenthesis_style_code}{match.group(4)}{reset_code}'
+            parenthesis_close = re.sub(ansi_escape_sequence_pattern, '', match.group(4))
+
+            # Apply styles to 'cls' parameter within function calls
+            styled_params = re.sub(cls_param_pattern, f'{self.style_codes.get('python_self_param', '')}cls{reset_code}', params)
+
+            # Apply styles to 'self' parameter within function calls
+            styled_params = re.sub(self_param_pattern, f'{self.style_codes.get('python_self_param', '')}self{reset_code}', params)
+
+            # Apply styles to parameters with default values
+            styled_params = re.sub(param_pattern, param_replacer, styled_params)
+
+            styled_function_call = f'{function_name}{parenthesis_open}{styled_params}{parenthesis_close}'
+
+            return styled_function_call
+
+        # Apply the function_call_replacer for function calls
+        code_block = re.sub(function_call_pattern, function_call_replacer, code_block)
+        self.debug(f'\n\n{code_block}\n')
+
+        return code_block
+
+
+    def apply_markdown_style(self, style_name, text, nested_styles=None, reset=True):
+        text = str(text)
+
+        # Handle nested styles first, if provided
+        if nested_styles:
+            for nested_style in nested_styles:
+                text = self.apply_markdown_style(nested_style, text, reset=False)
+
+        # Fetch the corresponding style code
+        style_code = self.style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
+
+        # Apply reset code carefully for nested styles
+        reset_code = self.reset if reset else ''
+
+        # Handle code block separately for better readability
+        if style_name == 'code_block':
+            # styled_text = f"{style_code}\n{text}\n{reset_code}"  # Add extra line breaks for code blocks
+            language = text.split("\n", 1)[0]  # Get the first line, which is the language identifier (e.g., 'python')
+            code = text[len(language):]  # The rest is the actual code block content
+            highlighted_code = self.apply_custom_python_highlighting(code.strip())
+            # Combine the language identifier with the highlighted code block
+            styled_text = f"\n\n{style_code}{language}{reset_code}\n\n{highlighted_code}"
+        else:
+            # Apply the style and reset code for other markdown types
+            styled_text = f"{style_code}{text}{reset_code}"
+
+        return styled_text
+
+
+
+    def parse_markdown(self, text: str) -> List[Tuple[str, str]]:
+        parsed_segments = []
+
+        # Match everything in the correct order, including code blocks
+        pattern = re.compile(r"```(\w*)\n([\s\S]*?)```|^(#+)\s+(.+)|\*\*(.+?)\*\*|\*(.+?)\*|-\s+(.+)|\[(.+?)\]\((.+?)\)|`([^`]+)`", re.MULTILINE)
+
+        for match in pattern.finditer(text):
+            if match.group(1) is not None:  # Code block
+                language = match.group(1) or 'plain'
+                code_block = match.group(2).rstrip()  # Strip trailing spaces
+
+                # Normalize indentation by detecting the minimum leading spaces
+                lines = code_block.split('\n')
+                min_indent = min((len(line) - len(line.lstrip()) for line in lines if line.strip()), default=0)
+                normalized_code_block = "\n".join(line[min_indent:] for line in lines)
+
+                parsed_segments.append(('code_block', f"{language}\n{normalized_code_block}"))
+            elif match.group(3) is not None:  # Headers
+                header_level = len(match.group(3))
+                header_content = match.group(4).strip()
+                parsed_segments.append((f'header{header_level}', header_content))
+            elif match.group(5) is not None:  # Bold
+                parsed_segments.append(('bold', match.group(5).strip()))
+            elif match.group(6) is not None:  # Italic
+                parsed_segments.append(('italic', match.group(6).strip()))
+            elif match.group(7) is not None:  # List item
+                parsed_segments.append(('bullet', match.group(7).strip()))
+            elif match.group(8) is not None:  # Link
+                parsed_segments.append(('link', f"{match.group(8).strip()} ({match.group(9).strip()})"))
+            elif match.group(10) is not None:  # Inline code
+                parsed_segments.append(('inline_code', match.group(10).strip()))
+
+        return parsed_segments
+
+
     @staticmethod
     def contains_ansi_codes(s: str) -> bool:
         return '\033' in s
@@ -867,12 +1052,48 @@ class PrintsCharming:
               end: str = '\n',
               filename: str = None,
               skip_ansi_check: bool = False,
+              markdown: bool = False,
               **kwargs: Any) -> None:
 
 
-        print_start = time.perf_counter()
-
         converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
+
+        # Handle markdown parsing if markdown=True
+        if markdown:
+            markdown_segments = []
+            for arg in converted_args:
+                markdown_segments.extend(self.parse_markdown(arg))
+
+            styled_output = []
+            for style_type, content in markdown_segments:
+                if content.strip():  # Skip empty content
+                    if style_type == 'header1':
+                        styled_output.append(self.apply_markdown_style('header1', content))
+                    elif style_type == 'header2':
+                        styled_output.append(self.apply_markdown_style('header2', content))
+                    elif style_type == 'bold':
+                        styled_output.append(self.apply_markdown_style('bold', content))
+                    elif style_type == 'italic':
+                        styled_output.append(self.apply_markdown_style('italic', content))
+                    elif style_type == 'bullet':
+                        styled_output.append(self.apply_markdown_style('bullet', f"- {content}"))
+                    elif style_type == 'link':
+                        styled_output.append(self.apply_markdown_style('link', content))
+                    elif style_type == 'inline_code':
+                        styled_output.append(self.apply_markdown_style('inline_code', content))
+                    elif style_type == 'code_block':  # Ensure code block is styled and printed
+                        styled_output.append(self.apply_markdown_style('code_block', content))
+
+            # Join the styled output and proceed with regular printing
+            output = sep.join(styled_output)
+
+            # Print or write to file
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(output + end)
+            else:
+                print(output, end=end)
+            return
 
 
         # Handle not colored text
@@ -1004,80 +1225,21 @@ class PrintsCharming:
         sentence_ending_characters = ".,!?:;"
 
 
-        #if self.enable_styled_phrase_map:
+
         # Step 1: Handle phrases
-        for phrase, details in self.styled_phrase_map.items():
-            if phrase in text:
-                styled_phrase = details.get('styled', phrase)
+        if self.enable_styled_phrase_map:
+            for phrase, details in self.styled_phrase_map.items():
+                if phrase in text:
+                    styled_phrase = details.get('styled', phrase)
 
-                # Split the styled_phrase into words and spaces
-                styled_phrase_words_and_spaces = re.findall(r'\S+|\s+', styled_phrase)
+                    # Split the styled_phrase into words and spaces
+                    styled_phrase_words_and_spaces = re.findall(r'\S+|\s+', styled_phrase)
 
-                # Find the starting index of this phrase in the list of words_and_spaces
-                for i in range(len(words_and_spaces) - len(styled_phrase_words_and_spaces) + 1):
-                    if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == re.findall(r'\S+|\s+', phrase):
-                        # Update the indexes_used_by_phrases set
-                        indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words_and_spaces))))
-
-                        # Add the index before the starting index
-                        if i > 0:
-                            if i - 1 not in boundary_indices_dict:
-                                boundary_indices_dict[i - 1] = details.get('attribs')
-
-                        # Add the index after the ending index
-                        if i + len(styled_phrase_words_and_spaces) < len(words_and_spaces):
-                            if i + len(styled_phrase_words_and_spaces) not in boundary_indices_dict:
-                                boundary_indices_dict[i + len(styled_phrase_words_and_spaces)] = details.get('attribs')
-
-
-                        # Update the styled_words_and_spaces list
-                        for j, styled_word_or_space in enumerate(styled_phrase_words_and_spaces):
-                            styled_words_and_spaces[i + j] = styled_word_or_space
-
-
-        # Step 2: Handle individual words and substrings
-        for i, word_or_space in enumerate(words_and_spaces):
-            if i in indexes_used_by_phrases:
-                continue
-            if not word_or_space.isspace():
-                word = word_or_space.strip()
-                stripped_word = word.rstrip(sentence_ending_characters)
-                trailing_chars = word[len(stripped_word):]
-
-
-                # Check if the word is in the word_map
-                if stripped_word in self.styled_word_map:
-
-                    if trailing_chars:
-                        style_start = self.styled_word_map.get(stripped_word, {}).get('style_code', '')
-                        styled_word_or_space = f'{style_start}{word}{self.reset}'
-                    else:
-                        styled_word_or_space = self.styled_word_map.get(stripped_word, {}).get('styled', stripped_word)
-
-                    styled_words_and_spaces[i] = styled_word_or_space
-
-                    # Add the index before the starting index
-                    if i > 0:
-                        if i - 1 not in boundary_indices_dict:
-                            boundary_indices_dict[i - 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
-
-                    # Add the index after the ending index
-                    if i + 1 < len(words_and_spaces):
-                        if i + 1 not in boundary_indices_dict:
-                            boundary_indices_dict[i + 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
-
-                    # Update the indexes_used_by_words set
-                    indexes_used_by_words.add(i)
-
-
-                else:
-                    # Check if the word contains any substring in the substring_map
-                    for substring, details in self.styled_substring_map.items():
-                        if substring in word:
-                            style_start = details.get('style_code', '')
-                            style_end = self.reset
-                            styled_word_or_space = f"{style_start}{word_or_space}{style_end}"
-                            styled_words_and_spaces[i] = styled_word_or_space
+                    # Find the starting index of this phrase in the list of words_and_spaces
+                    for i in range(len(words_and_spaces) - len(styled_phrase_words_and_spaces) + 1):
+                        if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == re.findall(r'\S+|\s+', phrase):
+                            # Update the indexes_used_by_phrases set
+                            indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words_and_spaces))))
 
                             # Add the index before the starting index
                             if i > 0:
@@ -1085,13 +1247,75 @@ class PrintsCharming:
                                     boundary_indices_dict[i - 1] = details.get('attribs')
 
                             # Add the index after the ending index
-                            if i + 1 < len(words_and_spaces):
-                                if i + 1 not in boundary_indices_dict:
-                                    boundary_indices_dict[i + 1] = details.get('attribs')
+                            if i + len(styled_phrase_words_and_spaces) < len(words_and_spaces):
+                                if i + len(styled_phrase_words_and_spaces) not in boundary_indices_dict:
+                                    boundary_indices_dict[i + len(styled_phrase_words_and_spaces)] = details.get('attribs')
 
-                            indexes_used_by_substrings.add(i)
 
-                            break  # Stop after the first matching substring
+                            # Update the styled_words_and_spaces list
+                            for j, styled_word_or_space in enumerate(styled_phrase_words_and_spaces):
+                                styled_words_and_spaces[i + j] = styled_word_or_space
+
+
+        # Step 2: Handle individual words and substrings
+        if self.enable_styled_word_map:
+            for i, word_or_space in enumerate(words_and_spaces):
+                if i in indexes_used_by_phrases:
+                    continue
+                if not word_or_space.isspace():
+                    word = word_or_space.strip()
+                    stripped_word = word.rstrip(sentence_ending_characters)
+                    trailing_chars = word[len(stripped_word):]
+
+
+                    # Check if the word is in the word_map
+                    if stripped_word in self.styled_word_map:
+
+                        if trailing_chars:
+                            style_start = self.styled_word_map.get(stripped_word, {}).get('style_code', '')
+                            styled_word_or_space = f'{style_start}{word}{self.reset}'
+                        else:
+                            styled_word_or_space = self.styled_word_map.get(stripped_word, {}).get('styled', stripped_word)
+
+                        styled_words_and_spaces[i] = styled_word_or_space
+
+                        # Add the index before the starting index
+                        if i > 0:
+                            if i - 1 not in boundary_indices_dict:
+                                boundary_indices_dict[i - 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
+
+                        # Add the index after the ending index
+                        if i + 1 < len(words_and_spaces):
+                            if i + 1 not in boundary_indices_dict:
+                                boundary_indices_dict[i + 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
+
+                        # Update the indexes_used_by_words set
+                        indexes_used_by_words.add(i)
+
+
+                    else:
+                        # Check if the word contains any substring in the substring_map
+                        if self.enable_styled_substring_map:
+                            for substring, details in self.styled_substring_map.items():
+                                if substring in word:
+                                    style_start = details.get('style_code', '')
+                                    style_end = self.reset
+                                    styled_word_or_space = f"{style_start}{word_or_space}{style_end}"
+                                    styled_words_and_spaces[i] = styled_word_or_space
+
+                                    # Add the index before the starting index
+                                    if i > 0:
+                                        if i - 1 not in boundary_indices_dict:
+                                            boundary_indices_dict[i - 1] = details.get('attribs')
+
+                                    # Add the index after the ending index
+                                    if i + 1 < len(words_and_spaces):
+                                        if i + 1 not in boundary_indices_dict:
+                                            boundary_indices_dict[i + 1] = details.get('attribs')
+
+                                    indexes_used_by_substrings.add(i)
+
+                                    break  # Stop after the first matching substring
 
 
 
@@ -1162,6 +1386,7 @@ class PrintsCharming:
                 file.write(styled_text + end)
         else:
             print(styled_text, end=end)
+
 
 
     def compare_dicts(self, dict1, dict2, keys):
