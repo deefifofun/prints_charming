@@ -35,7 +35,121 @@ if sys.platform == 'win32':
 
 
 
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_end = False
+        self.style_info = None
+        self.insertion_order = None
 
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+        self.insertion_counter = 0
+
+    def insert(self, text, style_info):
+        node = self.root
+        for char in text:
+            if char not in node.children:
+                node.children[char] = TrieNode()
+            node = node.children[char]
+        node.is_end = True
+        node.style_info = style_info
+        node.insertion_order = self.insertion_counter  # Set the insertion order
+        self.insertion_counter += 1
+
+
+    def search_prefix(self, text):
+        node = self.root
+        current_match = []
+        for char in text:
+            if char not in node.children:
+                break
+            node = node.children[char]
+            current_match.append(char)
+            if node.is_end:
+                return ''.join(current_match), node.style_info
+        return None  # No prefix
+
+
+    def search_longest_prefix(self, text):
+        node = self.root
+        longest_match = None
+        current_match = []
+        for char in text:
+            if char not in node.children:
+                break
+            node = node.children[char]
+            current_match.append(char)
+            if node.is_end:
+                longest_match = (''.join(current_match), node.style_info)
+        return longest_match
+
+
+    def search_suffix(self, text):
+        matches = []
+        for i in range(len(text)):
+            node = self.root
+            current_match = []
+            for j in range(i, len(text)):
+                char = text[j]
+                if char not in node.children:
+                    break
+                node = node.children[char]
+                current_match.append(char)
+                if node.is_end:
+                    matches.append((''.join(current_match), node.style_info))
+        # Now check if any match is at the end of the word
+        for match, style_info in matches:
+            if text.endswith(match):
+                return match, style_info
+        return None  # No suffix match found
+
+
+    def search_any_substring(self, text):
+        # Search for any substring match within the given text
+        matches = []
+        for i in range(len(text)):
+            node = self.root
+            current_match = []
+            for j in range(i, len(text)):
+                char = text[j]
+                if char not in node.children:
+                    break
+                node = node.children[char]
+                current_match.append(char)
+                if node.is_end:
+                    matches.append((''.join(current_match), node.style_info))
+        return matches if matches else None
+
+
+    def search_any_substring_by_insertion_order(self, text):
+        # Search for any substring match within the given text
+        matches = []
+        for i in range(len(text)):
+            node = self.root
+            current_match = []
+            for j in range(i, len(text)):
+                char = text[j]
+                if char not in node.children:
+                    break
+                node = node.children[char]
+                current_match.append(char)
+                if node.is_end:
+                    matches.append((''.join(current_match), node.style_info, node.insertion_order))
+        # Sort matches by the insertion order to prioritize the earliest added substring
+        matches.sort(key=lambda x: x[2])  # Sort by insertion_order
+        return matches if matches else None
+
+
+    def search(self, text):
+        node = self.root
+        for char in text:
+            if char not in node.children:
+                return None  # Phrase not found
+            node = node.children[char]
+        return node.style_info if node.is_end else None
 
 
 class PrintsCharming:
@@ -197,6 +311,10 @@ class PrintsCharming:
         self.styled_word_map: Dict[str, Dict[str, str]] = {}
         self.styled_substring_map: Dict[str, Dict[str, str]] = {}
         self.styled_variable_map: Dict[str, str] = {}
+
+        self.phrase_trie = Trie()
+        self.word_trie = Trie()
+        self.substring_trie = Trie()
 
         self.enable_conceal_map = False
         self.enable_styled_phrase_map = False
@@ -573,43 +691,54 @@ class PrintsCharming:
 
         return bg_color_block
 
-
     def add_substring(self, substring: str, style_name: str) -> None:
+        """
+        Adds a substring to the substring trie with a specific style.
+
+        :param substring: The substring to be styled.
+        :param style_name: The name of the style to apply.
+        """
+
         substring = str(substring)
         if style_name in self.styles:
 
+            # Get the style attributes
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
                 attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
 
-            self.styled_substring_map[substring] = {
+            # Insert the substring into the substring trie
+            self.substring_trie.insert(substring, {
                 "style": style_name,
                 "style_code": self.style_codes[style_name],
                 "attribs": attribs
-            }
+            })
+
+            # Enable the substring map flag
             if not self.enable_styled_substring_map:
                 self.enable_styled_substring_map = True
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
-
     def add_string(self, string: str, style_name: str) -> None:
         """
-                Adds a string to the styled_string_map with a specific style.
+        Adds a string (word or phrase) to the appropriate trie with a specific style.
 
-                :param string: The string to be styled.
-                :param style_name: The name of the style to apply.
-                """
+        :param string: The string to be styled.
+        :param style_name: The name of the style to apply.
+        """
 
         string = str(string)
         if style_name in self.styles:
             style_code = self.get_style_code(style_name)
             styled_string = f"{style_code}{string}{self.reset}"
 
+            # Copy the style attributes
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
                 attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
 
+            # Handle concealment separately if needed
             if style_name == 'conceal':
                 self.conceal_map[string] = {
                     "style": style_name,
@@ -617,30 +746,35 @@ class PrintsCharming:
                 }
                 if not self.enable_conceal_map:
                     self.enable_conceal_map = True
+                return
 
+            # Determine if the string is a phrase (contains inner spaces)
             contains_inner_space = ' ' in string.strip()
+
             if contains_inner_space:
+                # Insert the phrase into the phrase trie
                 phrase_words_and_spaces = re.findall(r'\S+|\s+', string)
-                self.styled_phrase_map[string] = {
+                self.phrase_trie.insert(string, {
                     "phrase_words_and_spaces": phrase_words_and_spaces,
                     "phrase_length": len(phrase_words_and_spaces),
                     "style": style_name,
                     "style_code": style_code,
                     "styled": styled_string,
                     "attribs": attribs
-                }
+                })
                 if not self.enable_styled_phrase_map:
                     self.enable_styled_phrase_map = True
-
             else:
-                self.styled_word_map[string] = {
+                # Insert the word into the word trie
+                self.word_trie.insert(string, {
                     "style": style_name,
                     "style_code": style_code,
                     "styled": styled_string,
                     "attribs": attribs
-                }
+                })
                 if not self.enable_styled_word_map:
                     self.enable_styled_word_map = True
+
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
@@ -661,12 +795,75 @@ class PrintsCharming:
 
 
     def remove_string(self, string: str) -> None:
-        if string in self.styled_word_map:
-            del self.styled_word_map[string]
-        if string in self.styled_phrase_map:
-            del self.styled_phrase_map[string]
-        elif string in self.conceal_map[string]:
+        """
+        Removes a string (word or phrase) from the appropriate trie, and handles concealment.
+
+        :param string: The string to be removed.
+        """
+
+        string = str(string)
+
+        # Remove from the word trie if present
+        if self.word_trie and self._remove_from_trie(self.word_trie, string):
+            print(f"Removed '{string}' from word trie")
+
+        # Remove from the phrase trie if present
+        if self.phrase_trie and self._remove_from_trie(self.phrase_trie, string):
+            print(f"Removed '{string}' from phrase trie")
+
+        # Remove from the conceal_map if present
+        if string in self.conceal_map:
             del self.conceal_map[string]
+            print(f"Removed '{string}' from conceal map")
+
+    def _remove_from_trie(self, trie: Trie, string: str) -> bool:
+        """
+        Removes a string from the trie by marking the end node as non-terminal (is_end = False).
+        It does not remove the nodes themselves, because they may be shared with other words/phrases.
+
+        :param trie: The trie to remove the string from.
+        :param string: The string to remove.
+        :return: True if the string was removed, False if the string was not found.
+        """
+        node = trie.root
+        stack = []  # To keep track of the path
+
+        # Traverse the trie to find the string
+        for char in string:
+            if char not in node.children:
+                return False  # String not found in trie
+            stack.append((node, char))  # Store the parent node and char
+            node = node.children[char]
+
+        # Check if we reached the end of a valid word/phrase
+        if node.is_end:
+            # Mark the node as non-terminal
+            node.is_end = False
+            node.style_info = None  # Optionally clear style information
+
+            # Optionally: clean up unused nodes if they are not part of any other words/phrases
+            self._cleanup_trie(stack)
+
+            return True
+        return False  # String was not found as a complete word/phrase
+
+    def _cleanup_trie(self, stack):
+        """
+        Recursively clean up the trie by removing nodes that are no longer part of any valid words/phrases.
+
+        :param stack: A list of (node, char) pairs that represent the path of the string in the trie.
+        """
+        while stack:
+            node, char = stack.pop()
+            child_node = node.children[char]
+
+            # If the child node has no children and is not the end of another word/phrase, remove it
+            if not child_node.children and not child_node.is_end:
+                del node.children[char]
+            else:
+                # If the child node has children or marks the end of another word/phrase, stop cleaning
+                break
+
 
 
     def conceal_text(self, text_to_conceal, replace=False, style_name=None):
@@ -1052,8 +1249,17 @@ class PrintsCharming:
               end: str = '\n',
               filename: str = None,
               skip_ansi_check: bool = False,
+              phrase_search: bool = True,
+              word_search: bool = True,
+              substring_search: bool = True,
+              substring_style_option: str = "word_style_to_substring_prefix",
               markdown: bool = False,
+              perf_counter: bool = False,
               **kwargs: Any) -> None:
+
+
+        if perf_counter:
+            start_time = time.perf_counter()
 
 
         converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
@@ -1227,95 +1433,209 @@ class PrintsCharming:
 
 
         # Step 1: Handle phrases
+        # Instance level check
         if self.enable_styled_phrase_map:
-            for phrase, details in self.styled_phrase_map.items():
-                if phrase in text:
-                    styled_phrase = details.get('styled', phrase)
+            # Method level check
+            if phrase_search:
+                # Only perform phrase lookup if there are multiple elements (implying a possible phrase)
+                if len(words_and_spaces) > 1:
+                    for i in range(len(words_and_spaces)):
+                        # Build the text segment starting from the current position
+                        text_segment = ''.join(words_and_spaces[i:])
 
-                    # Split the styled_phrase into words and spaces
-                    styled_phrase_words_and_spaces = re.findall(r'\S+|\s+', styled_phrase)
+                        # Search for the longest matching phrase in the phrase trie
+                        phrase_match = self.phrase_trie.search_longest_prefix(text_segment)
+                        if phrase_match:
+                            phrase, details = phrase_match
+                            styled_phrase = details.get('styled', phrase)
 
-                    # Find the starting index of this phrase in the list of words_and_spaces
-                    for i in range(len(words_and_spaces) - len(styled_phrase_words_and_spaces) + 1):
-                        if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == re.findall(r'\S+|\s+', phrase):
-                            # Update the indexes_used_by_phrases set
-                            indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words_and_spaces))))
+                            # Split the styled phrase into words and spaces
+                            styled_phrase_words_and_spaces = re.findall(r'\S+|\s+', styled_phrase)
 
-                            # Add the index before the starting index
-                            if i > 0:
-                                if i - 1 not in boundary_indices_dict:
+                            # Ensure the phrase is properly aligned in the words_and_spaces list
+                            if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == re.findall(r'\S+|\s+', phrase):
+                                # Update the indexes_used_by_phrases set
+                                indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words_and_spaces))))
+
+                                # Add the index before the starting index
+                                if i > 0 and (i - 1) not in boundary_indices_dict:
                                     boundary_indices_dict[i - 1] = details.get('attribs')
 
-                            # Add the index after the ending index
-                            if i + len(styled_phrase_words_and_spaces) < len(words_and_spaces):
-                                if i + len(styled_phrase_words_and_spaces) not in boundary_indices_dict:
+                                # Add the index after the ending index
+                                if i + len(styled_phrase_words_and_spaces) < len(words_and_spaces) and (i + len(styled_phrase_words_and_spaces)) not in boundary_indices_dict:
                                     boundary_indices_dict[i + len(styled_phrase_words_and_spaces)] = details.get('attribs')
 
+                                # Update the styled_words_and_spaces list with the styled phrase
+                                for j, styled_word_or_space in enumerate(styled_phrase_words_and_spaces):
+                                    styled_words_and_spaces[i + j] = styled_word_or_space
 
-                            # Update the styled_words_and_spaces list
-                            for j, styled_word_or_space in enumerate(styled_phrase_words_and_spaces):
-                                styled_words_and_spaces[i + j] = styled_word_or_space
+                                # Move the index forward to skip over the phrase that has just been processed
+                                i += len(styled_phrase_words_and_spaces) - 1  # Adjust `i` to the end of the current phrase
 
 
         # Step 2: Handle individual words and substrings
         if self.enable_styled_word_map:
-            for i, word_or_space in enumerate(words_and_spaces):
-                if i in indexes_used_by_phrases:
-                    continue
-                if not word_or_space.isspace():
-                    word = word_or_space.strip()
-                    stripped_word = word.rstrip(sentence_ending_characters)
-                    trailing_chars = word[len(stripped_word):]
+            if word_search:
+                for i, word_or_space in enumerate(words_and_spaces):
+                    if i in indexes_used_by_phrases:
+                        continue
 
+                    if not word_or_space.isspace():
 
-                    # Check if the word is in the word_map
-                    if stripped_word in self.styled_word_map:
+                        word = word_or_space.strip()  # Strip whitespace around the word
+                        stripped_word = word.rstrip(sentence_ending_characters)  # Remove trailing punctuation
+                        trailing_chars = word[len(stripped_word):]  # Capture any trailing punctuation
 
-                        if trailing_chars:
-                            style_start = self.styled_word_map.get(stripped_word, {}).get('style_code', '')
-                            styled_word_or_space = f'{style_start}{word}{self.reset}'
+                        # Check if the word is in the word trie
+                        word_match = self.word_trie.search_longest_prefix(stripped_word)
+                        if word_match:
+                            matched_word, word_details = word_match
+                            style_start = word_details.get('style_code', '')
+
+                            # Apply the style to the word, accounting for trailing characters
+                            if trailing_chars:
+                                styled_word_or_space = f'{style_start}{word}{self.reset}'
+                            else:
+                                styled_word_or_space = word_details.get('styled', stripped_word)
+
+                            # Store the styled word
+                            styled_words_and_spaces[i] = styled_word_or_space
+
+                            # Update boundary information
+                            if i > 0 and (i - 1) not in boundary_indices_dict:
+                                boundary_indices_dict[i - 1] = word_details.get('attribs')
+
+                            if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                boundary_indices_dict[i + 1] = word_details.get('attribs')
+
+                            # Mark the word as styled
+                            indexes_used_by_words.add(i)
+
                         else:
-                            styled_word_or_space = self.styled_word_map.get(stripped_word, {}).get('styled', stripped_word)
+                            if self.enable_styled_substring_map:
+                                if substring_search:
+                                    if substring_style_option == "word_style_to_substring_prefix":
+                                        # Use the specialized prefix search method
+                                        prefix_match = self.substring_trie.search_prefix(stripped_word)
+                                        if prefix_match:
+                                            matched_substring, substring_details = prefix_match
+                                            style_start = substring_details.get('style_code', '')
+                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                            styled_words_and_spaces[i] = styled_word_or_space
 
-                        styled_words_and_spaces[i] = styled_word_or_space
+                                            # Update boundary information
+                                            if i > 0 and i - 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
 
-                        # Add the index before the starting index
-                        if i > 0:
-                            if i - 1 not in boundary_indices_dict:
-                                boundary_indices_dict[i - 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
+                                            if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
 
-                        # Add the index after the ending index
-                        if i + 1 < len(words_and_spaces):
-                            if i + 1 not in boundary_indices_dict:
-                                boundary_indices_dict[i + 1] = self.styled_word_map.get(stripped_word, {}).get('attribs')
+                                            indexes_used_by_substrings.add(i)
+                                            continue
 
-                        # Update the indexes_used_by_words set
-                        indexes_used_by_words.add(i)
+                                    elif substring_style_option == "word_style_to_substring_suffix":
+
+                                        # Use the specialized suffix search method
+                                        suffix_match = self.substring_trie.search_suffix(stripped_word)
+                                        if suffix_match:
+                                            matched_substring, substring_details = suffix_match
+                                            style_start = substring_details.get('style_code', '')
+                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                            styled_words_and_spaces[i] = styled_word_or_space
+
+                                            # Update boundary information
+                                            if i > 0:
+                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                            if i + 1 < len(words_and_spaces):
+                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                            indexes_used_by_substrings.add(i)
+                                            continue
 
 
-                    else:
-                        # Check if the word contains any substring in the substring_map
-                        if self.enable_styled_substring_map:
-                            for substring, details in self.styled_substring_map.items():
-                                if substring in word:
-                                    style_start = details.get('style_code', '')
-                                    style_end = self.reset
-                                    styled_word_or_space = f"{style_start}{word_or_space}{style_end}"
-                                    styled_words_and_spaces[i] = styled_word_or_space
+                                    elif substring_style_option == "word_style_to_first_matched_in_trie":
+                                        # Use the modified search_any_substring to get matches in trie insertion order
+                                        substring_matches = self.substring_trie.search_any_substring_by_insertion_order(stripped_word)
+                                        if substring_matches:
+                                            # The first match in the list will be the one added to the trie first
+                                            matched_substring, substring_details, _ = substring_matches[0]  # Get the earliest added match
+                                            style_start = substring_details.get('style_code', '')
+                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                            styled_words_and_spaces[i] = styled_word_or_space
 
-                                    # Add the index before the starting index
-                                    if i > 0:
-                                        if i - 1 not in boundary_indices_dict:
-                                            boundary_indices_dict[i - 1] = details.get('attribs')
+                                            # Update boundary information
+                                            if i > 0 and i - 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
 
-                                    # Add the index after the ending index
-                                    if i + 1 < len(words_and_spaces):
-                                        if i + 1 not in boundary_indices_dict:
-                                            boundary_indices_dict[i + 1] = details.get('attribs')
+                                            if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
 
-                                    indexes_used_by_substrings.add(i)
+                                            indexes_used_by_substrings.add(i)
+                                            continue
 
-                                    break  # Stop after the first matching substring
+                                    elif substring_style_option == "word_style_to_last_matched_in_trie":
+                                        # Use the modified search_any_substring to get matches sorted by insertion order
+                                        substring_matches = self.substring_trie.search_any_substring_by_insertion_order(stripped_word)
+                                        if substring_matches:
+                                            # The last match in the list will be the one added to the trie last
+                                            matched_substring, substring_details, _ = substring_matches[-1]  # Get the most recently added match
+                                            style_start = substring_details.get('style_code', '')
+                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                            styled_words_and_spaces[i] = styled_word_or_space
+
+                                            # Update boundary information
+                                            if i > 0 and i - 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+
+                                            if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                            indexes_used_by_substrings.add(i)
+                                            continue
+
+
+                                    elif substring_style_option == "substring_only":
+                                        substring_matches = self.substring_trie.search_any_substring(stripped_word)
+                                        if substring_matches:
+                                            sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
+
+                                            # Original behavior: style only the matching substring(s)
+                                            current_position = 0
+                                            styled_word_parts = []
+
+                                            for matched_substring, substring_details in sorted_matches:
+                                                style_start = substring_details.get('style_code', '')
+                                                substring_start = stripped_word.find(matched_substring, current_position)
+                                                substring_end = substring_start + len(matched_substring)
+
+                                                # Style the part before the substring
+                                                if substring_start > current_position:
+                                                    unstyled_part = stripped_word[current_position:substring_start]
+                                                    styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
+
+                                                # Apply style to the matched substring
+                                                styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
+                                                current_position = substring_end
+
+                                            # Handle any remaining part after the last substring
+                                            if current_position < len(stripped_word):
+                                                remaining_part = stripped_word[current_position:]
+                                                styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
+
+                                            # Combine parts and store the result
+                                            styled_word_or_space = ''.join(styled_word_parts)
+                                            styled_words_and_spaces[i] = styled_word_or_space
+
+                                            # Update boundary information
+                                            if i > 0:
+                                                if i - 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
+
+                                            if i + 1 < len(words_and_spaces):
+                                                if i + 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
+
+                                            indexes_used_by_substrings.add(i)
 
 
 
@@ -1380,12 +1700,19 @@ class PrintsCharming:
         # Step 5: Join the styled_words_and_spaces to form the final styled text
         styled_text = ''.join(filter(None, styled_words_and_spaces))
 
+        if perf_counter:
+            end_time = time.perf_counter()
+            total_time = end_time - start_time
+
         # Print or write to file
         if filename:
             with open(filename, 'a') as file:
                 file.write(styled_text + end)
         else:
             print(styled_text, end=end)
+
+            if perf_counter:
+                print(f'total_time: {total_time}')
 
 
 

@@ -30,7 +30,7 @@ import inspect
 
 
 styled_strings = {
-    "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "ABOVE THRESHOLD", "wss://advanced-trade-ws.coinbase.com", "Starting", "True", "C++", "substring"],
+    "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "ABOVE THRESHOLD", "wss://advanced-trade-ws.coinbase.com", "Starting", "True", "C++"],
     "green": ["apple"],
     "vred": ["Error", "Failed", "None", "Skipping.", "Canceling", "Canceled", "Hobbies", "Skills", "False"],
     "blue": ["CoinbaseWebsocketClient", "server", "Python"],
@@ -440,10 +440,10 @@ def kwargs_replace_and_style_placeholders_examples():
 
 def add_styled_substrings_to_instance(pc):
     pc.add_substring('please', 'yellow')
-    # pc.add_substring('substring', 'vgreen')
+    pc.add_substring('substring', 'vyellow')
     pc.add_substring('color', 'blue')
-    pc.add_substring('pine', 'white')
     pc.add_substring('apple', 'orange')
+    pc.add_substring('pine', 'white')
     pc.add_substring('ex', 'vred')
 
 
@@ -460,14 +460,14 @@ def random_examples():
 
     add_styled_substrings_to_instance(pc)
 
-    pc.print(f"This is an example text with the Some please phrase hello world. This includes snapple.")
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option='substring_only')
 
     print()
     print()
 
     pc.print(
-        f'Here    are    some examples of substrings.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple')
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
+        color='purple', substring_style_option='substring_only')
     print()
     print()
 

@@ -3,6 +3,11 @@
 import logging
 from typing import Dict
 from .prints_style import PStyle
+from .utils import (
+    compute_bg_color_map,
+    get_ansi_256_fg_color_code,
+    get_ansi_256_bg_color_code
+)
 
 
 
@@ -66,6 +71,74 @@ DEFAULT_COLOR_MAP: Dict[str, str] = {
         "white": "\033[38;5;15m",
         "vwhite": "\033[38;5;231m"
 }
+
+
+
+DEFAULT_BG_COLOR_MAP: Dict[str, str] = {
+    color: compute_bg_color_map(code) for color, code in DEFAULT_COLOR_MAP.items()
+}
+
+
+
+DEFAULT_256_COLOR_INDEXES: Dict[str, int] = {
+    "default": 0,
+    "dfff": 147,
+    "black": 0,
+    "red": 1,
+    "vred": 196,
+    "green": 34,
+    "dgreen": 28,
+    "vgreen": 46,
+    "lblue": 117,
+    "blue": 4,
+    "dblue": 27,
+    "vblue": 39,
+    "lmagenta": 205,
+    "magenta": 5,
+    "vmagenta": 198,
+    "lav": 183,
+    "lpurple": 135,
+    "purple": 129,
+    "dpurple": 93,
+    "lplum": 177,
+    "plum": 128,
+    "vplum": 201,
+    "lpink": 218,
+    "pink": 206,
+    "vpink": 199,
+    "cyan": 6,
+    "vcyan": 51,
+    "orange": 208,
+    "vorange": 202,
+    "copper": 166,
+    "yellow": 3,
+    "vyellow": 226,
+    "gold": 220,
+    "brass": 178,
+    "bronze": 136,
+    "lbrown": 138,
+    "brown": 94,
+    "sand": 215,
+    "silver": 12,
+    "dsilver": 10,
+    "gray": 248,
+    "dgray": 8,
+    "plat": 252,
+    "white": 15,
+    "vwhite": 231
+}
+
+
+DEFAULT_256_FG_COLOR_CODES: Dict[str, str] = {
+    color: get_ansi_256_fg_color_code(code) for color, code in DEFAULT_256_COLOR_INDEXES.items()
+}
+
+
+DEFAULT_256_BG_COLOR_CODES: Dict[str, str] = {
+    color: get_ansi_256_bg_color_code(code) for color, code in DEFAULT_256_COLOR_INDEXES.items()
+}
+
+
 
 DEFAULT_EFFECT_MAP: Dict[str, str] = {
         "reverse"      : "\033[7m",
@@ -189,6 +262,27 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
 }
 
 
+DEFAULT_CONTROL_MAP: Dict[str, str] = {
+        "alt_buffer": "\033[?1049h",
+        "normal_buffer": "\033[?1049l",
+        "alt_buffer_no_save": "\033[?47h",  # Switch to alternate buffer without saving the cursor
+        "normal_buffer_no_save": "\033[?47l",  # Switch back to normal buffer without restoring the cursor
+        "clear_line": "\033[2K",
+        "clear_screen": "\033[2J",
+        "cursor_position": "\033[{row};{col}H",
+        "cursor_home": "\033[H",  # Move cursor to the home position (top-left corner)
+        "move_cursor_up": "\033[{n}A",
+        "move_cursor_down": "\033[{n}B",
+        "move_cursor_right": "\033[{n}C",
+        "move_cursor_left": "\033[{n}D",
+        "save_cursor_position": "\033[s",
+        "restore_cursor_position": "\033[u",
+}
+
+
+
+
+
 DEFAULT_ERROR_STYLES: Dict[str, PStyle] = {
         "header"       : PStyle(color="vcyan"),
         "path"         : PStyle(color="blue"),
@@ -238,22 +332,6 @@ DEFAULT_LEVEL_STYLES = {
 }
 
 
-DEFAULT_CONTROL_MAP: Dict[str, str] = {
-        "alt_buffer": "\033[?1049h",
-        "normal_buffer": "\033[?1049l",
-        "alt_buffer_no_save": "\033[?47h",  # Switch to alternate buffer without saving the cursor
-        "normal_buffer_no_save": "\033[?47l",  # Switch back to normal buffer without restoring the cursor
-        "clear_line": "\033[2K",
-        "clear_screen": "\033[2J",
-        "cursor_position": "\033[{row};{col}H",
-        "cursor_home": "\033[H",  # Move cursor to the home position (top-left corner)
-        "move_cursor_up": "\033[{n}A",
-        "move_cursor_down": "\033[{n}B",
-        "move_cursor_right": "\033[{n}C",
-        "move_cursor_left": "\033[{n}D",
-        "save_cursor_position": "\033[s",
-        "restore_cursor_position": "\033[u",
-}
 
 
 
