@@ -152,6 +152,8 @@ class Trie:
         return node.style_info if node.is_end else None
 
 
+
+
 class PrintsCharming:
     RESET = "\033[0m"
     _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
@@ -1252,7 +1254,7 @@ class PrintsCharming:
               phrase_search: bool = True,
               word_search: bool = True,
               substring_search: bool = True,
-              substring_style_option: str = "word_style_to_substring_prefix",
+              substring_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
               markdown: bool = False,
               perf_counter: bool = False,
               **kwargs: Any) -> None:
@@ -1514,128 +1516,129 @@ class PrintsCharming:
                         else:
                             if self.enable_styled_substring_map:
                                 if substring_search:
-                                    if substring_style_option == "word_style_to_substring_prefix":
-                                        # Use the specialized prefix search method
-                                        prefix_match = self.substring_trie.search_prefix(stripped_word)
-                                        if prefix_match:
-                                            matched_substring, substring_details = prefix_match
-                                            style_start = substring_details.get('style_code', '')
-                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                            styled_words_and_spaces[i] = styled_word_or_space
-
-                                            # Update boundary information
-                                            if i > 0 and i - 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-
-                                            if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                            indexes_used_by_substrings.add(i)
-                                            continue
-
-                                    elif substring_style_option == "word_style_to_substring_suffix":
-
-                                        # Use the specialized suffix search method
-                                        suffix_match = self.substring_trie.search_suffix(stripped_word)
-                                        if suffix_match:
-                                            matched_substring, substring_details = suffix_match
-                                            style_start = substring_details.get('style_code', '')
-                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                            styled_words_and_spaces[i] = styled_word_or_space
-
-                                            # Update boundary information
-                                            if i > 0:
-                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-                                            if i + 1 < len(words_and_spaces):
-                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                            indexes_used_by_substrings.add(i)
-                                            continue
-
-
-                                    elif substring_style_option == "word_style_to_first_matched_in_trie":
-                                        # Use the modified search_any_substring to get matches in trie insertion order
-                                        substring_matches = self.substring_trie.search_any_substring_by_insertion_order(stripped_word)
-                                        if substring_matches:
-                                            # The first match in the list will be the one added to the trie first
-                                            matched_substring, substring_details, _ = substring_matches[0]  # Get the earliest added match
-                                            style_start = substring_details.get('style_code', '')
-                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                            styled_words_and_spaces[i] = styled_word_or_space
-
-                                            # Update boundary information
-                                            if i > 0 and i - 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-
-                                            if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                            indexes_used_by_substrings.add(i)
-                                            continue
-
-                                    elif substring_style_option == "word_style_to_last_matched_in_trie":
-                                        # Use the modified search_any_substring to get matches sorted by insertion order
-                                        substring_matches = self.substring_trie.search_any_substring_by_insertion_order(stripped_word)
-                                        if substring_matches:
-                                            # The last match in the list will be the one added to the trie last
-                                            matched_substring, substring_details, _ = substring_matches[-1]  # Get the most recently added match
-                                            style_start = substring_details.get('style_code', '')
-                                            styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                            styled_words_and_spaces[i] = styled_word_or_space
-
-                                            # Update boundary information
-                                            if i > 0 and i - 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-
-                                            if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                            indexes_used_by_substrings.add(i)
-                                            continue
-
-
-                                    elif substring_style_option == "substring_only":
-                                        substring_matches = self.substring_trie.search_any_substring(stripped_word)
-                                        if substring_matches:
-                                            sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
-
-                                            # Original behavior: style only the matching substring(s)
-                                            current_position = 0
-                                            styled_word_parts = []
-
-                                            for matched_substring, substring_details in sorted_matches:
+                                    if isinstance(substring_style_option, int):
+                                        if substring_style_option == 1:
+                                            # Use the specialized prefix search method
+                                            prefix_match = self.substring_trie.search_prefix(stripped_word)
+                                            if prefix_match:
+                                                matched_substring, substring_details = prefix_match
                                                 style_start = substring_details.get('style_code', '')
-                                                substring_start = stripped_word.find(matched_substring, current_position)
-                                                substring_end = substring_start + len(matched_substring)
+                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                                styled_words_and_spaces[i] = styled_word_or_space
 
-                                                # Style the part before the substring
-                                                if substring_start > current_position:
-                                                    unstyled_part = stripped_word[current_position:substring_start]
-                                                    styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
+                                                # Update boundary information
+                                                if i > 0 and i - 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
 
-                                                # Apply style to the matched substring
-                                                styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
-                                                current_position = substring_end
+                                                if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
 
-                                            # Handle any remaining part after the last substring
-                                            if current_position < len(stripped_word):
-                                                remaining_part = stripped_word[current_position:]
-                                                styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
+                                                indexes_used_by_substrings.add(i)
+                                                continue
 
-                                            # Combine parts and store the result
-                                            styled_word_or_space = ''.join(styled_word_parts)
-                                            styled_words_and_spaces[i] = styled_word_or_space
+                                        elif substring_style_option == 2:
 
-                                            # Update boundary information
-                                            if i > 0:
-                                                if i - 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
+                                            # Use the specialized suffix search method
+                                            suffix_match = self.substring_trie.search_suffix(stripped_word)
+                                            if suffix_match:
+                                                matched_substring, substring_details = suffix_match
+                                                style_start = substring_details.get('style_code', '')
+                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                                styled_words_and_spaces[i] = styled_word_or_space
 
-                                            if i + 1 < len(words_and_spaces):
-                                                if i + 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
+                                                # Update boundary information
+                                                if i > 0:
+                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                                if i + 1 < len(words_and_spaces):
+                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
 
-                                            indexes_used_by_substrings.add(i)
+                                                indexes_used_by_substrings.add(i)
+                                                continue
+
+
+                                        elif substring_style_option == 3:
+                                            # Use the modified search_any_substring to get matches in trie insertion order
+                                            substring_matches = self.substring_trie.search_any_substring_by_insertion_order(stripped_word)
+                                            if substring_matches:
+                                                # The first match in the list will be the one added to the trie first
+                                                matched_substring, substring_details, _ = substring_matches[0]  # Get the earliest added match
+                                                style_start = substring_details.get('style_code', '')
+                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                                styled_words_and_spaces[i] = styled_word_or_space
+
+                                                # Update boundary information
+                                                if i > 0 and i - 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+
+                                                if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                                indexes_used_by_substrings.add(i)
+                                                continue
+
+                                        elif substring_style_option == 4:
+                                            # Use the modified search_any_substring to get matches sorted by insertion order
+                                            substring_matches = self.substring_trie.search_any_substring_by_insertion_order(stripped_word)
+                                            if substring_matches:
+                                                # The last match in the list will be the one added to the trie last
+                                                matched_substring, substring_details, _ = substring_matches[-1]  # Get the most recently added match
+                                                style_start = substring_details.get('style_code', '')
+                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                                styled_words_and_spaces[i] = styled_word_or_space
+
+                                                # Update boundary information
+                                                if i > 0 and i - 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+
+                                                if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                                indexes_used_by_substrings.add(i)
+                                                continue
+
+
+                                        elif substring_style_option == 5:
+                                            substring_matches = self.substring_trie.search_any_substring(stripped_word)
+                                            if substring_matches:
+                                                sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
+
+                                                # Original behavior: style only the matching substring(s)
+                                                current_position = 0
+                                                styled_word_parts = []
+
+                                                for matched_substring, substring_details in sorted_matches:
+                                                    style_start = substring_details.get('style_code', '')
+                                                    substring_start = stripped_word.find(matched_substring, current_position)
+                                                    substring_end = substring_start + len(matched_substring)
+
+                                                    # Style the part before the substring
+                                                    if substring_start > current_position:
+                                                        unstyled_part = stripped_word[current_position:substring_start]
+                                                        styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
+
+                                                    # Apply style to the matched substring
+                                                    styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
+                                                    current_position = substring_end
+
+                                                # Handle any remaining part after the last substring
+                                                if current_position < len(stripped_word):
+                                                    remaining_part = stripped_word[current_position:]
+                                                    styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
+
+                                                # Combine parts and store the result
+                                                styled_word_or_space = ''.join(styled_word_parts)
+                                                styled_words_and_spaces[i] = styled_word_or_space
+
+                                                # Update boundary information
+                                                if i > 0:
+                                                    if i - 1 not in boundary_indices_dict:
+                                                        boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
+
+                                                if i + 1 < len(words_and_spaces):
+                                                    if i + 1 not in boundary_indices_dict:
+                                                        boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
+
+                                                indexes_used_by_substrings.add(i)
 
 
 

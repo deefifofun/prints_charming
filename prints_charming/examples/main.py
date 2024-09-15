@@ -460,16 +460,40 @@ def random_examples():
 
     add_styled_substrings_to_instance(pc)
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option='substring_only')
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=5)
 
-    print()
-    print()
+    print('\n\n')
+
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=1)
+
+    print('\n\n')
+
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=2)
+
+    print('\n\n')
+
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=3)
+
+    print('\n\n')
 
     pc.print(
         f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', substring_style_option='substring_only')
-    print()
-    print()
+        color='purple', substring_style_option=5)
+
+    print('\n\n')
+
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
+        color='purple', substring_style_option=1)
+
+    pc.print('\n\n')
+
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
+        color='purple', substring_style_option=2)
+
+    pc.print('\n\n')
+
 
     term_width = os.get_terminal_size().columns
 
