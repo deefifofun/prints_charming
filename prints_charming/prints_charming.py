@@ -35,7 +35,7 @@ if sys.platform == 'win32':
 
 
 
-class TrieNode:
+class PrintsTrieNode:
     def __init__(self):
         self.children = {}
         self.is_end = False
@@ -43,16 +43,16 @@ class TrieNode:
         self.insertion_order = None
 
 
-class Trie:
+class PrintsTrie:
     def __init__(self):
-        self.root = TrieNode()
+        self.root = PrintsTrieNode()
         self.insertion_counter = 0
 
     def insert(self, text, style_info):
         node = self.root
         for char in text:
             if char not in node.children:
-                node.children[char] = TrieNode()
+                node.children[char] = PrintsTrieNode()
             node = node.children[char]
         node.is_end = True
         node.style_info = style_info
@@ -314,9 +314,9 @@ class PrintsCharming:
         self.styled_substring_map: Dict[str, Dict[str, str]] = {}
         self.styled_variable_map: Dict[str, str] = {}
 
-        self.phrase_trie = Trie()
-        self.word_trie = Trie()
-        self.substring_trie = Trie()
+        self.phrase_trie = PrintsTrie()
+        self.word_trie = PrintsTrie()
+        self.substring_trie = PrintsTrie()
 
         self.enable_conceal_map = False
         self.enable_styled_phrase_map = False
@@ -818,7 +818,7 @@ class PrintsCharming:
             del self.conceal_map[string]
             print(f"Removed '{string}' from conceal map")
 
-    def _remove_from_trie(self, trie: Trie, string: str) -> bool:
+    def _remove_from_trie(self, trie: PrintsTrie, string: str) -> bool:
         """
         Removes a string from the trie by marking the end node as non-terminal (is_end = False).
         It does not remove the nodes themselves, because they may be shared with other words/phrases.
