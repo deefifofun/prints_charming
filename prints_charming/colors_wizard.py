@@ -1,4 +1,4 @@
-# prints_charming/show_colors.py
+# prints_charming/prints_charming_color_wizard.py
 
 import os
 import re
