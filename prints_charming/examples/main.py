@@ -1380,7 +1380,8 @@ def main():
 
     welcome()
 
-    pc = PrintsCharming(config={"internal_logging": True})
+    #pc = PrintsCharming(config={"internal_logging": True})
+    pc = PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     pc.add_string('function', 'blue')

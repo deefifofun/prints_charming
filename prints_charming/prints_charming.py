@@ -53,10 +53,8 @@ class KeyTrie:
         self.insertion_counter = 0
 
     def insert(self, text, style_info):
-        print(f'text:\n{text}')
         node = self.root
         for char in text:
-            print(f'char:\n{char}')
             if char not in node.children:
                 node.children[char] = KeyTrieNode()
             node = node.children[char]
@@ -67,7 +65,6 @@ class KeyTrie:
 
 
     def search_prefix(self, text):
-        print(f'text:\n{text}')
         node = self.root
         current_match = []
         for char in text:
@@ -81,7 +78,6 @@ class KeyTrie:
 
 
     def search_longest_prefix(self, text):
-        print(f'text:\n{text}')
         node = self.root
         longest_match = None
         current_match = []
@@ -96,7 +92,6 @@ class KeyTrie:
 
 
     def search_suffix(self, text):
-        print(f'text:\n{text}')
         matches = []
         for i in range(len(text)):
             node = self.root
@@ -117,7 +112,6 @@ class KeyTrie:
 
 
     def search_any_substring(self, text):
-        print(f'text:\n{text}')
         # Search for any substring match within the given text
         matches = []
         for i in range(len(text)):
@@ -135,7 +129,6 @@ class KeyTrie:
 
 
     def search_any_substring_by_insertion_order(self, text):
-        print(f'text:\n{text}')
         # Search for any substring match within the given text
         matches = []
         for i in range(len(text)):
