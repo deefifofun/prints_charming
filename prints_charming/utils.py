@@ -2,8 +2,24 @@ import os
 import sys
 import math
 import logging
-
+import tty
+import termios
 from .exceptions import PrintsCharmingError
+
+
+
+def get_key():
+    """Captures a single key press, including multi-byte sequences for arrow keys."""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        key = sys.stdin.read(1)
+        if key == '\x1b':  # Escape sequence (for special keys like arrows)
+            key += sys.stdin.read(2)  # Read the next 2 characters (e.g., [A for up arrow)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return key
 
 
 # Function to get the foreground ANSI escape sequence, including reset handling

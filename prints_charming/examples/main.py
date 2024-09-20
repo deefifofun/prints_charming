@@ -15,7 +15,8 @@ from prints_charming import (
     InteractiveMenu,
     PrintsCharmingError,
     ColorNotFoundError,
-    set_custom_excepthook
+    set_custom_excepthook,
+    colors_map_one
 )
 
 from prints_charming.logging import PrintsCharmingFormatter, PrintsCharmingLogHandler, setup_logger
@@ -520,7 +521,7 @@ def random_examples():
 
     mytext3 = f'Hello World'
 
-    mytext3_styled = pc.apply_my_new_style_code(my_style_code3, mytext3)
+    mytext3_styled = pc.apply_style_code(my_style_code3, mytext3)
 
     print(mytext3_styled)
 
@@ -1409,8 +1410,8 @@ if __name__ == "__main__":
     main()
 
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
-    menu_options = ["Option 1", "Option 2", "Option 3"]
-    menu = InteractiveMenu(menu_options, selected_style='vcyan', unselected_style='default', confirmed_style='vgreen')
+    menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
+    menu = InteractiveMenu('vcyan', menu_options, confirmed_style='vgreen', alt_buffer=True)
     menu.run()
 
 

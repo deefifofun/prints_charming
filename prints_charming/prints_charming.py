@@ -12,6 +12,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+
 from .exceptions import (
     InvalidLengthError,
     ColorNotFoundError
@@ -28,6 +29,8 @@ from .prints_charming_defaults import (
 
 from .prints_style import PStyle
 
+from .utils import compute_bg_color_map
+
 from .internal_logging_utils import shared_logger
 
 if sys.platform == 'win32':
@@ -35,24 +38,27 @@ if sys.platform == 'win32':
 
 
 
-class PrintsTrieNode:
+class KeyTrieNode:
     def __init__(self):
         self.children = {}
+        self.categories = {}
         self.is_end = False
         self.style_info = None
         self.insertion_order = None
 
 
-class PrintsTrie:
+class KeyTrie:
     def __init__(self):
-        self.root = PrintsTrieNode()
+        self.root = KeyTrieNode()
         self.insertion_counter = 0
 
     def insert(self, text, style_info):
+        print(f'text:\n{text}')
         node = self.root
         for char in text:
+            print(f'char:\n{char}')
             if char not in node.children:
-                node.children[char] = PrintsTrieNode()
+                node.children[char] = KeyTrieNode()
             node = node.children[char]
         node.is_end = True
         node.style_info = style_info
@@ -61,6 +67,7 @@ class PrintsTrie:
 
 
     def search_prefix(self, text):
+        print(f'text:\n{text}')
         node = self.root
         current_match = []
         for char in text:
@@ -74,6 +81,7 @@ class PrintsTrie:
 
 
     def search_longest_prefix(self, text):
+        print(f'text:\n{text}')
         node = self.root
         longest_match = None
         current_match = []
@@ -88,6 +96,7 @@ class PrintsTrie:
 
 
     def search_suffix(self, text):
+        print(f'text:\n{text}')
         matches = []
         for i in range(len(text)):
             node = self.root
@@ -108,6 +117,7 @@ class PrintsTrie:
 
 
     def search_any_substring(self, text):
+        print(f'text:\n{text}')
         # Search for any substring match within the given text
         matches = []
         for i in range(len(text)):
@@ -125,6 +135,7 @@ class PrintsTrie:
 
 
     def search_any_substring_by_insertion_order(self, text):
+        print(f'text:\n{text}')
         # Search for any substring match within the given text
         matches = []
         for i in range(len(text)):
@@ -232,7 +243,7 @@ class PrintsCharming:
         cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
         cls.shared_color_map.setdefault('default', PrintsCharming.RESET)
         cls.shared_bg_color_map = shared_bg_color_map or {
-            color: PrintsCharming.compute_bg_color_map(code) for color, code in cls.shared_color_map.items()
+            color: compute_bg_color_map(code) for color, code in cls.shared_color_map.items()
         }
 
         if shared_effect_map:
@@ -287,10 +298,12 @@ class PrintsCharming:
 
         # Set self.bg_color_map based on the provided arguments and class-level settings
         self.bg_color_map = bg_color_map or PrintsCharming.shared_bg_color_map or {
-                    color: PrintsCharming.compute_bg_color_map(code) for color, code in self.color_map.items()
+                    color: compute_bg_color_map(code) for color, code in self.color_map.items()
                 }
 
         self.effect_map = effect_map or PrintsCharming.shared_effect_map
+
+        self.ctl_map = self.shared_ctl_map
 
         self.styles = styles or PrintsCharming.shared_styles or DEFAULT_STYLES.copy()
 
@@ -314,9 +327,9 @@ class PrintsCharming:
         self.styled_substring_map: Dict[str, Dict[str, str]] = {}
         self.styled_variable_map: Dict[str, str] = {}
 
-        self.phrase_trie = PrintsTrie()
-        self.word_trie = PrintsTrie()
-        self.substring_trie = PrintsTrie()
+        self.phrase_trie = KeyTrie()
+        self.word_trie = KeyTrie()
+        self.substring_trie = KeyTrie()
 
         self.enable_conceal_map = False
         self.enable_styled_phrase_map = False
@@ -492,17 +505,6 @@ class PrintsCharming:
         return styled_text
 
 
-    @staticmethod
-    def compute_bg_color_map(code):
-        if '[38' in code:
-            bg_code = code.replace('[38', '[48')  # Change to background color for 256-color codes
-        elif '[9' in code:
-            bg_code = code.replace('[9', '[10')  # Special handling for white, which starts with 9
-        else:
-            bg_code = code.replace('[3', '[4')  # Basic ANSI colors: convert foreground color to background color
-
-        return bg_code
-
     def print_bg(self, color_name: str, length: int = 1) -> None:
         """
         Prints a "block" of background color.
@@ -639,7 +641,7 @@ class PrintsCharming:
         return ' '.join(styled_strs) if not return_list else styled_strs
 
 
-    def apply_my_new_style_code(self, code, text):
+    def apply_style_code(self, code, text):
         return f'{code}{text}{self.reset}'
 
 
@@ -692,6 +694,15 @@ class PrintsCharming:
         bg_color_block = f"{bg_color_code}{text}{self.reset}"
 
         return bg_color_block
+
+    def get_effect_code(self, effect_name):
+        return self.effect_map.get(effect_name, '')
+
+
+    def apply_effect(self, effect_name, text):
+        effect_code = self.get_effect_code(effect_name)
+        return f'{effect_code}{text}{self.reset}'
+
 
     def add_substring(self, substring: str, style_name: str) -> None:
         """
@@ -818,7 +829,7 @@ class PrintsCharming:
             del self.conceal_map[string]
             print(f"Removed '{string}' from conceal map")
 
-    def _remove_from_trie(self, trie: PrintsTrie, string: str) -> bool:
+    def _remove_from_trie(self, trie: KeyTrie, string: str) -> bool:
         """
         Removes a string from the trie by marking the end node as non-terminal (is_end = False).
         It does not remove the nodes themselves, because they may be shared with other words/phrases.
@@ -1745,7 +1756,7 @@ class PrintsCharming:
             if bar_symbol == ' ':
                 bar_symbol = self.apply_bg_color(color, bar_symbol)
             bar = bar_symbol * block + "-" * (bar_length - block)
-            time.sleep(1)
+            time.sleep(0.4)
             self.clear_line()
             self.print(f"Progress: |{bar}| {int(progress * 100)}%", end='', color=color)
             sys.stdout.flush()
@@ -1780,6 +1791,7 @@ class PrintsCharming:
             print(closing_brace)
         else:
             print(f"{closing_brace},")
+
 
 
     """
