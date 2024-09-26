@@ -37,13 +37,55 @@ styled_strings = {
     "blue": ["CoinbaseWebsocketClient", "server", "Python"],
     "yellow": ["1", "returned", "Flask", "Some", ],
     "vyellow": ["File modified:", "File modified AGAIN", "subscribed", "=", "JavaScript"],
-    "magenta": ["within 10 seconds.", "how", "React"],
+    "magenta": ["within 10 seconds.", "how", "React", "this is a test"],
     "cyan": ["|", "#", "are", "your", "Project Management System"],
     "orange": ["New Message!", "Prints", "Software Developer", "Prince Charming"],
     "purple": ["My color is purple", "Reading"],
     # Uncomment the next line to hide API keys or sensitive information
     # "conceal": [os.environ[key] for key in os.environ if "API" in key],
 }
+
+
+def right_angled_triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, left=True, reversed=False):
+    if left:
+        args = [start_char * (i + 1) for i in range(height)]
+    else:
+        # Create the triangle where the pointed end is on the right
+        args = [(prog_sep * (height - i - 1)) + (start_char * (i + 1)) for i in range(height)]
+
+    if reversed:
+        args = args[::-1]
+
+
+    return pc_instance.format_with_sep(*args, sep=sep, prog_sep=prog_sep, prog_step=step)
+
+
+def equilateral_triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, mirrored=False, reversed=False, flipped=False):
+    args = [prog_sep * (height - i - 1) + start_char * (2 * i + 1) for i in range(height)]
+
+    if reversed:
+        args = args[::-1]
+
+    if mirrored:
+        max_width = len(args[-1])
+        args = [(prog_sep * (max_width - len(line))) + line for line in args]
+
+    # Flip each line vertically
+    if flipped:
+        args = [line[::-1] for line in args]
+
+    return pc_instance.format_with_sep(*args, sep=sep, prog_sep='', prog_step=step)
+
+
+def diamond_shape(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, flipped=False):
+    top = [prog_sep * (height - i - 1) + start_char * (2 * i + 1) for i in range(height)]
+    bottom = [prog_sep * (i + 1) + start_char * (2 * (height - i - 1) - 1) for i in range(height - 1)]
+    args = top + bottom
+
+    if flipped:
+        args = [line[::-1] for line in args]
+
+    return pc_instance.format_with_sep(*args, sep=sep, prog_sep='', prog_step=step)
 
 
 def make_box():
@@ -440,12 +482,12 @@ def kwargs_replace_and_style_placeholders_examples():
 
 
 def add_styled_substrings_to_instance(pc):
-    pc.add_substring('please', 'yellow')
-    pc.add_substring('substring', 'vyellow')
-    pc.add_substring('color', 'blue')
-    pc.add_substring('apple', 'orange')
-    pc.add_substring('pine', 'white')
-    pc.add_substring('ex', 'vred')
+    pc.add_subword('please', 'yellow')
+    pc.add_subword('substring', 'vyellow')
+    pc.add_subword('color', 'blue')
+    pc.add_subword('apple', 'orange')
+    pc.add_subword('pine', 'white')
+    pc.add_subword('ex', 'vred')
 
 
 def random_examples():
@@ -461,39 +503,51 @@ def random_examples():
 
     add_styled_substrings_to_instance(pc)
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=5)
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=5)
 
     print('\n\n')
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=1)
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=1)
 
     print('\n\n')
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=2)
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=2)
 
     print('\n\n')
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", substring_style_option=3)
-
-    print('\n\n')
-
-    pc.print(
-        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', substring_style_option=5)
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=3)
 
     print('\n\n')
 
     pc.print(
         f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', substring_style_option=1)
+        color='purple', subword_style_option=5)
 
-    pc.print('\n\n')
+    print('\n\n')
 
     pc.print(
         f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', substring_style_option=2)
+        color='purple', subword_style_option=1)
 
-    pc.print('\n\n')
+    print('\n\n')
+
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
+        color='purple', subword_style_option=2)
+
+    print('\n\n')
+
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
+        color='purple', subword_style_option=2)
+
+    print('\n\n')
+
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n',
+        color='purple', phrase_norm=True, subword_style_option=2)
+
+
 
 
     term_width = os.get_terminal_size().columns
@@ -1296,6 +1350,37 @@ def print_markdown(pc):
     print()
 
 
+def print_shapes():
+    print('\n\n')
+
+    # Running test cases for the shapes
+    left_triangle = right_angled_triangle(quick_pc, 5)
+    right_triangle = right_angled_triangle(quick_pc, 5, left=False)
+    equilateral = equilateral_triangle(quick_pc, 5)
+    diamond = diamond_shape(quick_pc, 5)
+
+    reversed_triangle = right_angled_triangle(quick_pc, 5, reversed=True)
+
+    mirrored_equilateral = equilateral_triangle(quick_pc, 5, mirrored=True)
+    reversed_equilateral = equilateral_triangle(quick_pc, 5, reversed=True)
+    flipped_equilateral = equilateral_triangle(quick_pc, 5, flipped=True)
+
+    flipped_diamond = diamond_shape(quick_pc, 5, flipped=True)
+
+    print(f'left_triangle:\n{left_triangle}\n\n')
+    print(f'right_triangle:\n{right_triangle}\n\n')
+    print(f'Reversed Triangle:\n{reversed_triangle}\n\n')
+
+    print(f'equilateral:\n{equilateral}\n\n')
+    print(f'Mirrored Equilateral:\n{mirrored_equilateral}\n\n')
+    print(f'Reversed Equilateral:\n{reversed_equilateral}\n\n')
+    print(f'Flipped Equilateral:\n{flipped_equilateral}\n\n')
+
+    print(f'diamond:\n{diamond}\n\n')
+    print(f'Flipped Diamond:\n{flipped_diamond}\n\n')
+
+
+
 def setup_logger2(pc, name=None):
     logger = logging.getLogger(__name__) if not name else logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
@@ -1374,13 +1459,14 @@ def main():
     set_custom_excepthook()
 
     # uncomment to play around with logging
-    play_around_with_logging()
+    #play_around_with_logging()
 
     random_examples()
 
+
+
     welcome()
 
-    #pc = PrintsCharming(config={"internal_logging": True})
     pc = PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
@@ -1400,7 +1486,9 @@ def main():
     formatted_text_box_stuff()
     my_custom_error(pc)
     progress_bar(pc)
-    print_markdown(pc)
+    #print_markdown(pc)
+    #print_shapes()
+
 
 
 if __name__ == "__main__":
@@ -1412,7 +1500,7 @@ if __name__ == "__main__":
 
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
-    menu = InteractiveMenu('vcyan', menu_options, confirmed_style='vgreen', alt_buffer=True)
+    menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
     menu.run()
 
 
