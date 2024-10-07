@@ -1,5 +1,6 @@
 import ctypes
 import logging
+import platform
 
 
 
@@ -13,6 +14,20 @@ class WinUtils:
     ENABLE_PROCESSED_OUTPUT = 0x0001
     ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
     ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+
+
+    @staticmethod
+    def is_ansi_supported_natively():
+        """
+        Check if the current version of Windows supports ANSI escape codes natively.
+        Returns True if supported, False otherwise.
+        """
+        # Get Windows version as a tuple, e.g., (10, 0, 19041) for Windows 10
+        win_version = platform.version().split(".")
+
+        # For Windows 10, version 1511 or later supports ANSI codes
+        return int(win_version[0]) >= 10 and int(win_version[2]) >= 10586
+
 
     @staticmethod
     def enable_win_console_ansi_handling(handle_type=-11, mode=None):

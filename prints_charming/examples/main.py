@@ -46,18 +46,39 @@ styled_strings = {
 }
 
 
-def right_angled_triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, left=True, reversed=False):
-    if left:
-        args = [start_char * (i + 1) for i in range(height)]
-    else:
+def triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, right=False, reversed=False, flipped_mirrored=False, mirrored=False, style=None):
+    prog_direction = 'forward'
+    start_spaces = ''
+
+    if right:
         # Create the triangle where the pointed end is on the right
-        args = [(prog_sep * (height - i - 1)) + (start_char * (i + 1)) for i in range(height)]
+        #args = [(prog_sep * (height - i - 1)) + (start_char * (i + 1)) for i in range(height)]
+        # Create the triangle without leading spaces for right alignment
+        args = [(start_char * (i + 1)).rjust(height) for i in range(height)]
+        #prog_sep = ''
+    else:
+        args = [start_char * (i + 1) for i in range(height)]
 
     if reversed:
         args = args[::-1]
 
+    if flipped_mirrored:
+        # Create the mirrored triangle with progressively fewer spaces and more asterisks
+        args = [(prog_sep * i) + (start_char * (height - i)) for i in range(height)]
 
-    return pc_instance.format_with_sep(*args, sep=sep, prog_sep=prog_sep, prog_step=step)
+    if mirrored:
+        # Create the mirrored triangle with progressively more leading spaces and fewer asterisks
+        args = [(prog_sep * (height - i - 1)) + (start_char * (i + 1)) for i in range(height)]
+        start_spaces = ' ' * (len(args) - step)
+        prog_direction = "reverse"
+
+
+    format_with_sep = pc_instance.format_with_sep(*args, sep=sep, prog_sep=prog_sep, prog_step=step, prog_direction=prog_direction, start=start_spaces)
+
+    if style:
+        format_with_sep = pc_instance.apply_style(style, format_with_sep)
+
+    return format_with_sep
 
 
 def equilateral_triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, mirrored=False, reversed=False, flipped=False):
@@ -278,8 +299,10 @@ def formatted_text_box_stuff():
     title = 'Prints Charming'
     subtitle = 'Hope you find the user guide helpful'
 
+
     title_center_aligned = pc.apply_style('vgreen', builder.align_text(title, available_width, 'center'))
     subtitle_center_aligned = pc.apply_style('white', builder.align_text(subtitle, available_width, 'center'))
+
 
     print(purple_horiz_border)
     print(f'{orange_vert_border}{title_center_aligned}{purple_vert_border}')
@@ -744,31 +767,34 @@ def variable_examples(pc):
     return text
 
 
+
 def simple_use_case(pc):
+    ds = '\n' * 2
+    ts = '\n' * 3
     print(styled_mini_border)
     pc.print(f'function: simple_use_case:')
-    print(styled_mini_border)
-    print()
+    print(styled_mini_border, end=ds)
 
     pc.print("# Basic printing with ColorPrinter will print in the default style with default color.")
-    pc.print("Hello, world!")
+    pc.print("Hello, world!", end=ds)
     pc.print("# Print in the default style reverse foreground and background.")
-    pc.print("Hello, world!", reverse=True)
+    pc.print("Hello, world!", reverse=True, end=ds)
     pc.print("# Specify only the color of the args.")
-    pc.print("Hello, world!", color="red")
+    pc.print("Hello, world!", color="red", end=ds)
     pc.print("# Specify only italic and underline will print in the default color.")
-    pc.print("Hello, world!", italic=True, underline=True)
+    pc.print("Hello, world!", italic=True, underline=True, end=ds)
     pc.print("# Specify a predefined style 'magenta'. The 'magenta' style is defined above.")
-    pc.print("Hello, world!", style="magenta")
+    pc.print("Hello, world!", style="magenta", end=ds)
     pc.print("# Specify predefined style 'task' for printing. The 'task' style is defined above.")
-    pc.print("This is a task.", style="task")
+    pc.print("This is a task.", style="task", end=ds)
     pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
-    pc.print("This is a task.", style="task", color="green", underline=True)
+    pc.print("This is a task.", style="task", color="green", underline=True, end=ds)
     pc.print("Show text with bg_color:")
-    pc.print("This has a bg_color", style="bg_color_green")
+    pc.print("This has a bg_color", style="bg_color_green", end=ds)
     pc.print("# Show that 'Hello, world!' isn't color or style defined.")
-    pc.print("Hello, world!")
-    print()
+    pc.print("Hello, world!", end=ts)
+
+
 
 
 def more_stuff():
@@ -1309,7 +1335,7 @@ def experiment():
 # Define the markdown printer using def
 def create_markdown_printer(pc_instance):
     def printer(*args, **kwargs):
-        pc_instance.print(*args, sep='\n', markdown=True, **kwargs)
+        pc_instance.print_markdown(*args, sep=' ', **kwargs)
 
     return printer
 
@@ -1354,12 +1380,15 @@ def print_shapes():
     print('\n\n')
 
     # Running test cases for the shapes
-    left_triangle = right_angled_triangle(quick_pc, 5)
-    right_triangle = right_angled_triangle(quick_pc, 5, left=False)
+    left_triangle = triangle(quick_pc, 5, style='vgreen')
+    left_mirrored = triangle(quick_pc, 5, mirrored=True, style='vgreen')
+    right_triangle = triangle(quick_pc, 5, right=True, style='purple')
+    right_mirrored = triangle(quick_pc, 5, right=True, mirrored=True, style='purple')
+
     equilateral = equilateral_triangle(quick_pc, 5)
     diamond = diamond_shape(quick_pc, 5)
 
-    reversed_triangle = right_angled_triangle(quick_pc, 5, reversed=True)
+    reversed_triangle = triangle(quick_pc, 5, reversed=True, style='purple')
 
     mirrored_equilateral = equilateral_triangle(quick_pc, 5, mirrored=True)
     reversed_equilateral = equilateral_triangle(quick_pc, 5, reversed=True)
@@ -1368,16 +1397,18 @@ def print_shapes():
     flipped_diamond = diamond_shape(quick_pc, 5, flipped=True)
 
     print(f'left_triangle:\n{left_triangle}\n\n')
+    print(f'left_mirrored:\n{left_mirrored}\n\n')
     print(f'right_triangle:\n{right_triangle}\n\n')
+    print(f'right_mirrored:\n{right_mirrored}\n\n')
     print(f'Reversed Triangle:\n{reversed_triangle}\n\n')
 
-    print(f'equilateral:\n{equilateral}\n\n')
-    print(f'Mirrored Equilateral:\n{mirrored_equilateral}\n\n')
-    print(f'Reversed Equilateral:\n{reversed_equilateral}\n\n')
-    print(f'Flipped Equilateral:\n{flipped_equilateral}\n\n')
+    #print(f'equilateral:\n{equilateral}\n\n')
+    #print(f'Mirrored Equilateral:\n{mirrored_equilateral}\n\n')
+    #print(f'Reversed Equilateral:\n{reversed_equilateral}\n\n')
+    #print(f'Flipped Equilateral:\n{flipped_equilateral}\n\n')
 
-    print(f'diamond:\n{diamond}\n\n')
-    print(f'Flipped Diamond:\n{flipped_diamond}\n\n')
+    #print(f'diamond:\n{diamond}\n\n')
+    #print(f'Flipped Diamond:\n{flipped_diamond}\n\n')
 
 
 
@@ -1486,8 +1517,8 @@ def main():
     formatted_text_box_stuff()
     my_custom_error(pc)
     progress_bar(pc)
-    #print_markdown(pc)
-    #print_shapes()
+    print_markdown(pc)
+    print_shapes()
 
 
 

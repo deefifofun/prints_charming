@@ -28,9 +28,8 @@ from .prints_charming_defaults import (
 )
 
 from .prints_style import PStyle
-
 from .utils import compute_bg_color_map
-
+from .trie_manager import KeyTrie
 from .internal_logging_utils import shared_logger
 
 if sys.platform == 'win32':
@@ -38,159 +37,13 @@ if sys.platform == 'win32':
 
 
 
-class KeyTrieNode:
-    def __init__(self):
-        self.children = {}
-        self.categories = {}
-        self.is_end = False
-        self.style_info = None
-        self.insertion_order = None
-
-
-class KeyTrie:
-    def __init__(self):
-        self.root = KeyTrieNode()
-        self.insertion_counter = 0
-
-    def insert(self, text, style_info):
-        node = self.root
-        for char in text:
-            if char not in node.children:
-                node.children[char] = KeyTrieNode()
-            node = node.children[char]
-        node.is_end = True
-        node.style_info = style_info
-        node.insertion_order = self.insertion_counter  # Set the insertion order
-        self.insertion_counter += 1
-
-
-    def search_prefix(self, text):
-        node = self.root
-        current_match = []
-        for char in text:
-            if char not in node.children:
-                break
-            node = node.children[char]
-            current_match.append(char)
-            if node.is_end:
-                return ''.join(current_match), node.style_info
-        return None  # No prefix
-
-
-    def search_longest_prefix(self, text, normalize=False, normalize_sep=' '):
-        original_text = text  # Store the original unnormalized text
-
-        if normalize:
-            # Normalize the search text by replacing \n and \t with ' '
-            text = text.replace('\n', ' ').replace('\t', ' ')
-            text = re.sub(r'\s+', normalize_sep, text)  # Normalize spaces
-
-        node = self.root
-        longest_match = None
-        current_match = []
-        match_length_original = 0  # Track the length of the match to map back to original text
-
-        for char in text:
-            if char not in node.children:
-                break
-            node = node.children[char]
-            current_match.append(char)
-
-            match_length_original += 1
-
-            if node.is_end:
-                longest_match = (''.join(current_match), node.style_info)
-
-        if longest_match:
-            # Map the matched portion back to the original unnormalized text
-            original_match = original_text[:match_length_original]  # Extract original matched text
-            return (original_match, longest_match[1])  # Return original match with style info
-
-
-        """
-        node = self.root
-        longest_match = None
-        current_match = []
-        for char in text:
-            if char not in node.children:
-                break
-            node = node.children[char]
-            current_match.append(char)
-            if node.is_end:
-                longest_match = (''.join(current_match), node.style_info)
-        return longest_match
-        """
-
-    def search_suffix(self, text):
-        matches = []
-        for i in range(len(text)):
-            node = self.root
-            current_match = []
-            for j in range(i, len(text)):
-                char = text[j]
-                if char not in node.children:
-                    break
-                node = node.children[char]
-                current_match.append(char)
-                if node.is_end:
-                    matches.append((''.join(current_match), node.style_info))
-        # Now check if any match is at the end of the word
-        for match, style_info in matches:
-            if text.endswith(match):
-                return match, style_info
-        return None  # No suffix match found
-
-
-    def search_any_substring(self, text):
-        # Search for any substring match within the given text
-        matches = []
-        for i in range(len(text)):
-            node = self.root
-            current_match = []
-            for j in range(i, len(text)):
-                char = text[j]
-                if char not in node.children:
-                    break
-                node = node.children[char]
-                current_match.append(char)
-                if node.is_end:
-                    matches.append((''.join(current_match), node.style_info))
-        return matches if matches else None
-
-
-    def search_any_substring_by_insertion_order(self, text):
-        # Search for any substring match within the given text
-        matches = []
-        for i in range(len(text)):
-            node = self.root
-            current_match = []
-            for j in range(i, len(text)):
-                char = text[j]
-                if char not in node.children:
-                    break
-                node = node.children[char]
-                current_match.append(char)
-                if node.is_end:
-                    matches.append((''.join(current_match), node.style_info, node.insertion_order))
-        # Sort matches by the insertion order to prioritize the earliest added substring
-        matches.sort(key=lambda x: x[2])  # Sort by insertion_order
-        return matches if matches else None
-
-
-    def search(self, text):
-        node = self.root
-        for char in text:
-            if char not in node.children:
-                return None  # Phrase not found
-            node = node.children[char]
-        return node.style_info if node.is_end else None
-
-
-
 
 class PrintsCharming:
     RESET = "\033[0m"
     _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
+    ansi_escape_pattern = re.compile(r'\033\[[0-9;]*[mK]')
+    words_and_spaces_pattern = re.compile(r'\S+|\s+')
 
 
 
@@ -289,6 +142,7 @@ class PrintsCharming:
 
 
 
+
     def __init__(self,
                  config: Optional[Dict[str, Union[bool, str, int]]] = None,
                  color_map: Optional[Dict[str, str]] = None,
@@ -368,10 +222,10 @@ class PrintsCharming:
         self.style_cache = {}
 
         if sys.platform == 'win32':
-            if autoconf_win:
-                self.enable_win_console_ansi_handling()
-            else:
-                self.win_utils = WinUtils
+            self.win_utils = WinUtils
+            if autoconf_win and not WinUtils.is_ansi_supported_natively():
+                if not WinUtils.enable_win_console_ansi_handling():
+                    logging.error("Failed to enable ANSI handling on Windows")
 
         # Instance-level flag to control logging
         self.internal_logging_enabled = self.config.get("internal_logging", False)
@@ -381,31 +235,17 @@ class PrintsCharming:
         self.setup_internal_logging(self.config.get("log_level", "DEBUG"))
 
         # Setup logging
-        #self.logger = None
-        #self.setup_logging(self.config["internal_logging"], self.config["log_level"])
+        # self.logger = None
+        # self.setup_logging(self.config["internal_logging"], self.config["log_level"])
 
 
 
 
-    @staticmethod
-    def enable_win_console_ansi_handling():
-        try:
-            import ctypes
-            k32 = ctypes.windll.kernel32
-            handle = k32.GetStdHandle(-11)
-            ENABLE_PROCESSED_OUTPUT = 0x0001
-            ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
-            ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
-            mode = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING
-            if not k32.SetConsoleMode(handle, mode):
-                logging.error("Failed to set console mode")
-                return False
-            logging.info(f"Console mode set to {mode}")
-            return True
-        except Exception as e:
-            logging.error(f"Error enabling ANSI handling: {e}")
-            return False
-
+    def escape_ansi_codes(self, ansi_string):
+        self.debug("Escaping ANSI codes in string: {}", ansi_string)
+        escaped_ansi_string = ansi_string.replace("\033", "\\033")
+        self.debug("Escaped ANSI codes in string: {}", escaped_ansi_string)
+        return escaped_ansi_string
 
 
     def print_dict(self, d, indent=4):
@@ -435,93 +275,10 @@ class PrintsCharming:
         return "{\n" + pprint_dict(d) + "}"
 
 
-    def escape_ansi_codes(self, ansi_string):
-        self.debug("Escaping ANSI codes in string: {}", ansi_string)
-        escaped_ansi_string = ansi_string.replace("\033", "\\033")
-        self.debug("Escaped ANSI codes in string: {}", escaped_ansi_string)
-        return escaped_ansi_string
 
 
-    def replace_and_style_placeholders(self,
-                                       text: str,
-                                       kwargs: Dict[str, Any],
-                                       enable_label_style: bool = True,
-                                       top_level_label: str = 'top_level_label',
-                                       sub_level_label: str = 'sub_level_label',
-                                       label_delimiter: str = ':',
-                                       style_function: Callable[[str, Dict[str, Any]], str] = None,
-                                       **style_kwargs) -> str:
 
-        """Replace placeholders with actual values and apply colors."""
-        self.debug("Replacing and styling placeholders in text: {} with kwargs: {}", text, kwargs)
-        top_level_label_style_code = self.get_style_code(top_level_label) if enable_label_style else ''
-        sub_level_label_style_code = self.get_style_code(sub_level_label) if enable_label_style else ''
-        lines = text.split('\n')
 
-        # Style labels directly in the text
-        if enable_label_style:
-            for i, line in enumerate(lines):
-                stripped_line = line.strip()
-                # Handle standalone labels that end with ':'
-                if stripped_line.endswith(label_delimiter):
-                    label, _, rest = line.partition(label_delimiter)
-                    lines[i] = f"{sub_level_label_style_code}{label}{label_delimiter}{self.reset}{rest}"
-                # Handle inline labels followed by placeholders
-                elif label_delimiter in line:
-                    label, delimiter, rest = line.partition(label_delimiter)
-                    if '{' in rest:
-                        lines[i] = f"{top_level_label_style_code}{label}{delimiter}{self.reset}{rest}"
-
-        styled_text = '\n'.join(lines)
-
-        # Replace placeholders with actual values and apply styles
-        for key, value in kwargs.items():
-            styled_value = str(value)
-            if key in self.style_conditions_map:
-                style_name = self.style_conditions_map[key](value)
-                style_code = self.get_style_code(style_name)
-                styled_value = f"{style_code}{styled_value}{self.reset}"
-            styled_text = styled_text.replace(f"{{{key}}}", styled_value)
-
-        if not style_function:
-
-            # Apply additional styles for bullets, numbers, and sentences
-            lines = styled_text.split('\n')
-            for i, line in enumerate(lines):
-                stripped_line = line.strip()
-                leading_whitespace = line[:len(line) - len(stripped_line)]
-
-                if stripped_line.startswith('- ') and not stripped_line.endswith(':'):
-                    # Apply main bullet style
-                    parts = stripped_line.split(' ', 1)
-                    if len(parts) == 2:
-                        lines[
-                            i] = f"{leading_whitespace}{self.get_style_code('main_bullets')}{parts[0]} {self.reset}{self.get_style_code('main_bullet_text')}{parts[1]}{self.reset}"
-                elif len(stripped_line) > 1 and stripped_line[0].isdigit() and stripped_line[1] == '.':
-                    # Apply number and period style, followed by phrase style
-                    parts = stripped_line.split('. ', 1)
-                    if len(parts) == 2:
-                        lines[i] = f"{leading_whitespace}{self.get_style_code('numbers')}{parts[0]}.{self.reset} {self.get_style_code('sub_proj')}{parts[1]}{self.reset}"
-                elif stripped_line.startswith('- ') and stripped_line.endswith(':'):
-                    # Apply sub-bullet style
-                    parts = stripped_line.split(' ', 2)
-                    if len(parts) == 3:
-                        lines[i] = f"{leading_whitespace}{self.get_style_code('sub_bullets')}{parts[1]} {self.reset}{self.get_style_code('sub_bullet_text')}{parts[2]}{self.reset}"
-                elif leading_whitespace.startswith('   '):
-                    # Apply sub-bullet sentence style
-                    words = stripped_line.split()
-                    if len(words) > 1:
-                        lines[
-                            i] = f"{leading_whitespace}{self.get_style_code('sub_bullet_title')}{words[0]} {self.reset}{self.get_style_code('sub_bullet_sentence')}{' '.join(words[1:])}{self.reset}"
-
-            styled_text = '\n'.join(lines)
-
-        else:
-            styled_text = style_function(styled_text, **style_kwargs)
-
-        self.debug(f"Styled text: '{styled_text}'")
-
-        return styled_text
 
 
     def print_bg(self, color_name: str, length: int = 1) -> None:
@@ -785,10 +542,11 @@ class PrintsCharming:
 
             if contains_inner_space:
                 # Insert the phrase into the phrase trie
-                phrase_words_and_spaces = re.findall(r'\S+|\s+', string)
+                phrase_words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(string)
+                phrase_length = len(phrase_words_and_spaces)
                 self.phrase_trie.insert(string, {
                     "phrase_words_and_spaces": phrase_words_and_spaces,
-                    "phrase_length": len(phrase_words_and_spaces),
+                    "phrase_length": phrase_length,
                     "style": style_name,
                     "style_code": style_code,
                     "styled": styled_string,
@@ -1070,7 +828,7 @@ class PrintsCharming:
 
 
     def apply_custom_python_highlighting(self, code_block):
-        reset_code = self.reset
+        reset_code = PrintsCharming.RESET
 
         # Pattern to match ANSI escape sequences (like 38;5;248m) and exclude them from further styling
         ansi_escape_sequence_pattern = r'\033\[[0-9;]*m'
@@ -1290,10 +1048,9 @@ class PrintsCharming:
     def contains_ansi_codes(s: str) -> bool:
         return '\033' in s
 
-    @staticmethod
-    def remove_ansi_codes(text):
-        ansi_escape = re.compile(r'\033\[[0-9;]*[mK]')
-        return ansi_escape.sub('', text)
+    @classmethod
+    def remove_ansi_codes(cls, text):
+        return cls.ansi_escape_pattern.sub('', text)
 
 
     def write_file(self, text, filename, end, mode='a'):
@@ -1301,7 +1058,10 @@ class PrintsCharming:
             file.write(text + end)
 
 
-    def format_with_sep(self, *args, converted_args=None, sep=' ', prog_sep='', prog_step=1, start=''):
+
+
+
+    def format_with_sep(self, *args, converted_args=None, sep=' ', prog_sep='', prog_step=1, start='', prog_direction='forward'):
 
         if not converted_args:
             # Convert args to strings if required
@@ -1320,13 +1080,16 @@ class PrintsCharming:
                 for i in range(1, len(converted_args)):
                     # Apply constant separator (now sep) between arguments
                     text += sep
-                    # Apply progressively increasing separator
-                    if prog_sep:
+                    if prog_direction == 'reverse':
+                        # Apply progressively decreasing separator
+                        progressive_sep = prog_sep * ((len(converted_args) - i - 1) * prog_step)
+                    else:
                         progressive_sep = prog_sep * (i * prog_step)  # Use step to control progression
-                        text += progressive_sep
+                    text += progressive_sep
                     text += converted_args[i]
             else:
                 # Standard joining with string separator
+
                 text += sep.join(converted_args)
 
         elif isinstance(sep, tuple):
@@ -1396,7 +1159,7 @@ class PrintsCharming:
 
             # Remove ANSI codes if present
             if self.contains_ansi_codes(text):
-                text = self.remove_ansi_codes(text)
+                text = PrintsCharming.remove_ansi_codes(text)
 
             if filename:
                 self.write_file(text, filename, end)
@@ -1492,7 +1255,7 @@ class PrintsCharming:
 
 
         # Convert the text to a list of words and spaces
-        words_and_spaces = re.findall(r'\S+|\s+', text)
+        words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
         self.debug(f'words_and_spaces:\n{words_and_spaces}')
 
         # Initialize list to hold the final styled words and spaces
@@ -1536,6 +1299,7 @@ class PrintsCharming:
 
                             if not phrase_norm:
                                 styled_phrase = details.get('styled', phrase)
+
                             else:
                                 # Get the style code and apply it to the original, unnormalized phrase
                                 phrase_style_code = details.get('style_code')
@@ -1544,13 +1308,13 @@ class PrintsCharming:
                             self.debug(f'styled_phrase: {styled_phrase}')
 
                             # Split the styled phrase into words and spaces
-                            styled_phrase_words_and_spaces = re.findall(r'\S+|\s+', styled_phrase)
+                            styled_phrase_words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(styled_phrase)
                             self.debug(f'styled_phrase_words_and_spaces:\n{styled_phrase_words_and_spaces}')
 
 
 
                             # Ensure the phrase is properly aligned in the words_and_spaces list
-                            if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == re.findall(r'\S+|\s+', phrase):
+                            if words_and_spaces[i:i + len(styled_phrase_words_and_spaces)] == PrintsCharming.words_and_spaces_pattern.findall(phrase):
                                 # Update the indexes_used_by_phrases set
                                 indexes_used_by_phrases.update(list(range(i, i + len(styled_phrase_words_and_spaces))))
                                 self.debug(f'indexes_used_by_phrases:\n{indexes_used_by_phrases}')
@@ -1820,6 +1584,7 @@ class PrintsCharming:
         # Step 5: Join the styled_words_and_spaces to form the final styled text
         styled_text = ''.join(filter(None, styled_words_and_spaces))
 
+
         # Print or write to file
         if filename:
             with open(filename, 'a') as file:
@@ -1861,6 +1626,89 @@ class PrintsCharming:
             self.print(f"Progress: |{bar}| {int(progress * 100)}%", end='', color=color)
             sys.stdout.flush()
             time.sleep(0.25)  # Simulate work
+
+
+
+    def replace_and_style_placeholders(self,
+                                       text: str,
+                                       kwargs: Dict[str, Any],
+                                       enable_label_style: bool = True,
+                                       top_level_label: str = 'top_level_label',
+                                       sub_level_label: str = 'sub_level_label',
+                                       label_delimiter: str = ':',
+                                       style_function: Callable[[str, Dict[str, Any]], str] = None,
+                                       **style_kwargs) -> str:
+
+        """Replace placeholders with actual values and apply colors."""
+        self.debug("Replacing and styling placeholders in text: {} with kwargs: {}", text, kwargs)
+        top_level_label_style_code = self.get_style_code(top_level_label) if enable_label_style else ''
+        sub_level_label_style_code = self.get_style_code(sub_level_label) if enable_label_style else ''
+        lines = text.split('\n')
+
+        # Style labels directly in the text
+        if enable_label_style:
+            for i, line in enumerate(lines):
+                stripped_line = line.strip()
+                # Handle standalone labels that end with ':'
+                if stripped_line.endswith(label_delimiter):
+                    label, _, rest = line.partition(label_delimiter)
+                    lines[i] = f"{sub_level_label_style_code}{label}{label_delimiter}{self.reset}{rest}"
+                # Handle inline labels followed by placeholders
+                elif label_delimiter in line:
+                    label, delimiter, rest = line.partition(label_delimiter)
+                    if '{' in rest:
+                        lines[i] = f"{top_level_label_style_code}{label}{delimiter}{self.reset}{rest}"
+
+        styled_text = '\n'.join(lines)
+
+        # Replace placeholders with actual values and apply styles
+        for key, value in kwargs.items():
+            styled_value = str(value)
+            if key in self.style_conditions_map:
+                style_name = self.style_conditions_map[key](value)
+                style_code = self.get_style_code(style_name)
+                styled_value = f"{style_code}{styled_value}{self.reset}"
+            styled_text = styled_text.replace(f"{{{key}}}", styled_value)
+
+        if not style_function:
+
+            # Apply additional styles for bullets, numbers, and sentences
+            lines = styled_text.split('\n')
+            for i, line in enumerate(lines):
+                stripped_line = line.strip()
+                leading_whitespace = line[:len(line) - len(stripped_line)]
+
+                if stripped_line.startswith('- ') and not stripped_line.endswith(':'):
+                    # Apply main bullet style
+                    parts = stripped_line.split(' ', 1)
+                    if len(parts) == 2:
+                        lines[
+                            i] = f"{leading_whitespace}{self.get_style_code('main_bullets')}{parts[0]} {self.reset}{self.get_style_code('main_bullet_text')}{parts[1]}{self.reset}"
+                elif len(stripped_line) > 1 and stripped_line[0].isdigit() and stripped_line[1] == '.':
+                    # Apply number and period style, followed by phrase style
+                    parts = stripped_line.split('. ', 1)
+                    if len(parts) == 2:
+                        lines[i] = f"{leading_whitespace}{self.get_style_code('numbers')}{parts[0]}.{self.reset} {self.get_style_code('sub_proj')}{parts[1]}{self.reset}"
+                elif stripped_line.startswith('- ') and stripped_line.endswith(':'):
+                    # Apply sub-bullet style
+                    parts = stripped_line.split(' ', 2)
+                    if len(parts) == 3:
+                        lines[i] = f"{leading_whitespace}{self.get_style_code('sub_bullets')}{parts[1]} {self.reset}{self.get_style_code('sub_bullet_text')}{parts[2]}{self.reset}"
+                elif leading_whitespace.startswith('   '):
+                    # Apply sub-bullet sentence style
+                    words = stripped_line.split()
+                    if len(words) > 1:
+                        lines[
+                            i] = f"{leading_whitespace}{self.get_style_code('sub_bullet_title')}{words[0]} {self.reset}{self.get_style_code('sub_bullet_sentence')}{' '.join(words[1:])}{self.reset}"
+
+            styled_text = '\n'.join(lines)
+
+        else:
+            styled_text = style_function(styled_text, **style_kwargs)
+
+        self.debug(f"Styled text: '{styled_text}'")
+
+        return styled_text
 
 
 
