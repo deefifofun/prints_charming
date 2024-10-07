@@ -147,6 +147,7 @@ class PrintsCharming:
                  config: Optional[Dict[str, Union[bool, str, int]]] = None,
                  color_map: Optional[Dict[str, str]] = None,
                  bg_color_map: Optional[Dict[str, str]] = None,
+                 default_bg_color: Optional[str] = None,
                  effect_map: Optional[Dict[str, str]] = None,
                  styles: Optional[Dict[str, PStyle]] = None,
                  styled_strings: Optional[Dict[str, List[str]]] = None,
@@ -182,7 +183,12 @@ class PrintsCharming:
 
         self.ctl_map = self.shared_ctl_map
 
-        self.styles = styles or PrintsCharming.shared_styles or DEFAULT_STYLES.copy()
+        self.styles = copy.deepcopy(styles) or PrintsCharming.shared_styles or copy.deepcopy(DEFAULT_STYLES)
+
+        if default_bg_color is not None and default_bg_color in self.bg_color_map:
+            for style_key, style_value in self.styles.items():
+                if not hasattr(style_value, 'bg_color') or getattr(style_value, 'bg_color') is None:
+                    setattr(style_value, 'bg_color', default_bg_color)
 
         self.style_codes: Dict[str, str] = {
             name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map

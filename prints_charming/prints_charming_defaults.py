@@ -69,7 +69,8 @@ DEFAULT_COLOR_MAP: Dict[str, str] = {
         "dgray": "\033[38;5;8m",
         "plat": "\033[38;5;252m",
         "white": "\033[38;5;15m",
-        "vwhite": "\033[38;5;231m"
+        "vwhite": "\033[38;5;231m",
+        "jupyter": "\033[38;2;48;56;64m"
 }
 
 

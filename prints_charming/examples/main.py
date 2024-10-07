@@ -1483,10 +1483,17 @@ def play_around_with_logging():
     my_logger2.warning("Warning message.")
     my_logger2.error("Error encountered.")
     my_logger2.critical("Critical issue.")
-    print()
+
+
+def default_bg_check():
+    test_instance = PrintsCharming(default_bg_color='jupyter')
+    test_instance.print(f'This is some text that should have jupyter bg_color even though no bg is specified in the style!', style='vmagenta')
+
 
 
 def main():
+    default_bg_check()
+
     set_custom_excepthook()
 
     # uncomment to play around with logging
@@ -1522,8 +1529,12 @@ def main():
 
 
 
+
+
+
+
 if __name__ == "__main__":
-    PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP)
+    PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP.copy())
     quick_pc = PrintsCharming()
     mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     styled_mini_border = quick_pc.apply_color('orange', mini_border)
