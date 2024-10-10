@@ -1269,6 +1269,7 @@ class NewClass():
         return self.class_name, self.instance_name, self.arg1
 
 
+
 def play_around_with_logging():
     logger = setup_logger()
     pc = logger.pc
