@@ -155,6 +155,8 @@ DEFAULT_EFFECT_MAP: Dict[str, str] = {
 
 DEFAULT_STYLES: Dict[str, PStyle] = {
         "default"      : PStyle(),
+        "pc_title": PStyle(color='dfff', bold=True),
+
         "bold"      : PStyle(bold=True),
         "dim"       : PStyle(dim=True),
         "italic" : PStyle(italic=True),
@@ -163,85 +165,66 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "overline" : PStyle(overline=True),
         "strikethru" : PStyle(strikethru=True),
         "blink"      : PStyle(blink=True),
+
+        "numbers"      : PStyle(color="yellow"),
+
         "down_arrow": PStyle(color='vred', bold=True),
         "up_arrow": PStyle(color='vgreen', bold=True),
         "left_arrow": PStyle(color='vred', bold=True),
         "right_arrow": PStyle(color='vgreen', bold=True),
-        "pc_title": PStyle(color='dfff', bold=True),
-        "message": PStyle(color='yellow', italic=True, dim=True),
-        "bullet": PStyle(color='green'),
-        "link": PStyle(color='lblue', underline=True),
-        "inline_code": PStyle(color='vmagenta'),
-        "code_block": PStyle(color='vwhite', bold=True),
-        "class_name": PStyle(color="dfff"),
-        "method_name": PStyle(color="lpurple"),
-        "top_level_label": PStyle(bold=True, italic=True),
-        "sub_level_label": PStyle(color='lblue'),
-        "numbers"      : PStyle(color="yellow"),
-        'main_bullets' : PStyle(color="purple"),
-        "sub_bullets"  : PStyle(color="pink"),
-        "sub_proj"     : PStyle(color="cyan"),
-        "sub_bullet_title": PStyle(color="orange"),
-        "sub_bullet_sentence": PStyle(color="dblue"),
-        "white"        : PStyle(color="white"),
-        "gray"         : PStyle(color="gray"),
-        "dgray"        : PStyle(color="dgray"),
-        "black"        : PStyle(color="black"),
-        "green"        : PStyle(color="green", bold=True),
-        "vgreen"       : PStyle(color="vgreen", bold=True),
-        "log_true"     : PStyle(color='vgreen'),
-        "bg_color_green": PStyle(color="white", bg_color='green'),
-        "red"          : PStyle(color="red"),
-        "vred"         : PStyle(color="vred", bold=True),
-        "blue"         : PStyle(color="blue"),
-        "dblue"        : PStyle(color="dblue"),
-        "lblue"          : PStyle(color="lblue"),
-        "vblue"         : PStyle(color="vblue"),
-        "yellow"       : PStyle(color="yellow"),
-        "vyellow"      : PStyle(color="vyellow"),
-        "brass"        : PStyle(color="brass"),
-        "bronze"       : PStyle(color="bronze"),
-        "lbrown"       : PStyle(color="lbrown"),
-        "vorange"      : PStyle(color="vorange"),
-        "lplum"        : PStyle(color="lplum"),
-        "plum"         : PStyle(color="plum"),
-        "vplum"        : PStyle(color="vplum"),
-        "lmagenta"     : PStyle(color="lmagenta"),
-        "magenta"      : PStyle(color="magenta", bold=True),
-        "vmagenta"     : PStyle(color="vmagenta"),
-        "lpink"        : PStyle(color="lpink"),
-        "pink"         : PStyle(color="pink",),
-        "vpink"        : PStyle(color="vpink"),
-        "purple"       : PStyle(color="purple"),
-        "dpurple"      : PStyle(color="dpurple"),
-        "gold"         : PStyle(color="gold"),
-        "cyan"         : PStyle(color="cyan"),
-        "vcyan"        : PStyle(color="vcyan"),
-        "orange"       : PStyle(color="orange"),
-        "orangewhite"  : PStyle(color="green", bg_color='dgray', underline=True),
-        "copper"       : PStyle(color="copper"),
-        "brown"        : PStyle(color="brown"),
-        "sand"         : PStyle(color="sand"),
-        "lav"          : PStyle(color="lav"),
-        "lpurple"      : PStyle(color="lpurple"),
-        "plat"         : PStyle(color="plat"),
-        "silver"       : PStyle(color="dfff", bg_color="dsilver"),
-        "dfff"        : PStyle(color="dfff", bg_color="purple", reverse=True),
-        "vwhite"       : PStyle(color="vwhite"),
-        "header"       : PStyle(color="vcyan"),
+
+
         "header1"      : PStyle(color="blue", bold=True, underline=True),
         "header2" : PStyle(color="cyan", bold=True),
         "header_main"  : PStyle(color="vcyan", bold=True),
         "header_text"  : PStyle(color="purple", bg_color="gray", bold=True, italic=True),
         "header_text2" : PStyle(color="gray", bg_color="purple", bold=True),
+
         "task"         : PStyle(color="blue", bold=True),
+        "message": PStyle(color='yellow', italic=True, dim=True),
+        "link": PStyle(color='lblue', underline=True),
+
+        "top_level_label": PStyle(bold=True, italic=True),
+        "sub_level_label": PStyle(color='lblue'),
+        'main_bullets' : PStyle(color="purple"),
+        "sub_bullets"  : PStyle(color="pink"),
+        "sub_proj"     : PStyle(color="cyan"),
+        "sub_bullet_title": PStyle(color="orange"),
+        "sub_bullet_sentence": PStyle(color="dblue"),
+        "bullet": PStyle(color='green'),
+
+        #"method_name": PStyle(color="lpurple"),
+        "inline_code": PStyle(color='vmagenta'),
+        "code_block": PStyle(color='vwhite', bold=True),
+
+        # Error styles
+        "header"       : PStyle(color="vcyan"),
         "path"         : PStyle(color="blue"),
-        "filename"     : PStyle(color="yellow"),
+        "error_filename": PStyle(color="yellow"),
         "line_info"    : PStyle(color="yellow", bold=True),
-        "line_number"  : PStyle(color="orange", bold=True),
+        "error_line_number"  : PStyle(color="orange", bold=True),
         "function_name": PStyle(color="yellow", italic=True),
         "error_message": PStyle(color="vred", bold=True, dim=True),
-        "code"         : PStyle(color="yellow"),
+
+        "log_true"     : PStyle(color='vgreen'),
+
+        # Default Logging
+        "timestamp": PStyle(color="vwhite"),
+        "debug": PStyle(color="blue"),
+        "info": PStyle(color="green"),
+        "warning": PStyle(color="yellow"),
+        "error": PStyle(color="red"),
+        "critical": PStyle(color="vred", bold=True, italic=True),
+        "filename": PStyle(color="cyan", bold=True),
+        'record_name': PStyle(color="orange"),
+        "hostname": PStyle(color="white"),
+        "class_name": PStyle(color="dfff"),
+        "method_name": PStyle(color="vwhite"),
+        "line_number": PStyle(color="vcyan"),
+        "highlight_arg": PStyle(color="vcyan"),
+        "args": PStyle(color="dfff", italic=True),
+
+        # Python dict styles
         "dict_key": PStyle(color="lblue"),
         "dict_value": PStyle(color="white"),
         "true": PStyle(color="vgreen"),
@@ -250,6 +233,9 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "int": PStyle(color="cyan"),
         "float": PStyle(color="vcyan"),
         "other": PStyle(color="lav"),
+
+        "code"         : PStyle(color="yellow"),
+
         "python_keyword": PStyle(color="lav", italic=True),
         "python_string": PStyle(color="dgreen"),
         "python_comment": PStyle(dim=True),
@@ -264,8 +250,117 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "python_colon": PStyle(color="vpink"),
         "python_variable": PStyle(color="white"),
         "python_fstring_variable": PStyle(color="orange"),
+
+
+        "bg_color_green": PStyle(color="white", bg_color='green'),
+        "black"        : PStyle(color="black"),
+        "blue"         : PStyle(color="blue"),
+        "dblue"        : PStyle(color="dblue"),
+        "lblue"          : PStyle(color="lblue"),
+        "vblue"         : PStyle(color="vblue"),
+        "brass"        : PStyle(color="brass"),
+        "bronze"       : PStyle(color="bronze"),
+        "lbrown"       : PStyle(color="lbrown"),
+        "brown"        : PStyle(color="brown"),
+
+        "copper"       : PStyle(color="copper"),
+        "cyan"         : PStyle(color="cyan"),
+        "vcyan"        : PStyle(color="vcyan"),
+
+        "dfff"        : PStyle(color="dfff", bg_color="purple", reverse=True),
+
+        "gold"         : PStyle(color="gold"),
+        "dgray"        : PStyle(color="dgray"),
+        "gray"         : PStyle(color="gray"),
+        "green"        : PStyle(color="green", bold=True),
+        "vgreen"       : PStyle(color="vgreen", bold=True),
+
+        "lav"          : PStyle(color="lav"),
+
+        "lmagenta"     : PStyle(color="lmagenta"),
+        "magenta"      : PStyle(color="magenta", bold=True),
+        "vmagenta"     : PStyle(color="vmagenta"),
+
+        "vorange"      : PStyle(color="vorange"),
+        "orange"       : PStyle(color="orange"),
+        "orangewhite"  : PStyle(color="green", bg_color='dgray', underline=True),
+
+        "lpink"        : PStyle(color="lpink"),
+        "pink"         : PStyle(color="pink",),
+        "vpink"        : PStyle(color="vpink"),
+        "plat"         : PStyle(color="plat"),
+        "lplum"        : PStyle(color="lplum"),
+        "plum"         : PStyle(color="plum"),
+        "vplum"        : PStyle(color="vplum"),
+        "lpurple"      : PStyle(color="lpurple"),
+        "purple"       : PStyle(color="purple"),
+        "dpurple"      : PStyle(color="dpurple"),
+
+        "red"          : PStyle(color="red"),
+        "vred"         : PStyle(color="vred", bold=True),
+
+        "sand"         : PStyle(color="sand"),
+        "silver"       : PStyle(color="dfff", bg_color="dsilver"),
+
+        "white"        : PStyle(color="white"),
+        "vwhite"       : PStyle(color="vwhite"),
+
+        "yellow"       : PStyle(color="yellow"),
+        "vyellow"      : PStyle(color="vyellow"),
+
         "conceal": PStyle(conceal=True)
 }
+
+
+
+DEFAULT_ERROR_STYLES: Dict[str, PStyle] = {
+        "header"       : PStyle(color="vcyan"),
+        "path"         : PStyle(color="blue"),
+        "filename"     : PStyle(color="yellow"),
+        "line_info"    : PStyle(color="yellow", bold=True),
+        "line_number"  : PStyle(color="orange", bold=True),
+        "function_name": PStyle(color="yellow", italic=True),
+        "error_message": PStyle(color="vred", bold=True, dim=True),
+}
+
+
+DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
+        "default": PStyle(),
+        "timestamp": PStyle(color="vwhite"),
+        "filename": PStyle(color="cyan", bold=True),
+        'record_name': PStyle(color="orange"),
+        "hostname": PStyle(color="white"),
+        "class_name": PStyle(color="dfff"),
+        "method_name": PStyle(color="vwhite"),
+        "line_number": PStyle(color="vcyan"),
+        "highlight_arg": PStyle(color="vcyan"),
+        "args": PStyle(color="dfff", italic=True),
+        "debug": PStyle(color="blue"),
+        "info": PStyle(color="green"),
+        "warning": PStyle(color="yellow"),
+        "error": PStyle(color="red"),
+        "critical": PStyle(color="vred", bold=True, italic=True),
+        "dict_key": PStyle(color="lblue"),
+        "dict_value": PStyle(color="white"),
+        "true": PStyle(color="vgreen"),
+        "false": PStyle(color="vred"),
+        'none': PStyle(color="lpurple"),
+        "int": PStyle(color="cyan"),
+        "float": PStyle(color="vcyan"),
+        "other": PStyle(color="lav"),
+        "conceal": PStyle(conceal=True)
+}
+
+
+
+DEFAULT_LEVEL_STYLES = {
+    logging.DEBUG: 'debug',
+    logging.INFO: 'info',
+    logging.WARNING: 'warning',
+    logging.ERROR: 'error',
+    logging.CRITICAL: 'critical'
+}
+
 
 
 DEFAULT_CONTROL_MAP: Dict[str, str] = {
@@ -421,53 +516,7 @@ DEFAULT_CONTROL_MAP: Dict[str, str] = {
 
 
 
-DEFAULT_ERROR_STYLES: Dict[str, PStyle] = {
-        "header"       : PStyle(color="vcyan"),
-        "path"         : PStyle(color="blue"),
-        "filename"     : PStyle(color="yellow"),
-        "line_info"    : PStyle(color="yellow", bold=True),
-        "line_number"  : PStyle(color="orange", bold=True),
-        "function_name": PStyle(color="yellow", italic=True),
-        "error_message": PStyle(color="vred", bold=True, dim=True),
-}
 
-
-DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
-        "default": PStyle(),
-        "timestamp": PStyle(color="vwhite"),
-        "filename": PStyle(color="cyan", bold=True),
-        'record_name': PStyle(color="orange"),
-        "hostname": PStyle(color="white"),
-        "class_name": PStyle(color="dfff"),
-        "method_name": PStyle(color="vwhite"),
-        "line_number": PStyle(color="vcyan"),
-        "highlight_arg": PStyle(color="vcyan"),
-        "args": PStyle(color="dfff", italic=True),
-        "debug": PStyle(color="blue"),
-        "info": PStyle(color="green"),
-        "warning": PStyle(color="yellow"),
-        "error": PStyle(color="red"),
-        "critical": PStyle(color="vred", bold=True, italic=True),
-        "dict_key": PStyle(color="lblue"),
-        "dict_value": PStyle(color="white"),
-        "true": PStyle(color="vgreen"),
-        "false": PStyle(color="vred"),
-        'none': PStyle(color="lpurple"),
-        "int": PStyle(color="cyan"),
-        "float": PStyle(color="vcyan"),
-        "other": PStyle(color="lav"),
-        "conceal": PStyle(conceal=True)
-}
-
-
-
-DEFAULT_LEVEL_STYLES = {
-    logging.DEBUG: 'debug',
-    logging.INFO: 'info',
-    logging.WARNING: 'warning',
-    logging.ERROR: 'error',
-    logging.CRITICAL: 'critical'
-}
 
 
 

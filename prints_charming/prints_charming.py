@@ -65,7 +65,7 @@ class PrintsCharming:
     shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
 
     # This style map is shared across all instances for package wide internal logging purposes.
-    _shared_internal_logging_styles: Optional[Dict[str, PStyle]] = DEFAULT_LOGGING_STYLES.copy()
+    _shared_internal_logging_styles: Optional[Dict[str, PStyle]] = copy.deepcopy(DEFAULT_LOGGING_STYLES)
 
     # This method is entirely optional and not required for the usage of the PrintsCharming class.
     @classmethod
@@ -279,11 +279,6 @@ class PrintsCharming:
             return result
 
         return "{\n" + pprint_dict(d) + "}"
-
-
-
-
-
 
 
 

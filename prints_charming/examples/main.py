@@ -11,6 +11,7 @@ from prints_charming import (
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
     TableManager,
+    ToggleManager,
     FrameBuilder,
     InteractiveMenu,
     PrintsCharmingError,
@@ -25,6 +26,7 @@ import os
 import sys
 import logging
 import inspect
+import copy
 
 
 
@@ -46,75 +48,6 @@ styled_strings = {
 }
 
 
-def triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, right=False, reversed=False, flipped_mirrored=False, mirrored=False, style=None):
-    prog_direction = 'forward'
-    start_spaces = ''
-
-    if right:
-        # Create the triangle where the pointed end is on the right
-        #args = [(prog_sep * (height - i - 1)) + (start_char * (i + 1)) for i in range(height)]
-        # Create the triangle without leading spaces for right alignment
-        args = [(start_char * (i + 1)).rjust(height) for i in range(height)]
-        #prog_sep = ''
-    else:
-        args = [start_char * (i + 1) for i in range(height)]
-
-    if reversed:
-        args = args[::-1]
-
-    if flipped_mirrored:
-        # Create the mirrored triangle with progressively fewer spaces and more asterisks
-        args = [(prog_sep * i) + (start_char * (height - i)) for i in range(height)]
-
-    if mirrored:
-        # Create the mirrored triangle with progressively more leading spaces and fewer asterisks
-        args = [(prog_sep * (height - i - 1)) + (start_char * (i + 1)) for i in range(height)]
-        start_spaces = ' ' * (len(args) - step)
-        prog_direction = "reverse"
-
-
-    format_with_sep = pc_instance.format_with_sep(*args, sep=sep, prog_sep=prog_sep, prog_step=step, prog_direction=prog_direction, start=start_spaces)
-
-    if style:
-        format_with_sep = pc_instance.apply_style(style, format_with_sep)
-
-    return format_with_sep
-
-
-def equilateral_triangle(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, mirrored=False, reversed=False, flipped=False):
-    args = [prog_sep * (height - i - 1) + start_char * (2 * i + 1) for i in range(height)]
-
-    if reversed:
-        args = args[::-1]
-
-    if mirrored:
-        max_width = len(args[-1])
-        args = [(prog_sep * (max_width - len(line))) + line for line in args]
-
-    # Flip each line vertically
-    if flipped:
-        args = [line[::-1] for line in args]
-
-    return pc_instance.format_with_sep(*args, sep=sep, prog_sep='', prog_step=step)
-
-
-def diamond_shape(pc_instance, height, start_char='*', sep='\n', prog_sep=' ', step=1, flipped=False):
-    top = [prog_sep * (height - i - 1) + start_char * (2 * i + 1) for i in range(height)]
-    bottom = [prog_sep * (i + 1) + start_char * (2 * (height - i - 1) - 1) for i in range(height - 1)]
-    args = top + bottom
-
-    if flipped:
-        args = [line[::-1] for line in args]
-
-    return pc_instance.format_with_sep(*args, sep=sep, prog_sep='', prog_step=step)
-
-
-def make_box():
-    pass
-
-
-def get_current_function_name():
-    return inspect.currentframe().f_back.f_code.co_name
 
 
 class BorderBoxStyles:
@@ -269,8 +202,7 @@ def custom_style_function(text: str, label_style: str, label_delimiter: str, pc)
 def my_custom_error(pc):
     print(styled_mini_border)
     print(f'function: my_custom_erro:')
-    print(styled_mini_border)
-    print()
+    print(f'{styled_mini_border}\n')
     try:
         message = f'A custom error occurred'
         styled_message = pc.apply_style('purple', message)
@@ -307,8 +239,7 @@ def formatted_text_box_stuff():
     print(purple_horiz_border)
     print(f'{orange_vert_border}{title_center_aligned}{purple_vert_border}')
     print(f'{orange_vert_border}{subtitle_center_aligned}{purple_vert_border}')
-    print(orange_horiz_border)
-    print()
+    print(f'{orange_horiz_border}\n')
 
     title_left_aligned = pc.apply_style('vgreen', builder.align_text(title, available_width, 'left'))
     subtitle_left_aligned = pc.apply_style('white', builder.align_text(subtitle, available_width, 'left'))
@@ -316,8 +247,7 @@ def formatted_text_box_stuff():
     print(purple_horiz_border)
     print(f'{orange_vert_border}{title_left_aligned}{purple_vert_border}')
     print(f'{orange_vert_border}{subtitle_left_aligned}{purple_vert_border}')
-    print(orange_horiz_border)
-    print()
+    print(f'{orange_horiz_border}\n')
 
     title_right_aligned = pc.apply_style('vgreen', builder.align_text(title, available_width, 'right'))
     subtitle_right_aligned = pc.apply_style('white', builder.align_text(subtitle, available_width, 'right'))
@@ -325,10 +255,8 @@ def formatted_text_box_stuff():
     print(purple_horiz_border)
     print(f'{orange_vert_border}{title_right_aligned}{purple_vert_border}')
     print(f'{orange_vert_border}{subtitle_right_aligned}{purple_vert_border}')
-    print(orange_horiz_border)
-    print()
+    print(f'{orange_horiz_border}\n\n')
 
-    print()
     print(horiz_border_top)
 
     center_padding = " ".center(available_width)
@@ -362,9 +290,7 @@ def formatted_text_box_stuff():
     print(f'{vert_border_left}{left_subtext}{vert_border_right}')
     print(f'{vert_border_left}{right_text}{vert_border_right}')
     print(f'{vert_border_left}{right_subtext}{vert_border_right}')
-    print(horiz_border_bottom)
-    print()
-    print()
+    print(f'{horiz_border_bottom}\n')
 
     one_col_text = 'center aligned single col'
     two_col_aligned_text_tuple = ('left aligned double col', 'right aligned double col')
@@ -390,25 +316,16 @@ def formatted_text_box_stuff():
     print(f'{orange_vert_border}{two_col_strings_hug_right}{purple_vert_border}')
     print(f'{orange_vert_border}{three_col_strings_centered}{purple_vert_border}')
     print(f'{orange_vert_border}{three_col_strings_mixed}{purple_vert_border}')
-    print(orange_horiz_border)
-    print()
+    print(f'{orange_horiz_border}\n\n\n\n')
 
-    print()
-    print()
-    print()
-
-    pc.print('These will purposely cause an error that is styled', color='vgreen')
-    print()
-    print()
+    pc.print(f'These will purposely cause an error that is styled\n\n', color='vgreen')
     print_horizontal_bg_strip(pc)
 
     my_custom_error(pc)
-    print()
-    print()
+    print('\n\n')
 
     # Print a simple border boxed text for the welcome message in the welcome function
     builder.print_simple_border_boxed_text("Prints Charming", subtitle="Hope you find the user guide helpful!", align='center')
-
     print()
 
 
@@ -447,7 +364,6 @@ def kwargs_replace_and_style_placeholders_examples():
     }
 
     my_text = "Hello, {name}. You are {age} years old, your occupation is {occupation}, and you have {balance} USD in your account."
-
     pc.print(my_text, **my_kwargs)  # print my_text directly thru the PrintCharming print method
 
     colored_text = pc.replace_and_style_placeholders(text=my_text, kwargs=my_kwargs)  # return the styled text from the method
@@ -490,9 +406,7 @@ def kwargs_replace_and_style_placeholders_examples():
     pc.print(structured_text,
              color='silver')  # print with the PrintsCharming print method. This will not be directed to the replace_and_style_placeholders method because no kwargs
 
-    print()
-    print()
-    print()
+    print('\n\n\n')
 
     # Create a partial function with specific parameters
     custom_style_with_params = partial(custom_style_function, label_style='main_bullets', label_delimiter=':', pc=pc)
@@ -526,59 +440,27 @@ def random_examples():
 
     add_styled_substrings_to_instance(pc)
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=5)
+    pc.print(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
 
-    print('\n\n')
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=1)
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
 
-    print('\n\n')
+    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=3)
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=2)
+    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=5)
 
-    print('\n\n')
+    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=1)
 
-    pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.", subword_style_option=3)
+    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
 
-    print('\n\n')
+    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
 
-    pc.print(
-        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', subword_style_option=5)
-
-    print('\n\n')
-
-    pc.print(
-        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', subword_style_option=1)
-
-    print('\n\n')
-
-    pc.print(
-        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', subword_style_option=2)
-
-    print('\n\n')
-
-    pc.print(
-        f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!',
-        color='purple', subword_style_option=2)
-
-    print('\n\n')
-
-    pc.print(
-        f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n',
-        color='purple', phrase_norm=True, subword_style_option=2)
+    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', phrase_norm=True, subword_style_option=2)
 
 
 
-
-    term_width = os.get_terminal_size().columns
-
-    pc.print(' ' * term_width, style="purple", overline=True, underline=True)
-    print()
-
-    pc.print(f' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True)
+    pc.print(' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True, end='\n\n')
 
     # Basic printing with ColorPrinter using default style and color
     pc.print("Hello, world!")
@@ -633,14 +515,13 @@ def random_examples():
 
     # Print using a predefined style 'task' with color changed to green and underline
     pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
-    pc.print("This is a task.", style="task", color="green", underline=True)
+    pc.print("This is a task.\n\n", style="task", color="green", underline=True)
 
 
 def print_horizontal_bg_strip(pc):
     print(styled_mini_border)
     print(f'function: print_horizontal_bg_strip:')
-    print(styled_mini_border)
-    print()
+    print(f'{styled_mini_border}\n')
     try:
         pc.print_bg('green', 50)
         pc.print_bg('vyellow')
@@ -652,8 +533,7 @@ def print_horizontal_bg_strip(pc):
 def print_variable_examples(pc):
     print(styled_mini_border)
     print(f'function: print_variable_examples:')
-    print(styled_mini_border)
-    print()
+    print(f'{styled_mini_border}\n')
 
     pc.print_variables("Hello {username}, your balance is {balance} USD.", text_style="yellow",
                        username=("Prince", "blue"), balance=(1000, "green"))
@@ -665,10 +545,10 @@ def print_variable_examples(pc):
 
 
 def auto_styling_examples(pc, text):
-    print(styled_mini_border)
+    print(f'\n\n{styled_mini_border}')
     print(f'function: auto_styling_examples:')
-    print(styled_mini_border)
-    print()
+    print(f'{styled_mini_border}\n')
+
     pc.add_strings_from_dict(styled_strings)
     pc.print("Let's first print, Hello, world! styled as described above.")
     pc.print("Let's first print, Hello, world! styled as described above and right here.", style="yellow")
@@ -683,15 +563,14 @@ def auto_styling_examples(pc, text):
              style='magenta')
     pc.print("Hello", "how are you?", sep="---", color='green')
     pc.print("This string is not connected to another", color='blue')
-    pc.print("This string is connected to another", "string", color='vyellow')
-    print()
+    pc.print("This string is connected to another", "string\n", color='vyellow')
 
 
 def index_styling_examples(pc):
     print(styled_mini_border)
     print(f'function: index_styling_examples:')
-    print(styled_mini_border)
-    print()
+    print(f'{styled_mini_border}\n')
+
     indexed_style = {
         1: "vgreen",
         (2, 4): "blue",
@@ -703,22 +582,17 @@ def index_styling_examples(pc):
     print()
 
     index_styled_text = pc.style_words_by_index("These, words are going to be styled by their indexes.", indexed_style)
-    print(index_styled_text)
-    print()
-    print()
-    print()
+    print(f'{index_styled_text}\n\n\n')
 
     text = f'This is a sentence where the way we determine 1 how and 2 where the text gets styled depends on: where the word: that is the dictionary key falls within this text.'
 
     splits = dict(green='sentence', red='2', orange='gets', blue='word:', yellow='')
     styled_sentence = pc.segment_and_style(text, splits)
-    print(styled_sentence)
-
-    print()
+    print(f'{styled_sentence}\n')
 
     splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
     styled_sentence2 = pc.segment_and_style2(text, splits2)
-    print(styled_sentence2)
+    print(f'{styled_sentence2}\n\n')
 
     splitter_text = f' | This is a sentence | where the way we determine 1 how and 2 | where the text gets | styled depends on: where the word: | that is the dictionary key falls within this text. |'
 
@@ -736,8 +610,8 @@ def index_styling_examples(pc):
 def variable_examples(pc):
     print(styled_mini_border)
     print(f'function: variable_examples:')
-    print(styled_mini_border)
-    print()
+    print(f'{styled_mini_border}\n')
+
     pc.print("# Use the add_string method to add 'Hello, world!' to the phrases dictionary with 'vgreen' style.")
     pc.add_string("Hello, world!", style_name="vgreen")
     pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
@@ -761,8 +635,7 @@ def variable_examples(pc):
     pc.print("# Use the remove_string method to remove 'Hello, world!' from the styled phrases dictionary.")
     pc.remove_string("Hello, world!")
     pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
-    pc.print("Hello, world!")
-    print()
+    pc.print("Hello, world!\n")
 
     return text
 
@@ -900,8 +773,7 @@ def print_foreground_colors(pc, builder):
         fg_text = f"This is one of the prints_charming foreground colors in the color map # Name: {color}"
         fg_text2 = f"{color} foreground color in prints_charming ColorPrinter color map"
         fg_text_center_aligned = builder.pc.apply_color(color, builder.align_text(fg_text2, fg_available_width, 'center'))
-        pc.print()
-        pc.print(f'{fg_vert_border_left}{fg_text_center_aligned}{fg_vert_border_right}')
+        pc.print(f'\n{fg_vert_border_left}{fg_text_center_aligned}{fg_vert_border_right}')
 
         # pc.print(f"This is one of the prints_charming foreground colors in the color map. ### Name: {color_name}", color=color_name)
     pc.print()
@@ -1376,62 +1248,7 @@ def print_markdown(pc):
     print()
 
 
-def print_shapes():
-    print('\n\n')
 
-    # Running test cases for the shapes
-    left_triangle = triangle(quick_pc, 5, style='vgreen')
-    left_mirrored = triangle(quick_pc, 5, mirrored=True, style='vgreen')
-    right_triangle = triangle(quick_pc, 5, right=True, style='purple')
-    right_mirrored = triangle(quick_pc, 5, right=True, mirrored=True, style='purple')
-
-    equilateral = equilateral_triangle(quick_pc, 5)
-    diamond = diamond_shape(quick_pc, 5)
-
-    reversed_triangle = triangle(quick_pc, 5, reversed=True, style='purple')
-
-    mirrored_equilateral = equilateral_triangle(quick_pc, 5, mirrored=True)
-    reversed_equilateral = equilateral_triangle(quick_pc, 5, reversed=True)
-    flipped_equilateral = equilateral_triangle(quick_pc, 5, flipped=True)
-
-    flipped_diamond = diamond_shape(quick_pc, 5, flipped=True)
-
-    print(f'left_triangle:\n{left_triangle}\n\n')
-    print(f'left_mirrored:\n{left_mirrored}\n\n')
-    print(f'right_triangle:\n{right_triangle}\n\n')
-    print(f'right_mirrored:\n{right_mirrored}\n\n')
-    print(f'Reversed Triangle:\n{reversed_triangle}\n\n')
-
-    #print(f'equilateral:\n{equilateral}\n\n')
-    #print(f'Mirrored Equilateral:\n{mirrored_equilateral}\n\n')
-    #print(f'Reversed Equilateral:\n{reversed_equilateral}\n\n')
-    #print(f'Flipped Equilateral:\n{flipped_equilateral}\n\n')
-
-    #print(f'diamond:\n{diamond}\n\n')
-    #print(f'Flipped Diamond:\n{flipped_diamond}\n\n')
-
-
-
-def setup_logger2(pc, name=None):
-    logger = logging.getLogger(__name__) if not name else logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-
-    formatter = PrintsCharmingFormatter(
-        pc=pc,
-        datefmt='%Y-%m-%d %H:%M:%S.',
-        level_styles={
-            logging.DEBUG: 'debug',
-            logging.INFO: 'info',
-            logging.WARNING: 'warning',
-            logging.ERROR: 'error',
-            logging.CRITICAL: 'critical'
-        }
-    )
-
-    handler = PrintsCharmingLogHandler(pc, formatter=formatter)
-    logger.addHandler(handler)
-
-    return logger
 
 
 class NewClass():
@@ -1453,55 +1270,59 @@ class NewClass():
 
 
 def play_around_with_logging():
-    pc = PrintsCharming(styles=DEFAULT_LOGGING_STYLES.copy())
+    logger = setup_logger()
+    pc = logger.pc
 
-    my_logger = setup_logger(pc, name='scratch')
+    print()
 
-    init_message = f"my_logger initialized with pc configuration:\n{pc.print_dict(pc.config)}"
-    my_logger.debug(init_message)
+    init_message = f"logger initialized with pc configuration:\n{pc.print_dict(pc.config)}"
+    logger.debug(init_message)
 
-    my_logger.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
+    logger.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
 
-    my_logger.debug("Debugging information.")
-    my_logger.info("General info.")
-    my_logger.warning("Warning message.")
-    my_logger.error("Error encountered.")
-    my_logger.critical("Critical issue.")
+    logger.debug("Debugging information.")
+    logger.info("General info.")
+    logger.warning("Warning message.")
+    logger.error("Error encountered.")
+    logger.critical("Critical issue.")
 
     new_class = NewClass(pc, 'new_instance', 'my_arg')
     class_name, instance_name, arg1 = new_class.get_names()
-    my_logger.debug(f"Successfully retrieved class_name: {class_name}, instance_name: {instance_name}, and instance arg1: {arg1}.")
+    logger.debug(f"Retrieved class_name: {class_name}, instance_name: {instance_name}, and instance arg1: {arg1}.\n")
+
+    pc.print(' ' * term_width + '\n', style="vmagenta", overline=True, underline=True)
 
     ###########################################################################################################
 
-    my_logger2 = setup_logger()
+    # default_bg_color set to match jupyter notebook background in pycharm
+    logger2 = setup_logger(name='scratch', styles=copy.deepcopy(DEFAULT_STYLES), default_bg_color='jupyter')
 
-    my_logger2.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
+    init_message = f"\n\nlogger2 initialized with pc configuration:\n\n{logger2.pc.print_dict(logger2.pc.config)}\n"
+    logger2.debug(init_message)
 
-    my_logger2.debug("Debugging information.")
-    my_logger2.info("General info.")
-    my_logger2.warning("Warning message.")
-    my_logger2.error("Error encountered.")
-    my_logger2.critical("Critical issue.")
+    logger2.info(f"default_bg_color is set to 'jupyter' for this instance of PrintsCharming.")
+    logger2.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
 
+    logger2.debug("Debugging information.")
+    logger2.info("General info.")
+    logger2.warning("Warning message.")
+    logger2.error("Error encountered.")
+    logger2.critical("Critical issue.")
+    print('\n')
 
-def default_bg_check():
-    test_instance = PrintsCharming(default_bg_color='jupyter')
-    test_instance.print(f'This is some text that should have jupyter bg_color even though no bg is specified in the style!', style='vmagenta')
+    pc.print(' ' * term_width + '\n', style="vmagenta", overline=True, underline=True)
+
+    return logger, logger2
+
 
 
 
 def main():
-    default_bg_check()
-
-    set_custom_excepthook()
 
     # uncomment to play around with logging
-    #play_around_with_logging()
+    logger, logger2 = play_around_with_logging()
 
     random_examples()
-
-
 
     welcome()
 
@@ -1523,18 +1344,28 @@ def main():
     kwargs_replace_and_style_placeholders_examples()
     formatted_text_box_stuff()
     my_custom_error(pc)
-    progress_bar(pc)
+    #progress_bar(pc)
     print_markdown(pc)
-    print_shapes()
+
+    try:
+        # Raise a CustomError
+        raise CustomError("Custom error occurred!", pc, "Additional context-specific information")
+    except CustomError as e:
+        logger.error(f"Error caught: {e}")
 
 
-
+    try:
+        # Raise a CustomError
+        raise CustomError("Custom error2 occurred!", pc, "Additional context-specific information2")
+    except CustomError as e:
+        logger2.error(f"Error caught: {e}")
 
 
 
 
 if __name__ == "__main__":
     PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP.copy())
+    term_width = os.get_terminal_size().columns
     quick_pc = PrintsCharming()
     mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     styled_mini_border = quick_pc.apply_color('orange', mini_border)

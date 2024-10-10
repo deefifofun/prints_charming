@@ -1,4 +1,5 @@
 import logging
+import copy
 import time
 from socket import gethostname
 
@@ -19,7 +20,7 @@ class PrintsCharmingFormatter(logging.Formatter):
 
     def __init__(self, pc, datefmt=None, style='%', timestamp_style_name=None, level_styles=None, use_styles=True, internal_logging=False):
         super().__init__(datefmt=datefmt, style=style)
-        self.pc = pc or PrintsCharming(styles=DEFAULT_LOGGING_STYLES.copy())
+        self.pc = pc or PrintsCharming(styles=copy.deepcopy(DEFAULT_LOGGING_STYLES))
 
         if internal_logging:
             self.apply_style = self.pc._apply_style_internal

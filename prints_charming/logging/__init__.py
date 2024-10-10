@@ -1,15 +1,22 @@
 import logging.handlers
+import sys
 import inspect
+import copy
 from .formatter import PrintsCharmingFormatter
 from .log_handler import PrintsCharmingLogHandler
-from ..prints_charming_defaults import DEFAULT_COLOR_MAP, DEFAULT_LOGGING_STYLES
+from ..prints_charming_defaults import DEFAULT_COLOR_MAP, DEFAULT_STYLES, DEFAULT_LOGGING_STYLES
 from ..prints_charming import PrintsCharming
+from ..exceptions import set_custom_excepthook_with_logging
+
+
+
 
 
 
 def setup_logger(pc=None, name=None, level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S.',
                  handler_configs=None, color_map=None, styles=None, level_styles=None,
-                 internal_logging=False):
+                 default_bg_color=None, internal_logging=False, enable_exception_logging=True,
+                 unhandled_exception_debug=False, log_exc_info=False):
     """
     Setup and return a logger with customizable handlers and formatters, including user-supplied custom handlers.
     Use PrintsCharmingLogHandler by default for custom styling and formatting.
@@ -32,7 +39,8 @@ def setup_logger(pc=None, name=None, level=logging.DEBUG, datefmt='%Y-%m-%d %H:%
         logging.Logger: Configured logger instance with specified handlers.
     """
 
-    pc = pc or PrintsCharming(color_map=color_map or DEFAULT_COLOR_MAP.copy(), styles=styles or DEFAULT_LOGGING_STYLES.copy())
+    pc = pc or PrintsCharming(color_map=color_map or DEFAULT_COLOR_MAP.copy(), styles=copy.deepcopy(styles) or copy.deepcopy(DEFAULT_STYLES),
+                              default_bg_color=default_bg_color)
 
     if name is None:
         # Use inspect to get the module name of the caller
@@ -42,6 +50,12 @@ def setup_logger(pc=None, name=None, level=logging.DEBUG, datefmt='%Y-%m-%d %H:%
             name = caller_module.__name__
     logger = logging.getLogger(name)
     logger.setLevel(level)
+
+    # Attach the `pc` instance to the logger for future access
+    logger.pc = pc
+
+    if enable_exception_logging:
+        set_custom_excepthook_with_logging(logger, pc, unhandled_exception_debug, log_exc_info)
 
     # Helper function to create or use a supplied formatter
     def create_formatter(use_styles=None, custom_formatter=None):
