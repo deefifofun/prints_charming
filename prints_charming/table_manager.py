@@ -10,12 +10,12 @@ from .prints_charming_defaults import (
 
 from .prints_charming import PrintsCharming
 from .utils import get_terminal_width
-
+import copy
 
 
 class TableManager:
     def __init__(self, pc: PrintsCharming = None, style_themes: dict = None, conditional_styles: dict = None):
-        self.pc = pc or PrintsCharming(color_map=DEFAULT_COLOR_MAP.copy(), styles=DEFAULT_STYLES.copy())
+        self.pc = pc or PrintsCharming(color_map=DEFAULT_COLOR_MAP.copy(), styles=copy.deepcopy(DEFAULT_STYLES))
         self.style_themes = style_themes
         self.conditional_styles = conditional_styles
         self.tables = {}
@@ -23,6 +23,17 @@ class TableManager:
         self.border_char = "-"
         self.col_sep = " | "
         self.title_style = "header_text"
+
+        self.header_styles = {
+            'Color Name': self.col_sep,
+            'Foreground Text': self.col_sep,
+            'Background Block': self.col_sep,
+            'Style Name': self.col_sep,
+            'Styled Text': self.col_sep,
+            'Style Definition': self.col_sep,
+        }
+
+        self.debug = self.pc.debug
 
 
     def generate_table(self,
@@ -59,27 +70,43 @@ class TableManager:
         :return: A string representing the formatted table.
         """
 
+        self.debug(f"Generating table with name: {table_name}")
+        self.debug(f"Table Data: \n{table_data}")
+
         if use_styles:
             styled_col_sep = self.pc.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
         else:
             styled_col_sep = self.pc.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
 
+        self.debug(f"Column Separator: {styled_col_sep}\n")
+
         # 1. Automatic Column Sizing
+        self.debug(f"Step 1: Automatic Column Sizing")
         max_col_lengths = [0] * len(table_data[0])
+        self.debug(f"Max col lengths: {max_col_lengths}")
         for row in table_data:
+            self.debug(f"Column Length: {len(row)}")
+            self.debug(f"row: {row}")
             for i, cell in enumerate(row):
+                self.debug(f"index: {i}\tcell: {cell}")
                 cell_length = len(str(cell))
+                self.debug(f"cell length: {cell_length}")
                 max_col_lengths[i] = max(max_col_lengths[i], cell_length)
+                self.debug(f"max_col_length: {max_col_lengths[i]}")
 
         # 2. Column Alignment
+        self.debug(f"Step 2: Column Alignment")
         table_output = []
         header = table_data[0]
+        self.debug(f"header: {header}")
 
         for row_idx, row in enumerate(table_data):
+            self.debug(f"row_idx: {row_idx}\trow: {row}")
             aligned_row = []
             for i, cell in enumerate(row):
                 cell_str = str(cell)
                 max_length = max_col_lengths[i]
+                self.debug(f"i: {i}\tcell_str: {cell_str}\tmax_length: {max_length}")
 
                 # Determine the alignment for this cell
                 alignment = 'left'  # Default
@@ -87,6 +114,8 @@ class TableManager:
                     alignment = col_alignments[i]
                 elif isinstance(cell, (int, float)):
                     alignment = 'right'
+
+                self.debug(f'alignment: {alignment}')
 
                 # Apply the alignment
                 if alignment == 'left':
@@ -98,13 +127,19 @@ class TableManager:
                 else:
                     aligned_cell = cell_str.ljust(max_length)  # Fallback
 
+                self.debug(f'aligned_cell: {aligned_cell}')
+
                 # Apply the style
                 if row_idx == 0:
+                    self.debug(f"row_idx == 0")
                     # Apply header styles
                     if header_column_styles and i in header_column_styles:
                         aligned_cell = self.pc.apply_style(header_column_styles[i], aligned_cell)
                     elif header_style:
                         aligned_cell = self.pc.apply_style(header_style, aligned_cell)
+
+                    self.debug(f'aligned_cell: {aligned_cell}')
+
                 else:
                     if header[i] == 'Color Name':
                         aligned_cell = self.pc.apply_color(cell_str, aligned_cell)

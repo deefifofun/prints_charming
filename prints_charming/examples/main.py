@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 
 from functools import partial
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
 
 from prints_charming import (
-    get_terminal_width,
-    PStyle,
-    PrintsCharming,
     DEFAULT_COLOR_MAP,
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
+    DynamicFormatter,
+    get_terminal_width,
+    PStyle,
+    PrintsCharming,
     TableManager,
     ToggleManager,
     FrameBuilder,
@@ -17,7 +20,8 @@ from prints_charming import (
     PrintsCharmingError,
     ColorNotFoundError,
     set_custom_excepthook,
-    colors_map_one
+    colors_map_one,
+    get_key,
 )
 
 from prints_charming.logging import PrintsCharmingFormatter, PrintsCharmingLogHandler, setup_logger
@@ -27,6 +31,7 @@ import sys
 import logging
 import inspect
 import copy
+import textwrap
 
 
 
@@ -46,6 +51,7 @@ styled_strings = {
     # Uncomment the next line to hide API keys or sensitive information
     # "conceal": [os.environ[key] for key in os.environ if "API" in key],
 }
+
 
 
 
@@ -442,31 +448,51 @@ def random_examples():
 
     pc.print(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
 
+    pc.print2(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
+
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
+
+    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
 
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
 
+    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
+
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=3)
+
+    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=3)
 
     pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=5)
 
+    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=5)
+
     pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=1)
+
+    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=1)
 
     pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
 
+    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
+
     pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
+
+    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
 
     pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', phrase_norm=True, subword_style_option=2)
 
-
+    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', phrase_norm=True, subword_style_option=2)
 
     pc.print(' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True, end='\n\n')
 
+    pc.print2(' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True, end='\n\n')
+
     # Basic printing with ColorPrinter using default style and color
     pc.print("Hello, world!")
+    pc.print2("Hello, world!")
 
     # Print with default style reversed foreground and background colors
     pc.print("Hello, world!", reverse=True)
+    pc.print2("Hello, world!", reverse=True)
 
     my_style_code = pc.create_style_code(PStyle(color='green', bg_color='white', underline=True))
 
@@ -493,29 +519,43 @@ def random_examples():
     pc.print(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
              '   orange phrase          white bg', color='green', bg_color='white', underline=True, overline=True, skip_ansi_check=True)
 
+    pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
+             '   orange phrase          white bg', color='green', bg_color='white', underline=True, overline=True, skip_ansi_check=True)
+
     pc.print(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
              '   orange phrase          white bg', color='green', underline=True, overline=True, skip_ansi_check=True)
 
+    pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
+             '   orange phrase          white bg', color='green', underline=True, overline=True, skip_ansi_check=True)
+
     pc.print(mytext3_styled, skip_ansi_check=True)
+
+    pc.print2(mytext3_styled, skip_ansi_check=True)
 
     some_var = 21
 
     # Print specifying only the color of the text
     pc.print("Hello, world!", color="red" if some_var < 21 else "green")
+    pc.print2("Hello, world!", color="red" if some_var < 21 else "green")
+
 
     # Print specifying italic and underline styles with default color
     pc.print("Hello, world!", italic=True, underline=True)
+    pc.print2("Hello, world!", italic=True, underline=True)
 
     # Print using a predefined style 'magenta' defined above
     pc.print("Hello, world!", style="magenta")
+    pc.print2("Hello, world!", style="magenta")
 
     # Print using a predefined style 'task' defined above
     pc.print("# Specify predefined style 'task' for printing. The 'task' style is defined above.")
     pc.print("This is a task.", style="task")
+    pc.print2("This is a task.", style="task")
 
     # Print using a predefined style 'task' with color changed to green and underline
     pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
     pc.print("This is a task.\n\n", style="task", color="green", underline=True)
+    pc.print2("This is a task.\n\n", style="task", color="green", underline=True)
 
 
 def print_horizontal_bg_strip(pc):
@@ -554,16 +594,27 @@ def auto_styling_examples(pc, text):
     pc.print("Let's first print, Hello, world! styled as described above and right here.", style="yellow")
     pc.print(f"{text} Remember we assigned, 'Hello, world!' to the 'text' variable above. Let's pretend we are Connected to wss://advanced-trade-ws.coinbase.com", color="blue")
     pc.print("These words are going to be styled by their indexes, Hello, world!", style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 10): "purple", (11, 12): "pink"})
+    pc.print2("These words are going to be styled by their indexes, Hello, world!", style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 10): "purple", (11, 12): "pink"})
     pc.print("Hello, world! These words are going to be styled by their indexes, Hello, world!",
+             style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 11): "purple", (13, 14): "pink"}, color='red')
+    pc.print2("Hello, world! These words are going to be styled by their indexes, Hello, world!",
              style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 11): "purple", (13, 14): "pink"}, color='red')
     pc.print("Hello, world! Only these words are going to be styled by their indexes, Hello, world!",
              style={(3, 4): "orange", (5, 7): "blue", (8, 9): "yellow", (10, 13): "purple", (14, 15): "pink"})
+    pc.print2("Hello, world! Only these words are going to be styled by their indexes, Hello, world!",
+             style={(3, 4): "orange", (5, 7): "blue", (8, 9): "yellow", (10, 13): "purple", (14, 15): "pink"})
     pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple! these words are default. server")
+    pc.print2("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple! these words are default. server")
     pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple these words are magenta. server",
              style='magenta')
+    pc.print2("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple these words are magenta. server",
+             style='magenta')
     pc.print("Hello", "how are you?", sep="---", color='green')
+    pc.print2("Hello", "how are you?", sep="---", color='green')
     pc.print("This string is not connected to another", color='blue')
+    pc.print2("This string is not connected to another", color='blue')
     pc.print("This string is connected to another", "string\n", color='vyellow')
+    pc.print2("This string is connected to another", "string\n", color='vyellow')
 
 
 def index_styling_examples(pc):
@@ -579,6 +630,7 @@ def index_styling_examples(pc):
         (8, 10): "pink"
     }
     pc.print("These, words are going to be styled by their indexes.", style=indexed_style)
+    pc.print2("These, words are going to be styled by their indexes.", style=indexed_style)
     print()
 
     index_styled_text = pc.style_words_by_index("These, words are going to be styled by their indexes.", indexed_style)
@@ -664,6 +716,7 @@ def simple_use_case(pc):
     pc.print("This is a task.", style="task", color="green", underline=True, end=ds)
     pc.print("Show text with bg_color:")
     pc.print("This has a bg_color", style="bg_color_green", end=ds)
+    pc.print2("This has a bg_color", style="bg_color_green", end=ds)
     pc.print("# Show that 'Hello, world!' isn't color or style defined.")
     pc.print("Hello, world!", end=ts)
 
@@ -827,36 +880,7 @@ def print_colors_and_styles():
     print_styles(pc, builder)
 
 
-def log_level_style_function(log_level):
-    level_styles = {
-        "INFO": "blue",
-        "WARN": "yellow",
-        "ERROR": "red",
-        "DEBUG": "gray"
-    }
-    return level_styles.get(log_level, None)
 
-
-def source_style_function(source):
-    if "auth-service" in source:
-        return "cyan"  # Highlight authentication service logs
-    elif "payment-service" in source:
-        return "magenta"  # Highlight payment service logs
-    elif "inventory-service" in source:
-        return "green"  # Highlight inventory service logs
-    return None
-
-
-def message_style_function(message):
-    if "successful" in message.lower():
-        return "vgreen"  # Success messages in green
-    elif "failed" in message.lower():
-        return "vred"  # Failure messages in red
-    elif "error" in message.lower():
-        return "red"  # Error messages in red
-    elif "out_of_stock" in message.upper():
-        return "orange"  # Specific error codes in orange
-    return None
 
 
 def accuracy_style_function(accuracy):
@@ -1136,7 +1160,11 @@ def welcome():
 
     print(really_complex_table_str)
 
-    more_complex_table_data = [
+    ################################################################################################################################
+    # Logging Table
+    ################################################################################################################################
+
+    logs_table_data = [
         ["Timestamp", "Log Level", "Source", "Message"],
         ["2024-08-31 12:00:01", "INFO", "auth-service", "User login successful: user123"],
         ["2024-08-31 12:01:15", "WARN", "auth-service", "User login attempt failed: user456"],
@@ -1146,7 +1174,37 @@ def welcome():
         ["2024-08-31 12:05:55", "ERROR", "inventory-service", "Inventory level check failed: OUT_OF_STOCK"]
     ]
 
-    more_conditional_style_functions = {
+
+    def log_level_style_function(log_level):
+        level_styles = {
+            "INFO": "blue",
+            "WARN": "yellow",
+            "ERROR": "red",
+            "DEBUG": "gray"
+        }
+        return level_styles.get(log_level, None)
+
+    def source_style_function(source):
+        if "auth-service" in source:
+            return "cyan"  # Highlight authentication service logs
+        elif "payment-service" in source:
+            return "magenta"  # Highlight payment service logs
+        elif "inventory-service" in source:
+            return "green"  # Highlight inventory service logs
+        return None
+
+    def message_style_function(message):
+        if "successful" in message.lower():
+            return "vgreen"  # Success messages in green
+        elif "failed" in message.lower():
+            return "vred"  # Failure messages in red
+        elif "error" in message.lower():
+            return "red"  # Error messages in red
+        elif "out_of_stock" in message.upper():
+            return "orange"  # Specific error codes in orange
+        return None
+
+    logs_style_functions = {
         "Log Level": log_level_style_function,
         "Source": source_style_function,
         "Message": message_style_function
@@ -1157,10 +1215,11 @@ def welcome():
     }
 
     more_complex_table_str = table_manager.generate_table(
-        table_data=more_complex_table_data,
-        conditional_style_functions=more_conditional_style_functions,
-        header_style="header_main",
+        table_data=logs_table_data,
         header_column_styles=header_column_styles,
+        conditional_style_functions=logs_style_functions,
+        header_style="header_main",
+
         border_style="vgreen",
         col_sep_style="vgreen",
         show_table_name=True,
@@ -1298,7 +1357,7 @@ def play_around_with_logging():
     # default_bg_color set to match jupyter notebook background in pycharm
     logger2 = setup_logger(name='scratch', styles=copy.deepcopy(DEFAULT_STYLES), default_bg_color='jupyter')
 
-    init_message = f"\n\nlogger2 initialized with pc configuration:\n\n{logger2.pc.print_dict(logger2.pc.config)}\n"
+    init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.print_dict(logger2.pc.config)}"
     logger2.debug(init_message)
 
     logger2.info(f"default_bg_color is set to 'jupyter' for this instance of PrintsCharming.")
@@ -1318,7 +1377,7 @@ def play_around_with_logging():
 
 
 
-def main():
+def main(internal_logging=False):
 
     # uncomment to play around with logging
     logger, logger2 = play_around_with_logging()
@@ -1327,7 +1386,7 @@ def main():
 
     welcome()
 
-    pc = PrintsCharming()
+    pc = PrintsCharming(config={'internal_logging': True}) if internal_logging else PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
     pc.add_string('function', 'blue')
@@ -1362,6 +1421,12 @@ def main():
         logger2.error(f"Error caught: {e}")
 
 
+    # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
+    menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
+    menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
+    menu.run()
+
+
 
 
 if __name__ == "__main__":
@@ -1370,12 +1435,156 @@ if __name__ == "__main__":
     quick_pc = PrintsCharming()
     mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     styled_mini_border = quick_pc.apply_color('orange', mini_border)
+
+
+
+    # Example usage
+    formatter = DynamicFormatter()
+
+    formatter_style_names = {
+        'neg': 'vred',
+        'pos': 'vgreen',
+        'zero': 'blue',
+    }
+
+    formatter.styles = formatter_style_names
+
+    # Format multiple strings and write them to stdout
+    formatter.set_width(30)
+    string1 = formatter.format("First formatted string", tabs=1)
+    string2 = formatter.format("Second formatted string", tabs=2)
+    string3 = formatter.format("Third formatted string", tabs=2)
+
+    # Write all formatted strings at once (with newlines) to stdout
+    formatter.write(string1, end='\n')
+    formatter.write(string2, end='\n')
+    formatter.write(string3, end='\n\n')
+
+    # String formatting with newlines and tabs using sys.stdout.write
+    formatter.set_width(10)
+    string1 = formatter.format("Text with 2 tabs and newline", tabs=2, newlines=1)
+    formatter.write(string1, end='\n')
+
+    # Multi-line text with wrapping and indentation
+    text_block = "This text will wrap at a specified width and be indented with tabs."
+    formatter.set_width(15)
+    multiple_lines = formatter.format_multiline(text_block, width=15, tabs=1)
+    for line in multiple_lines:
+        sys.stdout.write(line)
+
+    print(f'\tAfter manual write multiple lines\n\n')
+
+    formatter.write(multiple_lines, start="Start:\n", end="\nEnd.\n\n\n", spacing=0)
+
+    # Conditional formatting for a negative number
+    neg_string = formatter.conditional_format(-42, quick_pc)
+    print(neg_string)
+
+    # Conditional formatting for a positive number
+    pos_string = formatter.conditional_format(42, quick_pc)
+    print(pos_string)
+
+    # Conditional formatting for zero
+    zero_string = formatter.conditional_format(0, quick_pc)
+    print(zero_string)
+
+    # Formatting datetime objects
+    formatter.set_datetime_format('%d-%b-%Y %H:%M:%S')
+    dt_now = formatter.format(datetime.now(), newlines=1)
+
+    formatter.write(dt_now)
+
+
+    # Set left and right padding characters, fill char, and format a string
+    formatter.set_pad_char_left('*')
+    formatter.set_pad_char_right('#')
+    formatter.set_fill_char('-')
+    formatter.set_width(20)
+    padded_string = formatter.format("Padded String", tabs=1)
+
+    # Write the formatted string with padding applied
+    formatter.write(padded_string, end='\nEnd.\n\n\n')
+
+    # Uniform single spacing after each item
+    formatter.write(["Line 1", "Line 2", "Line 3"], start="<<", end=">>", spacing=1)
+
+    # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
+    formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
+
+    # Example tokens to format: characters, words, or phrases
+    tokens = ["Hello", " ", "world", "!", "\nNext", " ", "line"]
+
+    # Format each token incrementally, storing results in buffer
+    formatter.format_token_by_token(tokens)
+
+    # Get the final formatted string
+    formatted_output = formatter.get_formatted_buffer()
+
+    # Output the final result
+    print(formatted_output)
+    print(f'\n\n\n')
+
+    styled_strings2 = {
+        "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "Starting", "True", "C++"],
+        "green": ["apple"],
+        "vred": ["Error", "Failed", "None", "Skipping.", "Canceling", "Canceled", "Hobbies", "Skills", "False"],
+        "blue": ["CoinbaseWebsocketClient", "server", "Python"],
+        "yellow": ["1", "returned", "Flask", "Some", ],
+        "vyellow": ["File modified:", "File modified AGAIN", "subscribed", "=", "JavaScript"],
+        "magenta": ["within 10 seconds.", "how", "React", "this is a test"],
+        "cyan": ["|", "#", "are", "your", "Project Management System"],
+        "orange": ["New Message,", "Prints", "Software Developer", "Prince Charming"],
+        "purple": ["My color is purple", "Reading"],
+        # Uncomment the next line to hide API keys or sensitive information
+        # "conceal": [os.environ[key] for key in os.environ if "API" in key],
+    }
+
+    pc2 = PrintsCharming(styled_strings=styled_strings2)
+
+    print_statements = [
+        f'This is some green text with other colors too like, New Message, Reading',
+        f'This is some red text with other colors too like, Hello, world!',
+        f'This is some yellow text with other colors too like your',
+        f'This is more yellow text with other colors too like My color is purple',
+        f'This is more red text with other colors too like, 1'
+    ]
+
+    pc2.print(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
+    print(f'\n\n\n')
+
+
+    pc2.print2(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
+    print(f'\n\n\n')
+
+
+    styles = ['green', 'red', 'yellow', 'yellow', 'red']
+    pc2.print2(*print_statements, start="\nStart:\n\t", end="\nEnd.\n", sep='\n\n\t\t', style=styles, style_args_as_one=False)
+
+    print_statements2 = [
+        f'\tThis is some green text with other colors too like, New Message, Reading\n\n',
+        f'\t\tThis is some red text with other colors too like, Hello, world!\n\n',
+        f'\t\tThis is some yellow text with other colors too like your\n\n',
+        f'\tThis is more yellow text with other colors too like My color is purple\n\n',
+        f'\t\tThis is more red text with other colors too like, 1'
+    ]
+
+    styles = ['green', 'red', 'yellow', 'yellow', 'red']
+    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', style=styles, style_args_as_one=False)
+
+    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', color=styles, style_args_as_one=False)
+
+    styled_args_list = pc2.print2(*print_statements2, start="", end="", sep='', style=styles, style_args_as_one=False, return_styled_args_list=True)
+
+    # Uniform single spacing after each item
+    formatter.write(styled_args_list, start="<<", end=">>", spacing=1)
+
+    # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
+    formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
+
+
     main()
 
-    # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
-    menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
-    menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
-    menu.run()
+
 
 
 

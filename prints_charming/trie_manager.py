@@ -73,19 +73,6 @@ class KeyTrie:
             return original_match, longest_match[1]  # Return original match with style info
 
 
-        """
-        node = self.root
-        longest_match = None
-        current_match = []
-        for char in text:
-            if char not in node.children:
-                break
-            node = node.children[char]
-            current_match.append(char)
-            if node.is_end:
-                longest_match = (''.join(current_match), node.style_info)
-        return longest_match
-        """
 
     def search_suffix(self, text):
         matches = []

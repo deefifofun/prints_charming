@@ -216,6 +216,8 @@ class PrintsCharming:
         self.enable_styled_subwords = False
         self.enable_styled_variable_map = False
 
+        self.sentence_ending_characters = ".,!?:;"
+
 
         if styled_strings:
             self.add_strings_from_dict(styled_strings)
@@ -827,6 +829,25 @@ class PrintsCharming:
 
         return " ".join(words)
 
+        words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
+
+        # Initialize list to hold the final styled words and spaces
+        styled_words_and_spaces = [None] * len(words_and_spaces)
+
+        # Initialize the lists to keep track of which indexes are used by what
+        indexes_used_by_phrases = set()  # should include all indexes
+        indexes_used_by_words = set()
+        indexes_used_by_default_styling = set()
+        indexes_used_by_spaces = set()
+        indexes_used_by_none_styling = set()
+
+        boundary_indices_dict = {}
+
+        # Define sentence-ending characters
+        sentence_ending_characters = ".,!?:;"
+
+
+
 
     def apply_custom_python_highlighting(self, code_block):
         reset_code = PrintsCharming.RESET
@@ -1071,7 +1092,7 @@ class PrintsCharming:
         self.debug(f"converted_args:\n{converted_args}")
 
         # Initialize text with the start parameter
-        text = start
+        text = ''
 
         # Handle separator logic
         if isinstance(sep, str):
@@ -1102,7 +1123,9 @@ class PrintsCharming:
         else:
             raise TypeError(f"sep must be either a string or a tuple, got {type(sep)}")
 
-        return text
+        final_text = start + text
+
+        return final_text
 
 
 
@@ -1124,6 +1147,7 @@ class PrintsCharming:
               sep: str = ' ',
               prog_sep: str = '',
               prog_step: int = 1,
+              prog_direction: str = 'forward',
               share_alike_sep_bg: bool = True,
               share_alike_sep_ul: bool = False,
               share_alike_sep_ol: bool = False,
@@ -1147,9 +1171,9 @@ class PrintsCharming:
         self.debug(f'converted_args:\n{converted_args}')
 
         if not prog_sep:
-            text = start + sep.join(converted_args)
+            text = sep.join(converted_args)
         else:
-            text = self.format_with_sep(converted_args=converted_args, sep=sep, prog_sep=prog_sep, prog_step=prog_step, start=start)
+            text = self.format_with_sep(converted_args=converted_args, sep=sep, prog_sep=prog_sep, prog_step=prog_step, prog_direction=prog_direction)
 
         self.debug(f"text defined:\n{text}")
 
@@ -1589,9 +1613,10 @@ class PrintsCharming:
         # Print or write to file
         if filename:
             with open(filename, 'a') as file:
-                file.write(styled_text + end)
+                file.write(start + styled_text + end)
         else:
-            print(styled_text, end=end)
+            sys.stdout.write(start + styled_text + end)
+            #print(start + styled_text, end=end)
 
 
 
@@ -1850,6 +1875,763 @@ class PrintsCharming:
 
     def critical(self, message: str, *args, **kwargs) -> None:
         self.log('CRITICAL', message, *args, **kwargs)
+
+
+
+
+    def handle_other_styled_text_and_spaces(self, words_and_spaces, styled_words_and_spaces, indexes_used_by_phrases, indexes_used_by_words, indexes_used_by_subwords, indexes_used_by_spaces, indexes_used_by_default_styling, style_instance, style_code, share_alike_sep_bg, share_alike_sep_ul, share_alike_sep_ol, share_alike_sep_st, share_alike_sep_bl, boundary_indices_dict):
+
+        for i, word_or_space in enumerate(words_and_spaces):
+            if i in indexes_used_by_phrases or i in indexes_used_by_words or i in indexes_used_by_subwords:
+                continue
+
+            if word_or_space.isspace():
+                indexes_used_by_spaces.add(i)
+                if i not in boundary_indices_dict:
+                    styled_word_or_space = f"{style_code}{word_or_space}{self.reset}"
+                else:
+
+                    style_instance_dict = asdict(style_instance)
+
+                    keys_to_compare = ['color', 'bg_color']
+                    if share_alike_sep_ul:
+                        keys_to_compare.append('underline')
+                    if share_alike_sep_ol:
+                        keys_to_compare.append('overline')
+                    if share_alike_sep_st:
+                        keys_to_compare.append('strikethru')
+                    if share_alike_sep_bl:
+                        keys_to_compare.append('blink')
+
+                    comparison_results = self.compare_dicts(boundary_indices_dict[i], style_instance_dict, keys_to_compare)
+
+                    space_style_codes = []
+                    if share_alike_sep_bg and comparison_results.get('bg_color'):
+                        space_style_codes.append(self.bg_color_map.get(style_instance_dict.get('bg_color')))
+
+                    if len(keys_to_compare) > 2:
+                        if comparison_results.get('color'):
+                            space_style_codes.append(self.color_map.get(style_instance_dict.get('color'), self.color_map.get(boundary_indices_dict[i].get('color', ''))))
+
+                            for key in keys_to_compare[2:]:
+                                if comparison_results.get(key):
+                                    space_style_codes.append(self.effect_map.get(key, ''))
+
+                    new_style_code = ''.join(space_style_codes)
+                    styled_word_or_space = f'{new_style_code}{word_or_space}{self.reset}'
+
+            else:
+                indexes_used_by_default_styling.add(i)
+                styled_word_or_space = f"{style_code}{word_or_space}{self.reset}"
+
+            # Update the styled_words_and_spaces list
+            styled_words_and_spaces[i] = styled_word_or_space
+
+        return styled_words_and_spaces, indexes_used_by_spaces, indexes_used_by_default_styling
+
+
+
+
+
+    def handle_words_and_subwords(self,
+                                  words_and_spaces,
+                                  styled_words_and_spaces,
+                                  indexes_used_by_phrases,
+                                  indexes_used_by_words,
+                                  indexes_used_by_subwords,
+                                  subword_search,
+                                  subword_style_option,
+                                  style_code,
+                                  boundary_indices_dict):
+
+        sentence_ending_characters = self.sentence_ending_characters
+
+        for i, word_or_space in enumerate(words_and_spaces):
+            if i in indexes_used_by_phrases:
+                continue
+
+            if not word_or_space.isspace():
+
+                word = word_or_space.strip()  # Strip whitespace around the word
+                self.debug(f'word[{i}]: {word}')
+
+                stripped_word = word.rstrip(sentence_ending_characters)
+                self.debug(f'stripped_word[{i}]: {stripped_word}')
+
+                trailing_chars = word[len(stripped_word):]  # Capture any trailing punctuation
+                self.debug(f'trailing_chars: {trailing_chars}')
+
+                # Check if the word is in the word trie
+                word_match = self.word_trie.search_longest_prefix(stripped_word)
+                self.debug(f'word_match: {word_match}')
+
+                if word_match:
+                    matched_word, word_details = word_match
+                    self.debug(f'word_match True:\nmatched_word: {matched_word}\nword_details: {word_details}')
+
+                    style_start = word_details.get('style_code', '')
+                    self.debug(f'style_start: {style_start}')
+
+                    # Apply the style to the word, accounting for trailing characters
+                    if trailing_chars:
+                        styled_word_or_space = f'{style_start}{word}{self.reset}'
+                    else:
+                        styled_word_or_space = word_details.get('styled', stripped_word)
+
+                    self.debug(f'styled_word_or_space: {styled_word_or_space}')
+
+                    # Store the styled word
+                    styled_words_and_spaces[i] = styled_word_or_space
+                    self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+                    # Update boundary information
+                    if i > 0 and (i - 1) not in boundary_indices_dict:
+                        boundary_indices_dict[i - 1] = word_details.get('attribs')
+
+                    if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                        boundary_indices_dict[i + 1] = word_details.get('attribs')
+
+                    # Mark the word as styled
+                    indexes_used_by_words.add(i)
+
+                else:
+
+                    if self.enable_styled_subwords:
+                        if subword_search:
+                            if isinstance(subword_style_option, int):
+                                if subword_style_option == 1:
+                                    # Use the specialized prefix search method
+                                    prefix_match = self.subword_trie.search_prefix(stripped_word)
+                                    if prefix_match:
+                                        matched_substring, substring_details = prefix_match
+                                        style_start = substring_details.get('style_code', '')
+                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                        styled_words_and_spaces[i] = styled_word_or_space
+
+                                        # Update boundary information
+                                        if i > 0 and i - 1 not in boundary_indices_dict:
+                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+
+                                        if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                        indexes_used_by_subwords.add(i)
+                                        continue
+
+                                elif subword_style_option == 2:
+
+                                    # Use the specialized suffix search method
+                                    suffix_match = self.subword_trie.search_suffix(stripped_word)
+                                    if suffix_match:
+                                        matched_substring, substring_details = suffix_match
+                                        style_start = substring_details.get('style_code', '')
+                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                        styled_words_and_spaces[i] = styled_word_or_space
+
+                                        # Update boundary information
+                                        if i > 0:
+                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                        if i + 1 < len(words_and_spaces):
+                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                        indexes_used_by_subwords.add(i)
+                                        continue
+
+
+                                elif subword_style_option in [3, 4]:
+                                    # Use the modified search_any_substring to get matches in trie insertion order
+                                    substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                    if substring_matches:
+                                        # The first match in the list will be the one added to the trie first
+                                        # The last match in the list will be the one added to the trie last
+                                        # Choose the match based on whether the option is 3 or 4
+                                        matched_substring, substring_details, _ = (
+                                            substring_matches[0] if subword_style_option == 3 else substring_matches[-1]
+                                        )  # Get the earliest added match or the most recently added match
+
+                                        style_start = substring_details.get('style_code', '')
+                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                        styled_words_and_spaces[i] = styled_word_or_space
+
+                                        # Update boundary information
+                                        if i > 0 and i - 1 not in boundary_indices_dict:
+                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+
+                                        if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
+                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+
+                                        indexes_used_by_subwords.add(i)
+                                        continue
+
+
+
+                                elif subword_style_option == 5:
+                                    substring_matches = self.subword_trie.search_any_substring(stripped_word)
+                                    if substring_matches:
+                                        sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
+
+                                        # Original behavior: style only the matching substring(s)
+                                        current_position = 0
+                                        styled_word_parts = []
+
+                                        for matched_substring, substring_details in sorted_matches:
+                                            style_start = substring_details.get('style_code', '')
+                                            substring_start = stripped_word.find(matched_substring, current_position)
+                                            substring_end = substring_start + len(matched_substring)
+
+                                            # Style the part before the substring
+                                            if substring_start > current_position:
+                                                unstyled_part = stripped_word[current_position:substring_start]
+                                                styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
+
+                                            # Apply style to the matched substring
+                                            styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
+                                            current_position = substring_end
+
+                                        # Handle any remaining part after the last substring
+                                        if current_position < len(stripped_word):
+                                            remaining_part = stripped_word[current_position:]
+                                            styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
+
+                                        # Combine parts and store the result
+                                        styled_word_or_space = ''.join(styled_word_parts)
+                                        styled_words_and_spaces[i] = styled_word_or_space
+
+                                        # Update boundary information
+                                        if i > 0:
+                                            if i - 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
+
+                                        if i + 1 < len(words_and_spaces):
+                                            if i + 1 not in boundary_indices_dict:
+                                                boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
+
+                                        indexes_used_by_subwords.add(i)
+
+
+        return styled_words_and_spaces, indexes_used_by_words, indexes_used_by_subwords, boundary_indices_dict
+
+
+
+
+    def handle_phrases(self,
+                       words_and_spaces,
+                       styled_words_and_spaces,
+                       indexes_used_by_phrases,
+                       phrase_norm,
+                       phrase_norm_sep,
+                       boundary_indices_dict):
+
+        for i in range(len(words_and_spaces)):
+            # Build the text segment starting from the current position
+            text_segment = ''.join(words_and_spaces[i:])
+
+            # Search for the longest matching phrase in the phrase trie
+            phrase_match = self.phrase_trie.search_longest_prefix(text_segment, phrase_norm, phrase_norm_sep)
+            self.debug(f'phrase_match: {phrase_match}')
+
+            if phrase_match:
+                phrase, details = phrase_match
+                self.debug(f'phrase_match True:\nphrase: {phrase}\n\ndetails: {details}')
+
+                if not phrase_norm:
+                    styled_phrase = details.get('styled', phrase)
+
+                else:
+                    # Get the style code and apply it to the original, unnormalized phrase
+                    phrase_style_code = details.get('style_code')
+                    styled_phrase = f'{phrase_style_code}{phrase}{self.reset}'
+
+                self.debug(f'styled_phrase: {styled_phrase}')
+
+                # Split the styled phrase into words and spaces
+                styled_phrase_words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(styled_phrase)
+                styled_phrase_len = len(styled_phrase_words_and_spaces)
+
+                self.debug(f'styled_phrase_length: {styled_phrase_len}')
+                self.debug(f'styled_phrase_words_and_spaces:\n{styled_phrase_words_and_spaces}')
+
+                # Ensure the phrase is properly aligned in the words_and_spaces list
+                if words_and_spaces[i:i + styled_phrase_len] == PrintsCharming.words_and_spaces_pattern.findall(phrase):
+                    # Update the indexes_used_by_phrases set
+                    indexes_used_by_phrases.update(list(range(i, i + styled_phrase_len)))
+                    self.debug(f'indexes_used_by_phrases:\n{indexes_used_by_phrases}')
+
+                    # Add the index before the starting index
+                    if i > 0 and (i - 1) not in boundary_indices_dict:
+                        boundary_indices_dict[i - 1] = details.get('attribs')
+
+                    # Add the index after the ending index
+                    if i + styled_phrase_len < len(words_and_spaces) and (i + styled_phrase_len) not in boundary_indices_dict:
+                        boundary_indices_dict[i + styled_phrase_len] = details.get('attribs')
+
+                    # Update the styled_words_and_spaces list with the styled phrase
+                    for j, styled_word_or_space in enumerate(styled_phrase_words_and_spaces):
+                        styled_words_and_spaces[i + j] = styled_word_or_space
+
+                    # Move the index forward to skip over the phrase that has just been processed
+                    i += styled_phrase_len - 1  # Adjust `i` to the end of the current phrase
+
+        return styled_words_and_spaces, indexes_used_by_phrases, boundary_indices_dict
+
+
+
+
+    def get_style_instance_and_code(self, style, color, bg_color, reverse, bold, dim, italic, underline, overline, strikethru, conceal, blink):
+
+        style_instance, style_code = (
+            (self.styles.get(style, self.styles['default']), self.style_codes.get(style, self.style_codes['default'])) if style and isinstance(style, str)
+            else (self.styles.get('default'), self.style_codes.get('default'))
+        )
+
+        if any((color is not None,
+                bg_color is not None,
+                reverse is not None,
+                bold is not None,
+                dim is not None,
+                italic is not None,
+                underline is not None,
+                overline is not None,
+                strikethru is not None,
+                conceal is not None,
+                blink is not None)):
+
+            style_instance = copy.copy(style_instance)
+
+            updated_style = {k: v for k, v in {
+                'color': color,
+                'bg_color': bg_color,
+                'reverse': reverse,
+                'bold': bold,
+                'dim': dim,
+                'italic': italic,
+                'underline': underline,
+                'overline': overline,
+                'strikethru': strikethru,
+                'conceal': conceal,
+                'blink': blink,
+
+            }.items() if v is not None}
+
+            style_instance.update(updated_style)
+
+            style_key = (
+                style_instance.color,
+                style_instance.bg_color,
+                style_instance.reverse,
+                style_instance.bold,
+                style_instance.dim,
+                style_instance.italic,
+                style_instance.underline,
+                style_instance.overline,
+                style_instance.strikethru,
+                style_instance.conceal,
+                style_instance.blink,
+            )
+
+            # Check the cache for the style code
+            cached_style_code = self.style_cache.get(style_key)
+            if cached_style_code:
+                style_code = cached_style_code
+            else:
+                # Cache the style code
+                style_code = self.create_style_code(style_instance)
+                self.style_cache[style_key] = style_code
+
+        return style_instance, style_code
+
+
+
+
+
+    def print2(self,
+               *args: Any,
+               style: Union[None, str, Dict[Union[int, Tuple[int, int]], str], List[Union[None, str, Dict[Union[int, Tuple[int, int]], str]]]] = None,
+               color: Union[None, str, List[Union[None, str]]] = None,
+               bg_color: Union[None, str, List[Union[None, str]]] = None,
+               reverse: Union[None, bool, List[Union[None, bool]]] = None,
+               bold: Union[None, bool, List[Union[None, bool]]] = None,
+               dim: Union[None, bool, List[Union[None, bool]]] = None,
+               italic: Union[None, bool, List[Union[None, bool]]] = None,
+               underline: Union[None, bool, List[Union[None, bool]]] = None,
+               overline: Union[None, bool, List[Union[None, bool]]] = None,
+               strikethru: Union[None, bool, List[Union[None, bool]]] = None,
+               conceal: Union[None, bool, List[Union[None, bool]]] = None,
+               blink: Union[None, bool, List[Union[None, bool]]] = None,
+               sep: str = ' ',
+               prog_sep: str = '',
+               prog_step: int = 1,
+               prog_direction: str = 'forward',
+               share_alike_sep_bg: bool = True,
+               share_alike_sep_ul: bool = False,
+               share_alike_sep_ol: bool = False,
+               share_alike_sep_st: bool = False,
+               share_alike_sep_bl: bool = False,
+               start: str = '',
+               end: str = '\n',
+               filename: str = None,
+               skip_ansi_check: bool = False,
+               phrase_search: bool = True,
+               phrase_norm: bool = False,
+               phrase_norm_sep: str = ' ',
+               word_search: bool = True,
+               subword_search: bool = True,
+               subword_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
+               style_args_as_one: bool = True,
+               return_styled_args_list: bool = False,
+               **kwargs: Any) -> Union[None, List[str]]:
+
+
+
+        converted_args = [str(arg) for arg in args]
+        self.debug(f'converted_args:\n{converted_args}')
+
+        if not self.config["color_text"]:
+            # Remove ANSI codes if present
+            if any(self.contains_ansi_codes(arg) for arg in converted_args):
+                converted_args = [PrintsCharming.remove_ansi_codes(arg) for arg in converted_args]
+
+            text = sep.join(converted_args)  # Join args into final text
+
+            text = start + text
+
+            if filename:
+                self.write_file(text, filename, end)
+            else:
+                print(text, end=end)
+            return
+
+
+        # Check for ANSI codes in converted_args if skip_ansi_check is False
+        if not skip_ansi_check and any(self.contains_ansi_codes(arg) for arg in converted_args):
+            text = sep.join(converted_args)
+            text = start + text
+            if filename:
+                self.write_file(text, filename, end)
+            else:
+                print(text, end=end)
+            return
+
+
+
+        if style_args_as_one:
+            style_instance, style_code = self.get_style_instance_and_code(style,
+                                                                          color,
+                                                                          bg_color,
+                                                                          reverse,
+                                                                          bold,
+                                                                          dim,
+                                                                          italic,
+                                                                          underline,
+                                                                          overline,
+                                                                          strikethru,
+                                                                          conceal,
+                                                                          blink)
+
+            if not prog_sep:
+                text = sep.join(converted_args)
+            else:
+                text = self.format_with_sep(converted_args=converted_args, sep=sep, prog_sep=prog_sep, prog_step=prog_step, prog_direction=prog_direction)
+
+            self.debug(f"text defined:\n{text}")
+
+
+
+            if isinstance(style, dict):
+                text = self.style_words_by_index(text, style)
+
+            if self.config["kwargs"] and kwargs:
+                text = self.replace_and_style_placeholders(text, kwargs)
+
+                if filename:
+                    self.write_file(text, filename, end)
+                else:
+                    print(text, end=end)
+                return
+
+            # Convert the text to a list of words and spaces
+            words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
+            words_and_spaces_length = len(words_and_spaces)
+            self.debug(f'words_and_spaces:\n{words_and_spaces}')
+
+            # Initialize list to hold the final styled words and spaces
+            styled_words_and_spaces = [None] * words_and_spaces_length
+
+            # Initialize the lists to keep track of which indexes are used by what
+            indexes_used_by_phrases = set()
+            indexes_used_by_words = set()
+            indexes_used_by_subwords = set()
+            indexes_used_by_default_styling = set()
+            indexes_used_by_spaces = set()
+            indexes_used_by_none_styling = set()
+
+            boundary_indices_dict = {}
+
+            # Step 1: Handle phrases
+            # Instance level check
+            if self.enable_styled_phrases:
+                # Method level check
+                if phrase_search:
+                    # Only perform phrase lookup if there are multiple elements (implying a possible phrase)
+                    if words_and_spaces_length > 1:
+                        self.debug(f'Calling self.handle_phrases()')
+
+                        (styled_words_and_spaces,
+                         indexes_used_by_phrases,
+                         boundary_indices_dict) = self.handle_phrases(words_and_spaces,
+                                                                      styled_words_and_spaces,
+                                                                      indexes_used_by_phrases,
+                                                                      phrase_norm,
+                                                                      phrase_norm_sep,
+                                                                      boundary_indices_dict)
+
+                        self.debug(f'self.handle_phrases() returned')
+
+            self.debug(f'After Step 1:\nstyled_words_and_spaces:\n{styled_words_and_spaces}\nindexes_used_by_phrases:\n{indexes_used_by_phrases}\nboundary_indices_dict:\n{boundary_indices_dict}\n')
+
+            # Step 2: Handle individual words and substrings
+            if self.enable_styled_words:
+                if word_search:
+                    self.debug(f'Calling self.handle_words_and_subwords()')
+
+                    (styled_words_and_spaces,
+                     indexes_used_by_words,
+                     indexes_used_by_subwords,
+                     boundary_indices_dict) = self.handle_words_and_subwords(words_and_spaces,
+                                                                             styled_words_and_spaces,
+                                                                             indexes_used_by_phrases,
+                                                                             indexes_used_by_words,
+                                                                             indexes_used_by_subwords,
+                                                                             subword_search,
+                                                                             subword_style_option,
+                                                                             style_code,
+                                                                             boundary_indices_dict)
+
+                    self.debug(f'self.handle_words_and_subwords() returned')
+
+
+            self.debug(f'After Step 2:\nstyled_words_and_spaces:\n{styled_words_and_spaces}\nindexes_used_by_words:\n{indexes_used_by_words}\nindexes_used_by_subwords:\n{indexes_used_by_subwords}\nboundary_indices_dict:\n{boundary_indices_dict}\n')
+
+            # Step 3: Handle other styled text and spaces
+            self.debug(f'Calling self.handle_other_styled_text_and_spaces()')
+
+            (styled_words_and_spaces,
+             indexes_used_by_spaces,
+             indexes_used_by_default_styling) = self.handle_other_styled_text_and_spaces(words_and_spaces,
+                                                                                         styled_words_and_spaces,
+                                                                                         indexes_used_by_phrases,
+                                                                                         indexes_used_by_words,
+                                                                                         indexes_used_by_subwords,
+                                                                                         indexes_used_by_spaces,
+                                                                                         indexes_used_by_default_styling,
+                                                                                         style_instance,
+                                                                                         style_code,
+                                                                                         share_alike_sep_bg,
+                                                                                         share_alike_sep_ul,
+                                                                                         share_alike_sep_ol,
+                                                                                         share_alike_sep_st,
+                                                                                         share_alike_sep_bl,
+                                                                                         boundary_indices_dict)
+
+            self.debug(f'self.handle_other_styled_text_and_spaces() returned')
+
+
+            self.debug(f'After Step 3:\nstyled_words_and_spaces:\n{styled_words_and_spaces}\nindexes_used_by_spaces:\n{indexes_used_by_spaces}\nindexes_used_by_default_styling:\n{indexes_used_by_default_styling}\n')
+
+            # Step 4: Handle default styling for remaining words and spaces
+            self.debug(f'Handling default styling for remaining words and spaces.')
+
+            for i, styled_word_or_space in enumerate(styled_words_and_spaces):
+                if styled_word_or_space is None:
+                    styled_words_and_spaces[i] = f"{style_code}{words_and_spaces[i]}{self.reset}"
+                    indexes_used_by_none_styling.add(i)
+
+            self.debug(f'After handle default styling:\nindexes_used_by_none_styling:\n{indexes_used_by_none_styling}')
+            self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+            # Step 5: Join the styled_words_and_spaces to form the final styled text
+            styled_text = ''.join(filter(None, styled_words_and_spaces))
+
+            # Print or write to file
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(start + styled_text + end)
+            else:
+                sys.stdout.write(start + styled_text + end)
+                # print(start + styled_text, end=end)
+
+        else:
+
+            # Ensure all parameters are lists to handle individual styling for each arg
+            def ensure_list(param, length):
+                if param is None or isinstance(param, str) or isinstance(param, bool) or isinstance(param, dict):
+                    return [param] * length  # Broadcast single value to all args
+                return param
+
+            num_args = len(converted_args)
+            styles = ensure_list(style, num_args)
+            colors = ensure_list(color, num_args)
+            bg_colors = ensure_list(bg_color, num_args)
+            reverses = ensure_list(reverse, num_args)
+            bolds = ensure_list(bold, num_args)
+            dims = ensure_list(dim, num_args)
+            italics = ensure_list(italic, num_args)
+            underlines = ensure_list(underline, num_args)
+            overlines = ensure_list(overline, num_args)
+            strikethrus = ensure_list(strikethru, num_args)
+            conceals = ensure_list(conceal, num_args)
+            blinks = ensure_list(blink, num_args)
+
+            styled_parts = []
+
+            for i, arg in enumerate(converted_args):
+                # Apply the corresponding style for the i-th argument
+                style_instance, style_code = self.get_style_instance_and_code(styles[i],
+                                                                              colors[i],
+                                                                              bg_colors[i],
+                                                                              reverses[i],
+                                                                              bolds[i],
+                                                                              dims[i],
+                                                                              italics[i],
+                                                                              underlines[i],
+                                                                              overlines[i],
+                                                                              strikethrus[i],
+                                                                              conceals[i],
+                                                                              blinks[i])
+
+                if isinstance(styles[i], dict):
+                    arg = self.style_words_by_index(arg, styles[i])
+
+
+
+                # Convert the text to a list of words and spaces
+                words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(arg)
+                words_and_spaces_length = len(words_and_spaces)
+                self.debug(f'words_and_spaces:\n{words_and_spaces}')
+
+                # Initialize list to hold the final styled words and spaces
+                styled_words_and_spaces = [None] * words_and_spaces_length
+
+                # Initialize the lists to keep track of which indexes are used by what
+                indexes_used_by_phrases = set()
+                indexes_used_by_words = set()
+                indexes_used_by_subwords = set()
+                indexes_used_by_default_styling = set()
+                indexes_used_by_spaces = set()
+                indexes_used_by_none_styling = set()
+
+                boundary_indices_dict = {}
+
+
+                # Step 1: Handle phrases
+                # Instance level check
+                if self.enable_styled_phrases:
+                    # Method level check
+                    if phrase_search:
+                        # Only perform phrase lookup if there are multiple elements (implying a possible phrase)
+                        if words_and_spaces_length > 1:
+                            self.debug(f'Calling self.handle_phrases()')
+
+                            (styled_words_and_spaces,
+                             indexes_used_by_phrases,
+                             boundary_indices_dict) = self.handle_phrases(words_and_spaces,
+                                                                          styled_words_and_spaces,
+                                                                          indexes_used_by_phrases,
+                                                                          phrase_norm,
+                                                                          phrase_norm_sep,
+                                                                          boundary_indices_dict)
+
+                            self.debug(f'self.handle_phrases() returned')
+
+                self.debug(
+                    f'after phrases:\nindexes_used_by_phrases:\n{indexes_used_by_phrases}\nboundary_indices_dict:\n{boundary_indices_dict}\nstyled_words_and_spaces:\n{styled_words_and_spaces}')
+
+                # Step 2: Handle individual words and substrings
+                if self.enable_styled_words:
+                    if word_search:
+                        self.debug(f'Calling self.handle_words_and_subwords()')
+
+                        (styled_words_and_spaces,
+                         indexes_used_by_words,
+                         indexes_used_by_subwords,
+                         boundary_indices_dict) = self.handle_words_and_subwords(words_and_spaces,
+                                                                                 styled_words_and_spaces,
+                                                                                 indexes_used_by_phrases,
+                                                                                 indexes_used_by_words,
+                                                                                 indexes_used_by_subwords,
+                                                                                 subword_search,
+                                                                                 subword_style_option,
+                                                                                 style_code,
+                                                                                 boundary_indices_dict)
+
+                        self.debug(f'self.handle_words_and_subwords() returned')
+
+                self.debug(
+                    f'after words and subwords:\nindexes_used_by_words:\n{indexes_used_by_words}\nindexes_used_by_subwords:\n{indexes_used_by_subwords}\nboundary_indices_dict:\n{boundary_indices_dict}\nstyled_words_and_spaces:\n{styled_words_and_spaces}')
+                self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+                # Step 3: Handle other styled text and spaces
+                self.debug(f'Calling self.handle_other_styled_text_and_spaces()')
+
+                (styled_words_and_spaces,
+                 indexes_used_by_spaces,
+                 indexes_used_by_default_styling) = self.handle_other_styled_text_and_spaces(words_and_spaces,
+                                                                                             styled_words_and_spaces,
+                                                                                             indexes_used_by_phrases,
+                                                                                             indexes_used_by_words,
+                                                                                             indexes_used_by_subwords,
+                                                                                             indexes_used_by_spaces,
+                                                                                             indexes_used_by_default_styling,
+                                                                                             style_instance,
+                                                                                             style_code,
+                                                                                             share_alike_sep_bg,
+                                                                                             share_alike_sep_ul,
+                                                                                             share_alike_sep_ol,
+                                                                                             share_alike_sep_st,
+                                                                                             share_alike_sep_bl,
+                                                                                             boundary_indices_dict)
+
+                self.debug(f'self.handle_other_styled_text_and_spaces() returned')
+
+                self.debug(f'After Step 3:\nstyled_words_and_spaces:\n{styled_words_and_spaces}\nindexes_used_by_spaces:\n{indexes_used_by_spaces}\nindexes_used_by_default_styling:\n{indexes_used_by_default_styling}\n')
+
+                # Step 4: Handle default styling for remaining words and spaces
+                for j, styled_word_or_space in enumerate(styled_words_and_spaces):
+                    if styled_word_or_space is None:
+                        styled_words_and_spaces[j] = f"{style_code}{words_and_spaces[j]}{self.reset}"
+                        indexes_used_by_none_styling.add(j)
+
+                self.debug(f'After handle default styling:\nindexes_used_by_none_styling:\n{indexes_used_by_none_styling}')
+                self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+                # Step 5: Join the styled_words_and_spaces to form the final styled text
+                styled_text = ''.join(filter(None, styled_words_and_spaces))
+
+                # Step 6: Append styled_text to styled_parts list
+                styled_parts.append(styled_text)
+
+                #styled_arg = f"{style_code}{arg}{self.reset}"
+                #styled_parts.append(styled_arg)
+
+            if return_styled_args_list:
+                return styled_parts
+
+
+            if not prog_sep:
+                styled_parts_with_sep = sep.join(styled_parts)
+            else:
+                styled_parts_with_sep = self.format_with_sep(converted_args=styled_parts, sep=sep, prog_sep=prog_sep, prog_step=prog_step, prog_direction=prog_direction)
+
+
+
+            # Print or write to file
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(start + styled_parts_with_sep + end)
+            else:
+                sys.stdout.write(start + styled_parts_with_sep + end)
+                # print(start + styled_text, end=end)
+
 
 
 

@@ -15,7 +15,8 @@ from .utils import (
     set_custom_excepthook,
     set_custom_excepthook_with_logging,
     custom_excepthook,
-    custom_excepthook_with_logging
+    custom_excepthook_with_logging,
+    get_key
 )
 
 from .prints_charming import PrintsCharming
@@ -28,6 +29,7 @@ from .exceptions import (
     InvalidLengthError
 )
 
+from .dynamic_formatter import DynamicFormatter
 from .frame_builder import FrameBuilder
 from .interactive_menu import InteractiveMenu
 from .table_manager import TableManager
@@ -48,10 +50,10 @@ imported_symbols = after_import - before_import
 
 
 __all__ = ['PStyle', 'PrintsCharming', 'DEFAULT_CONFIG', 'DEFAULT_COLOR_MAP', 'DEFAULT_EFFECT_MAP',
-           'DEFAULT_STYLES', 'DEFAULT_LOGGING_STYLES', 'DEFAULT_LEVEL_STYLES', 'PrintsCharmingError',
-           'ColorNotFoundError', 'InvalidLengthError', 'FrameBuilder', 'InteractiveMenu', 'TableManager',
-           'ToggleManager', 'get_terminal_width', 'set_custom_excepthook', 'set_custom_excepthook_with_logging',
-           'custom_excepthook', 'custom_excepthook_with_logging', 'WinUtils']
+           'DEFAULT_STYLES', 'DEFAULT_LOGGING_STYLES', 'DEFAULT_LEVEL_STYLES', 'DynamicFormatter',
+           'PrintsCharmingError', 'ColorNotFoundError', 'InvalidLengthError', 'FrameBuilder',
+           'InteractiveMenu', 'TableManager', 'ToggleManager', 'get_terminal_width', 'set_custom_excepthook',
+           'set_custom_excepthook_with_logging', 'custom_excepthook', 'custom_excepthook_with_logging', 'WinUtils']
 
 
 # Extend __all__ with only the symbols imported from .color_maps

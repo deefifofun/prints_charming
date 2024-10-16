@@ -2,6 +2,7 @@ import logging.handlers
 import sys
 import inspect
 import copy
+from typing import Optional, Dict, Union
 from .formatter import PrintsCharmingFormatter
 from .log_handler import PrintsCharmingLogHandler
 from ..prints_charming_defaults import DEFAULT_COLOR_MAP, DEFAULT_STYLES, DEFAULT_LOGGING_STYLES
@@ -13,10 +14,20 @@ from ..exceptions import set_custom_excepthook_with_logging
 
 
 
-def setup_logger(pc=None, name=None, level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S.',
-                 handler_configs=None, color_map=None, styles=None, level_styles=None,
-                 default_bg_color=None, internal_logging=False, enable_exception_logging=True,
-                 unhandled_exception_debug=False, log_exc_info=False):
+def setup_logger(pc: Optional['PrintsCharming'] = None,
+                 name: Optional[str] = None,
+                 level: int = logging.DEBUG,
+                 datefmt: str = '%Y-%m-%d %H:%M:%S',
+                 handler_configs: Optional[Dict[str, Dict[str, Union[bool, str, int]]]] = None,
+                 color_map: Optional[Dict[str, str]] = None,
+                 styles: Optional[Dict[str, 'PStyle']] = None,
+                 level_styles: Optional[Dict[int, str]] = None,
+                 default_bg_color: Optional[str] = None,
+                 internal_logging: bool = False,
+                 internal_log_level: str = 'DEBUG',
+                 enable_exception_logging: bool = True,
+                 unhandled_exception_debug: bool = False,
+                 log_exc_info: bool = False) -> logging.Logger:
     """
     Setup and return a logger with customizable handlers and formatters, including user-supplied custom handlers.
     Use PrintsCharmingLogHandler by default for custom styling and formatting.
@@ -26,21 +37,35 @@ def setup_logger(pc=None, name=None, level=logging.DEBUG, datefmt='%Y-%m-%d %H:%
         name (str): Logger name (uses calling module name if None).
         level (int): Logging level for the logger. Defaults to logging.DEBUG.
         datefmt (str): Date format for the formatter.
-        handler_configs (dict): Dictionary containing handler configurations, e.g. {
+        handler_configs (Optional[Dict[str, Dict[str, Union[bool, str, int]]]]): e.g. {
             'console': {'enabled': True, 'use_styles': True, 'formatter': CustomFormatter()},
             'file': {'path': '/path/to/log', 'use_styles': False, 'level': logging.INFO},
             'custom_handler': {'handler': MyCustomHandler(), 'formatter': CustomFormatter(), 'use_styles': False}
         }
-
-        level_styles (dict): Dictionary mapping logging levels to style names.
-        internal_logging (bool): Toggle internal logging styles.
+        color_map (Optional[Dict[str, str]]): Custom color map.
+        styles (Optional[Dict[str, PStyle]]): Custom styles.
+        level_styles (Optional[Dict[int, str]]): Dictionary mapping logging levels to style names.
+        default_bg_color (Optional[str]): Default background color for logs.
+        internal_logging (bool): Toggle internal library logging.
+        enable_exception_logging (bool): Enable logging of unhandled exceptions.
+        unhandled_exception_debug (bool): Debug mode for unhandled exceptions.
+        log_exc_info (bool): Enable logging of exception info.
 
     Returns:
         logging.Logger: Configured logger instance with specified handlers.
     """
 
-    pc = pc or PrintsCharming(color_map=color_map or DEFAULT_COLOR_MAP.copy(), styles=copy.deepcopy(styles) or copy.deepcopy(DEFAULT_STYLES),
-                              default_bg_color=default_bg_color)
+    # If internal_logging is True, include it in the config
+    config = {
+        'internal_logging': internal_logging,
+        'log_level': internal_log_level,
+    }
+
+    pc = pc or PrintsCharming(
+        config=config,
+        color_map=color_map or DEFAULT_COLOR_MAP.copy(),
+        styles=copy.deepcopy(styles) or copy.deepcopy(DEFAULT_STYLES),
+        default_bg_color=default_bg_color)
 
     if name is None:
         # Use inspect to get the module name of the caller

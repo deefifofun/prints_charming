@@ -1,4 +1,4 @@
-
+import os
 
 
 
@@ -13,6 +13,10 @@ class Formatter:
         self.default_width = default_width
         self.default_precision = default_precision
         self.pad_char = pad_char
+
+
+    def get_terminal_width(self):
+        terminal_size = os.get_terminal_size()
 
 
     def set_default_width(self, width):
