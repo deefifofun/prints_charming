@@ -495,23 +495,23 @@ def progress_bar(pc):
     print("\nProcess complete.")
 
 
-@time_step
+
 # Dynamic Value Functions
 def get_dynamic_name():
     return "John Doe"
 
 
-@time_step
+
 def get_dynamic_age():
     return 20
 
 
-@time_step
+
 def get_dynamic_balance():
     return 5
 
 
-@time_step
+
 def get_dynamic_occupation():
     return "Software Developer"
 
@@ -822,6 +822,7 @@ def index_styling_examples(pc):
     string_style = ['yellow', 'orange', 'purple', 'vgreen', 'blue']
     styled_sentence3 = pc.segment_with_splitter_and_style(splitter_text, splitter_match, splitter_swap, splitter_show, splitter_style, splitter_arms, string_style)
     print(styled_sentence3)
+    print()
 
 
 @time_step
@@ -1052,7 +1053,6 @@ def print_colors_and_styles():
 
 
 
-@time_step
 def accuracy_style_function(accuracy):
     if accuracy > 0.9:
         return "vgreen"  # Very good accuracy
@@ -1062,14 +1062,12 @@ def accuracy_style_function(accuracy):
         return "red"  # Poor accuracy
 
 
-@time_step
 def precision_style_function(precision):
     if precision < 0.75:
         return "red"  # Low precision
     return None  # No style for acceptable precision
 
 
-@time_step
 def recall_style_function(recall):
     if recall > 0.9:
         return "vgreen"  # High recall
@@ -1079,7 +1077,6 @@ def recall_style_function(recall):
         return "red"  # Low recall
 
 
-@time_step
 def f1_score_style_function(f1_score, row):
     accuracy = row[1]  # Assume accuracy is the second column
     if abs(f1_score - accuracy) <= 0.05:
@@ -1087,14 +1084,12 @@ def f1_score_style_function(f1_score, row):
     return None
 
 
-@time_step
 def training_time_style_function(training_time):
     if training_time > 300:
         return "orange"  # Long training time
     return None
 
 
-@time_step
 def age_style_function(age):
     if age < 18:
         return "vred"
@@ -1105,7 +1100,7 @@ def age_style_function(age):
     return None
 
 
-@time_step
+
 def name_style_function(name):
     if name in ["Prince Charming", "John Smith"]:
         return "blue"
@@ -1114,7 +1109,6 @@ def name_style_function(name):
     return None
 
 
-@time_step
 def occupation_style_function(occupation):
     if occupation in ['Prince', 'Princess']:
         return "orange"
@@ -1486,8 +1480,146 @@ def print_markdown(pc):
 
     print()
     printer(md_text)
-    print()
-    print()
+    print('\n\n')
+
+
+
+def example_dynamic_formatter():
+    # Example usage
+    formatter = DynamicFormatter()
+
+    formatter_style_names = {
+        'neg': 'vred',
+        'pos': 'vgreen',
+        'zero': 'blue',
+    }
+
+    formatter.styles = formatter_style_names
+
+    # Format multiple strings and write them to stdout
+    formatter.set_width(30)
+    string1 = formatter.format("First formatted string", tabs=1)
+    string2 = formatter.format("Second formatted string", tabs=2)
+    string3 = formatter.format("Third formatted string", tabs=2)
+
+    # Write all formatted strings at once (with newlines) to stdout
+    formatter.write(string1, end='\n')
+    formatter.write(string2, end='\n')
+    formatter.write(string3, end='\n\n')
+
+    # String formatting with newlines and tabs using sys.stdout.write
+    formatter.set_width(10)
+    string1 = formatter.format("Text with 2 tabs and newline", tabs=2, newlines=1)
+    formatter.write(string1, end='\n')
+
+    # Multi-line text with wrapping and indentation
+    text_block = "This text will wrap at a specified width and be indented with tabs."
+    formatter.set_width(15)
+    multiple_lines = formatter.format_multiline(text_block, width=15, tabs=1)
+    for line in multiple_lines:
+        sys.stdout.write(line)
+
+    print(f'\tAfter manual write multiple lines\n\n')
+
+    formatter.write(multiple_lines, start="Start:\n", end="\nEnd.\n\n\n", spacing=0)
+
+    # Conditional formatting for a negative number
+    neg_string = formatter.conditional_format(-42, pc)
+    print(neg_string)
+
+    # Conditional formatting for a positive number
+    pos_string = formatter.conditional_format(42, pc)
+    print(pos_string)
+
+    # Conditional formatting for zero
+    zero_string = formatter.conditional_format(0, pc)
+    print(zero_string)
+
+    # Formatting datetime objects
+    formatter.set_datetime_format('%d-%b-%Y %H:%M:%S')
+    dt_now = formatter.format(datetime.now(), newlines=1)
+
+    formatter.write(dt_now)
+
+    # Set left and right padding characters, fill char, and format a string
+    formatter.set_pad_char_left('*')
+    formatter.set_pad_char_right('#')
+    formatter.set_fill_char('-')
+    formatter.set_width(20)
+    padded_string = formatter.format("Padded String", tabs=1)
+
+    # Write the formatted string with padding applied
+    formatter.write(padded_string, end='\nEnd.\n\n\n')
+
+    # Uniform single spacing after each item
+    formatter.write(["Line 1", "Line 2", "Line 3"], start="<<", end=">>", spacing=1)
+
+    # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
+    formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
+
+    # Example tokens to format: characters, words, or phrases
+    tokens = ["Hello", " ", "world", "!", "\nNext", " ", "line"]
+
+    # Format each token incrementally, storing results in buffer
+    formatter.format_token_by_token(tokens)
+
+    # Get the final formatted string
+    formatted_output = formatter.get_formatted_buffer()
+
+    # Output the final result
+    print(formatted_output)
+    print(f'\n\n\n')
+
+    pc2 = PrintsCharming(styled_strings=styled_strings2)
+
+    print_statements = [
+        f'This is some green text with other colors too like, New Message, Reading',
+        f'This is some red text with other colors too like, Hello, world!',
+        f'This is some yellow text with other colors too like your',
+        f'This is more yellow text with other colors too like My color is purple',
+        f'This is more red text with other colors too like, 1'
+    ]
+
+    pc2.print(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
+    print(f'\n\n\n')
+
+    pc2.print2(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
+    print(f'\n\n\n')
+
+    styles = ['green', 'red', 'yellow', 'yellow', 'red']
+    pc2.print2(*print_statements, start="\nStart:\n\t", end="\nEnd.\n", sep='\n\n\t\t', style=styles, style_args_as_one=False)
+
+    print_statements2 = [
+        f'\tThis is some green text with other colors too like, New Message, Reading\n\n',
+        f'\t\tThis is some red text with other colors too like, Hello, world!\n\n',
+        f'\t\tThis is some yellow text with other colors too like your\n\n',
+        f'\tThis is more yellow text with other colors too like My color is purple\n\n',
+        f'\t\tThis is more red text with other colors too like, 1'
+    ]
+
+    styles = ['green', 'red', 'yellow', 'yellow', 'red']
+    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', style=styles, style_args_as_one=False)
+
+    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', color=styles, style_args_as_one=False)
+
+    styled_args_list = pc2.print2(*print_statements2, start="", end="", sep='', style=styles, style_args_as_one=False, return_styled_args_list=True)
+
+    # Uniform single spacing after each item
+    formatter.write(styled_args_list, start="<<", end=">>", spacing=1)
+
+    # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
+    formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
+
+
+def example_dynamic_method_injection():
+    quick_pc.set_obj(quick_pc2)
+
+    print(f'quick_pc: {quick_pc}')
+    print(f'quick_pc2: {quick_pc2}')
+
+    quick_pc.dynamic_method("\n\nDynamic method used to print\n\n")
+
+
 
 
 def highlight(text, style_name=None, return_list=False):
@@ -1511,6 +1643,7 @@ class NewClass():
         self.arg1 = arg1
         self.logger = setup_logger(pc=pc, name=self.class_name)
 
+    @time_step
     def highlight(self, text, style_name=None, return_list=False):
         if not style_name:
             style_name = 'highlight_arg'
@@ -1605,6 +1738,7 @@ def custom_errors_orig(loggers):
             logger.error(f"Error caught: {e}")
 
 
+@time_step
 def custom_errors_2(logger1):
     CustomError2.set_pc(pc)
 
@@ -1631,6 +1765,7 @@ def custom_errors_2(logger1):
         e.handle_exception()
 
 
+@time_step
 def custom_errors_3():
     # Raise CustomError3 with logger2's PrintsCharming instance (subclass-specific)
     try:
@@ -1668,151 +1803,12 @@ def exception_examples(logger1, logger2, enable_custom_excepthook_error_example=
         custom_excepthook_error_example()
 
 
+@time_step
 def example_menu():
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
     menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
     menu.run()
-
-
-def example_dynamic_formatter():
-    # Example usage
-    formatter = DynamicFormatter()
-
-    formatter_style_names = {
-        'neg': 'vred',
-        'pos': 'vgreen',
-        'zero': 'blue',
-    }
-
-    formatter.styles = formatter_style_names
-
-    # Format multiple strings and write them to stdout
-    formatter.set_width(30)
-    string1 = formatter.format("First formatted string", tabs=1)
-    string2 = formatter.format("Second formatted string", tabs=2)
-    string3 = formatter.format("Third formatted string", tabs=2)
-
-    # Write all formatted strings at once (with newlines) to stdout
-    formatter.write(string1, end='\n')
-    formatter.write(string2, end='\n')
-    formatter.write(string3, end='\n\n')
-
-    # String formatting with newlines and tabs using sys.stdout.write
-    formatter.set_width(10)
-    string1 = formatter.format("Text with 2 tabs and newline", tabs=2, newlines=1)
-    formatter.write(string1, end='\n')
-
-    # Multi-line text with wrapping and indentation
-    text_block = "This text will wrap at a specified width and be indented with tabs."
-    formatter.set_width(15)
-    multiple_lines = formatter.format_multiline(text_block, width=15, tabs=1)
-    for line in multiple_lines:
-        sys.stdout.write(line)
-
-    print(f'\tAfter manual write multiple lines\n\n')
-
-    formatter.write(multiple_lines, start="Start:\n", end="\nEnd.\n\n\n", spacing=0)
-
-    # Conditional formatting for a negative number
-    neg_string = formatter.conditional_format(-42, pc)
-    print(neg_string)
-
-    # Conditional formatting for a positive number
-    pos_string = formatter.conditional_format(42, pc)
-    print(pos_string)
-
-    # Conditional formatting for zero
-    zero_string = formatter.conditional_format(0, pc)
-    print(zero_string)
-
-    # Formatting datetime objects
-    formatter.set_datetime_format('%d-%b-%Y %H:%M:%S')
-    dt_now = formatter.format(datetime.now(), newlines=1)
-
-    formatter.write(dt_now)
-
-    # Set left and right padding characters, fill char, and format a string
-    formatter.set_pad_char_left('*')
-    formatter.set_pad_char_right('#')
-    formatter.set_fill_char('-')
-    formatter.set_width(20)
-    padded_string = formatter.format("Padded String", tabs=1)
-
-    # Write the formatted string with padding applied
-    formatter.write(padded_string, end='\nEnd.\n\n\n')
-
-    # Uniform single spacing after each item
-    formatter.write(["Line 1", "Line 2", "Line 3"], start="<<", end=">>", spacing=1)
-
-    # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
-    formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
-
-    # Example tokens to format: characters, words, or phrases
-    tokens = ["Hello", " ", "world", "!", "\nNext", " ", "line"]
-
-    # Format each token incrementally, storing results in buffer
-    formatter.format_token_by_token(tokens)
-
-    # Get the final formatted string
-    formatted_output = formatter.get_formatted_buffer()
-
-    # Output the final result
-    print(formatted_output)
-    print(f'\n\n\n')
-
-
-
-    pc2 = PrintsCharming(styled_strings=styled_strings2)
-
-    print_statements = [
-        f'This is some green text with other colors too like, New Message, Reading',
-        f'This is some red text with other colors too like, Hello, world!',
-        f'This is some yellow text with other colors too like your',
-        f'This is more yellow text with other colors too like My color is purple',
-        f'This is more red text with other colors too like, 1'
-    ]
-
-    pc2.print(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
-    print(f'\n\n\n')
-
-    pc2.print2(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
-    print(f'\n\n\n')
-
-    styles = ['green', 'red', 'yellow', 'yellow', 'red']
-    pc2.print2(*print_statements, start="\nStart:\n\t", end="\nEnd.\n", sep='\n\n\t\t', style=styles, style_args_as_one=False)
-
-    print_statements2 = [
-        f'\tThis is some green text with other colors too like, New Message, Reading\n\n',
-        f'\t\tThis is some red text with other colors too like, Hello, world!\n\n',
-        f'\t\tThis is some yellow text with other colors too like your\n\n',
-        f'\tThis is more yellow text with other colors too like My color is purple\n\n',
-        f'\t\tThis is more red text with other colors too like, 1'
-    ]
-
-    styles = ['green', 'red', 'yellow', 'yellow', 'red']
-    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', style=styles, style_args_as_one=False)
-
-    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', color=styles, style_args_as_one=False)
-
-    styled_args_list = pc2.print2(*print_statements2, start="", end="", sep='', style=styles, style_args_as_one=False, return_styled_args_list=True)
-
-    # Uniform single spacing after each item
-    formatter.write(styled_args_list, start="<<", end=">>", spacing=1)
-
-    # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
-    formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
-
-
-def example_dynamic_method_injection():
-    quick_pc = PrintsCharming()
-    quick_pc2 = PrintsCharming(styles=DEFAULT_LOGGING_STYLES)
-    quick_pc.set_obj(quick_pc2)
-
-    print(f'quick_pc: {quick_pc}')
-    print(f'quick_pc2: {quick_pc2}')
-
-    quick_pc.dynamic_method("\n\nDynamic method used to print\n\n")
 
 
 
@@ -1861,9 +1857,8 @@ def main():
 
     example_menu()
 
-    example_dynamic_formatter()
-
-    example_dynamic_method_injection()
+    #example_dynamic_formatter()
+    #example_dynamic_method_injection()
 
 
 def divide_term_width(divisor):
@@ -1878,6 +1873,9 @@ if __name__ == "__main__":
 
     mini_border = '!' * divide_term_width(6)
     styled_mini_border = pc.apply_color('orange', mini_border)
+
+    quick_pc = PrintsCharming()
+    quick_pc2 = PrintsCharming(styles=DEFAULT_LOGGING_STYLES)
 
     main()
 
