@@ -1,16 +1,32 @@
+# prints_charming.logging.__init__.py
+
 import logging.handlers
 import sys
 import inspect
 import copy
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, List
+
+
 from .formatter import PrintsCharmingFormatter
 from .log_handler import PrintsCharmingLogHandler
 from ..prints_charming_defaults import DEFAULT_COLOR_MAP, DEFAULT_STYLES, DEFAULT_LOGGING_STYLES
 from ..prints_charming import PrintsCharming
-from ..exceptions import set_custom_excepthook_with_logging
+from ..exceptions.utils import set_excepthook
 
 
 
+def set_custom_excepthook_with_logging(logger, pc, log_exc_info=False, critical_exceptions=None, unhandled_exception_debug=False, update_exception_logging=False):
+    """
+    Set custom exception hook with logging capabilities.
+    """
+    set_excepthook(pc, logger=logger, log_exc_info=log_exc_info, critical_exceptions=critical_exceptions, update_exception_logging=update_exception_logging)
+
+    # Optionally, handle unhandled_exception_debug (calling sys.__excepthook__ if necessary)
+    if unhandled_exception_debug:
+        def debug_excepthook(exc_type, exc_value, exc_traceback):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+        sys.excepthook = debug_excepthook
 
 
 
@@ -26,8 +42,10 @@ def setup_logger(pc: Optional['PrintsCharming'] = None,
                  internal_logging: bool = False,
                  internal_log_level: str = 'DEBUG',
                  enable_exception_logging: bool = True,
-                 unhandled_exception_debug: bool = False,
-                 log_exc_info: bool = False) -> logging.Logger:
+                 update_exception_logging: bool = False,
+                 log_exc_info: bool = True,
+                 critical_exceptions: Union[None, List[ExceptionGroup]] = None,
+                 unhandled_exception_debug: bool = False) -> logging.Logger:
     """
     Setup and return a logger with customizable handlers and formatters, including user-supplied custom handlers.
     Use PrintsCharmingLogHandler by default for custom styling and formatting.
@@ -80,7 +98,7 @@ def setup_logger(pc: Optional['PrintsCharming'] = None,
     logger.pc = pc
 
     if enable_exception_logging:
-        set_custom_excepthook_with_logging(logger, pc, unhandled_exception_debug, log_exc_info)
+        set_custom_excepthook_with_logging(logger, pc, log_exc_info, critical_exceptions, unhandled_exception_debug, update_exception_logging)
 
     # Helper function to create or use a supplied formatter
     def create_formatter(use_styles=None, custom_formatter=None):

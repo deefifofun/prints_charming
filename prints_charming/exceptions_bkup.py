@@ -1,8 +1,12 @@
+
+
 import re
 import traceback
 import sys
+import copy
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
+from .prints_charming_defaults import DEFAULT_STYLES
+from .prints_charming import PrintsCharming
 
 
 
@@ -16,21 +20,23 @@ def get_all_subclass_names(cls, trailing_char=None):
 
 
 
-class PrintsCharmingError(Exception):
-    """Base class for exceptions in this module."""
+class PrintsCharmingException(Exception):
+    #Base class for exceptions in this Library.
+
+    # Class-level instance as the fallback
+    pc_exception_instance = PrintsCharming()
 
     def __init__(self,
                  message: str,
-                 pc: 'PrintsCharming',
-                 apply_style: Callable[[str, str], str],
+                 pc: Optional['PrintsCharming'] = None,
                  tb_style_name: str = 'default',
                  format_specific_exception: bool = False
                  ) -> None:
 
         super().__init__(message)
         self.message = message
-        self.pc = pc
-        self.apply_style = apply_style
+        self.pc = pc if pc else self.__class__.pc_exception_instance
+        self.apply_style = self.pc.apply_style
         self.tb_style_name = tb_style_name
         self.format_specific_exception = format_specific_exception
 
@@ -52,7 +58,7 @@ class PrintsCharmingError(Exception):
         # Only fetch subclass names if the flag is set to True
         subclass_names_with_colon = []
         if check_subclass_names:
-            subclass_names_with_colon = list(get_all_subclass_names(PrintsCharmingError, trailing_char=':'))
+            subclass_names_with_colon = list(get_all_subclass_names(PrintsCharmingException, trailing_char=':'))
 
         for line in tb_lines:
             leading_whitespace = re.match(r"^\s*", line).group()
@@ -152,35 +158,47 @@ class PrintsCharmingError(Exception):
         print()
 
 
-class ColorNotFoundError(PrintsCharmingError):
-    """Exception raised when a color is not found in the color map."""
+class ColorNotFoundError(PrintsCharmingException):
+    #Exception raised when a color is not found in the color map.
     pass
 
 
-class InvalidLengthError(PrintsCharmingError):
-    """Exception raised when an invalid length is provided."""
+class InvalidLengthError(PrintsCharmingException):
+    #Exception raised when an invalid length is provided.
     pass
 
 
-class UnsupportedEffectError(PrintsCharmingError):
-    """Exception raised when an unsupported effect is requested."""
+class UnsupportedEffectError(PrintsCharmingException):
+    #Exception raised when an unsupported effect is requested.
     pass
 
 
 # Custom exception hook to log unhandled exceptions using the logger
-def set_custom_excepthook_with_logging(logger, pc, unhandled_exception_debug=False, log_exc_info=False):
+def set_custom_excepthook_with_logging(logger, pc=None, unhandled_exception_debug=False, log_exc_info=False, critical_exceptions=None):
+    # Default critical exceptions if none are provided
+    if critical_exceptions is None:
+        critical_exceptions = (SystemExit, MemoryError, KeyboardInterrupt, OSError)
+
     def custom_excepthook(exc_type, exc_value, exc_traceback):
-        if issubclass(exc_type, PrintsCharmingError):
+        if issubclass(exc_type, PrintsCharmingException):
             # Handle PrintsCharming-specific exceptions
             exc_value.handle_exception()
         else:
-            general_exception = PrintsCharmingError(str(exc_value), pc, pc.apply_style)
+            # Use the passed `pc` or fallback to the class-level instance
+            pc_to_use = pc or PrintsCharmingException.pc_exception_instance
+            general_exception = PrintsCharmingException(str(exc_value), pc_to_use)
             tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
             styled_tb_lines = general_exception.stylize_traceback(tb_lines, check_subclass_names=False)
 
-            # Log the styled traceback
-            for line in styled_tb_lines:
-                logger.error(line, exc_info=log_exc_info)
+            if issubclass(exc_type, critical_exceptions):
+                # Log the styled traceback as critical for system-exiting or fatal errors
+                for line in styled_tb_lines:
+                    logger.critical(line, exc_info=log_exc_info)
+            else:
+                # Log the styled traceback as error for non-critical exceptions
+                for line in styled_tb_lines:
+                    logger.error(line, exc_info=log_exc_info)
+
 
             if unhandled_exception_debug:
                 # Call the default system excepthook

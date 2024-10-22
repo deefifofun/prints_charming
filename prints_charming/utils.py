@@ -4,7 +4,7 @@ import math
 import logging
 import tty
 import termios
-from .exceptions import PrintsCharmingError
+#from .exceptions import PrintsCharmingError
 
 
 
@@ -322,7 +322,7 @@ def get_terminal_width():
     return terminal_size.columns
 
 
-
+"""
 # Define the global exception hook
 def custom_excepthook(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, PrintsCharmingError):
@@ -346,7 +346,7 @@ def set_custom_excepthook():
 
 def set_custom_excepthook_with_logging():
     sys.excepthook = custom_excepthook_with_logging
-
+"""
 
 
 

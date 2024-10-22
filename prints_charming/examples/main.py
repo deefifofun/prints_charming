@@ -2,6 +2,8 @@
 
 from functools import partial
 from datetime import datetime
+from time import perf_counter
+from functools import wraps
 from typing import Any, Dict, List, Optional, Union
 
 
@@ -17,12 +19,11 @@ from prints_charming import (
     ToggleManager,
     FrameBuilder,
     InteractiveMenu,
-    PrintsCharmingError,
-    ColorNotFoundError,
-    set_custom_excepthook,
     colors_map_one,
     get_key,
 )
+
+from prints_charming.exceptions import PrintsCharmingException, ColorNotFoundError, set_excepthook, setup_exceptions
 
 from prints_charming.logging import PrintsCharmingFormatter, PrintsCharmingLogHandler, setup_logger
 
@@ -53,6 +54,156 @@ styled_strings = {
 }
 
 
+styled_strings2 = {
+    "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "Starting", "True", "C++"],
+    "green": ["apple"],
+    "vred": ["Error", "Failed", "None", "Skipping.", "Canceling", "Canceled", "Hobbies", "Skills", "False"],
+    "blue": ["CoinbaseWebsocketClient", "server", "Python"],
+    "yellow": ["1", "returned", "Flask", "Some", ],
+    "vyellow": ["File modified:", "File modified AGAIN", "subscribed", "=", "JavaScript"],
+    "magenta": ["within 10 seconds.", "how", "React", "this is a test"],
+    "cyan": ["|", "#", "are", "your", "Project Management System"],
+    "orange": ["New Message,", "Prints", "Software Developer", "Prince Charming"],
+    "purple": ["My color is purple", "Reading"],
+    # Uncomment the next line to hide API keys or sensitive information
+    # "conceal": [os.environ[key] for key in os.environ if "API" in key],
+    }
+
+
+
+
+class CustomError(PrintsCharmingException):
+    """Custom error for specific use cases."""
+    def __init__(self, message: str, pc: 'PrintsCharming', additional_info: str):
+        super().__init__(message, pc)
+        self.additional_info = additional_info
+
+    def handle_exception(self):
+        super().handle_exception()
+        print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
+
+
+class CustomError2(PrintsCharmingException):
+    """Custom error for specific use cases with additional context."""
+
+    _pc_instance = None  # Subclass-specific PrintsCharming instance
+
+    @classmethod
+    def set_pc(cls, pc: 'PrintsCharming'):
+        """Set the PrintsCharming instance for this subclass."""
+        cls._pc_instance = pc
+
+    def __init__(self, message: str = "Custom error occurred", additional_info: str = "Additional context info",
+                 pc_error: 'PrintsCharming' = None,
+                 check_subclass_names: bool = False,
+                 use_shared_pc: bool = False):
+
+        """
+        Initialize the exception.
+        If `use_shared_pc` is True, use the shared instance, otherwise use subclass-specific instance.
+        """
+
+        # Use subclass-specific pc instance if not using shared instance
+        if not use_shared_pc:
+            if not self.__class__._pc_instance:
+                raise ValueError("The PrintsCharming instance must be set using `CustomError2.set_pc()` before raising.")
+            self.pc = self.__class__._pc_instance
+        else:
+            if not PrintsCharmingException.shared_pc_exception_instance:
+                if not pc_error:
+                    raise ValueError(f"The init call to {self.__class__.__name__} instance must supply a pc instance to the pc_error parameter when use_shared_pc parameter is True.")
+                PrintsCharmingException.shared_pc_exception_instance = pc
+            self.pc = PrintsCharmingException.shared_pc_exception_instance  # Use shared instance
+
+
+
+        # Call the superclass constructor with default and passed parameters
+        super().__init__(message=message, pc=self.pc, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
+
+        # Store additional information for this custom error
+        self.additional_info = additional_info
+
+    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
+        """Handle the exception and print additional information."""
+        # Call the base class method to handle the exception
+        super().handle_exception()
+
+        # Print the additional information styled with cyan
+        print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
+
+
+
+class CustomError3(PrintsCharmingException):
+    """Another custom error subclass with its own PrintsCharming instance."""
+
+    _pc_instance = None  # Subclass-specific PrintsCharming instance
+
+    @classmethod
+    def set_pc(cls, pc: 'PrintsCharming'):
+        """Set the PrintsCharming instance for this subclass."""
+        cls._pc_instance = pc
+
+    def __init__(self, message: str = "CustomError3 occurred", additional_info: str = "Different context",
+                 pc_error: 'PrintsCharming' = None,
+                 check_subclass_names: bool = False,
+                 use_shared_pc: bool = False):
+        """
+        Initialize the exception.
+        If `use_shared_pc` is True, use the shared instance, otherwise use subclass-specific instance.
+        """
+        if not use_shared_pc:
+            if not self.__class__._pc_instance:
+                raise ValueError("The PrintsCharming instance must be set using `CustomError3.set_pc()` before raising.")
+            self.pc = self.__class__._pc_instance
+        else:
+            if not PrintsCharmingException.shared_pc_exception_instance:
+                if not pc_error:
+                    raise ValueError(f"The init call to {self.__class__.__name__} instance must supply a pc instance to the pc_error parameter when use_shared_pc parameter is True.")
+                PrintsCharmingException.shared_pc_exception_instance = pc
+            self.pc = PrintsCharmingException.shared_pc_exception_instance  # Use shared instance
+
+        self.additional_info = additional_info
+        super().__init__(message, pc=self.pc, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
+
+    def handle_exception(self):
+        """Handle the exception and print additional information."""
+        super().handle_exception()
+        print(self.pc.apply_style('green', self.additional_info), file=sys.stderr)
+
+
+# Timing decorator
+def time_step(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        step_start = perf_counter()
+        result = func(*args, **kwargs)
+        step_end = perf_counter()
+        elapsed_time = step_end - step_start
+        elapsed_time = f'{elapsed_time:.4f}'
+        print(f'{pc.apply_style('cyan', func.__name__)} took {pc.apply_style('vgreen', elapsed_time)} seconds to complete\n')
+        return result
+
+    return wrapper
+
+
+def time_total_execution(main_func):
+    def wrapper():
+        start_time = perf_counter()
+        try:
+            main_func()
+        except Exception as e:
+            message = f'An error occurred: {str(e)}'
+            styled_message = pc.apply_style('red', message)
+            # Raising the custom error with additional context
+            raise CustomError2(styled_message, pc_error=pc, additional_info="Execution failed in time_total_execution")
+        finally:
+            end_time = perf_counter()
+            total_time = end_time - start_time
+            total_time = f'{total_time:.4f}'
+            # Print total execution time with your styling
+            print(f'Total script execution time: {pc.apply_style('vgreen', total_time)} seconds!!!')
+
+    return wrapper
 
 
 
@@ -162,7 +313,7 @@ class StyleConditionsManager:
         return "purple" if position in ['top', 'right'] else "orange"
 
 
-class CustomError(PrintsCharmingError):
+class CustomError(PrintsCharmingException):
     """Custom error for specific use cases."""
 
     def __init__(self, message: str, pc: 'PrintsCharming', additional_info: str):
@@ -174,6 +325,7 @@ class CustomError(PrintsCharmingError):
         print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
 
 
+@time_step
 def custom_style_function(text: str, label_style: str, label_delimiter: str, pc) -> str:
     lines = text.split('\n')
     for i, line in enumerate(lines):
@@ -217,6 +369,7 @@ def my_custom_error(pc):
         e.handle_exception()
 
 
+@time_step
 def formatted_text_box_stuff():
     pc = PrintsCharming(config={"enable_logging": True}, style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
     builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
@@ -335,29 +488,35 @@ def formatted_text_box_stuff():
     print()
 
 
+@time_step
 def progress_bar(pc):
     print("Starting process...")
     pc.print_progress_bar()
     print("\nProcess complete.")
 
 
+@time_step
 # Dynamic Value Functions
 def get_dynamic_name():
     return "John Doe"
 
 
+@time_step
 def get_dynamic_age():
     return 20
 
 
+@time_step
 def get_dynamic_balance():
     return 5
 
 
+@time_step
 def get_dynamic_occupation():
     return "Software Developer"
 
 
+@time_step
 def kwargs_replace_and_style_placeholders_examples():
     pc = PrintsCharming(style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
 
@@ -424,6 +583,7 @@ def kwargs_replace_and_style_placeholders_examples():
     print(custom_replace_and_style_placeholders)
 
 
+@time_step
 def add_styled_substrings_to_instance(pc):
     pc.add_subword('please', 'yellow')
     pc.add_subword('substring', 'vyellow')
@@ -433,6 +593,7 @@ def add_styled_substrings_to_instance(pc):
     pc.add_subword('ex', 'vred')
 
 
+@time_step
 def random_examples():
     # Create a preconfigured instance of PrintsCharming
     # The first couple print statements though ugly demonstrate the nuanced and highly customizable and unbreakable relationship between color, bg_color, underlines, overlines, etc
@@ -558,6 +719,7 @@ def random_examples():
     pc.print2("This is a task.\n\n", style="task", color="green", underline=True)
 
 
+@time_step
 def print_horizontal_bg_strip(pc):
     print(styled_mini_border)
     print(f'function: print_horizontal_bg_strip:')
@@ -570,6 +732,7 @@ def print_horizontal_bg_strip(pc):
         e.handle_exception()
 
 
+@time_step
 def print_variable_examples(pc):
     print(styled_mini_border)
     print(f'function: print_variable_examples:')
@@ -584,6 +747,7 @@ def print_variable_examples(pc):
     print()
 
 
+@time_step
 def auto_styling_examples(pc, text):
     print(f'\n\n{styled_mini_border}')
     print(f'function: auto_styling_examples:')
@@ -617,6 +781,7 @@ def auto_styling_examples(pc, text):
     pc.print2("This string is connected to another", "string\n", color='vyellow')
 
 
+@time_step
 def index_styling_examples(pc):
     print(styled_mini_border)
     print(f'function: index_styling_examples:')
@@ -659,6 +824,7 @@ def index_styling_examples(pc):
     print(styled_sentence3)
 
 
+@time_step
 def variable_examples(pc):
     print(styled_mini_border)
     print(f'function: variable_examples:')
@@ -692,7 +858,7 @@ def variable_examples(pc):
     return text
 
 
-
+@time_step
 def simple_use_case(pc):
     ds = '\n' * 2
     ts = '\n' * 3
@@ -722,7 +888,7 @@ def simple_use_case(pc):
 
 
 
-
+@time_step
 def more_stuff():
     pc = PrintsCharming()
 
@@ -812,6 +978,7 @@ def more_stuff():
     print()
 
 
+@time_step
 def print_foreground_colors(pc, builder):
     for color in pc.color_map.keys():
         if builder.vert_char == ' ':
@@ -832,6 +999,7 @@ def print_foreground_colors(pc, builder):
     pc.print()
 
 
+@time_step
 def print_background_colors(pc, builder):
     for color in pc.color_map.keys():
         if builder.vert_char == ' ':
@@ -849,6 +1017,7 @@ def print_background_colors(pc, builder):
         pc.print(f"{bg_vert_border_left}{bg_bar_center_aligned}{bg_vert_border_right}")
 
 
+@time_step
 def print_styles(pc, builder):
     pc.print()
     for style_name in pc.styles.keys():
@@ -871,6 +1040,7 @@ def print_styles(pc, builder):
         pc.print(f'{print_styles_vert_border_left}{text_center_aligned}{print_styles_vert_border_right}')
 
 
+@time_step
 def print_colors_and_styles():
     pc = PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
@@ -882,7 +1052,7 @@ def print_colors_and_styles():
 
 
 
-
+@time_step
 def accuracy_style_function(accuracy):
     if accuracy > 0.9:
         return "vgreen"  # Very good accuracy
@@ -892,12 +1062,14 @@ def accuracy_style_function(accuracy):
         return "red"  # Poor accuracy
 
 
+@time_step
 def precision_style_function(precision):
     if precision < 0.75:
         return "red"  # Low precision
     return None  # No style for acceptable precision
 
 
+@time_step
 def recall_style_function(recall):
     if recall > 0.9:
         return "vgreen"  # High recall
@@ -907,6 +1079,7 @@ def recall_style_function(recall):
         return "red"  # Low recall
 
 
+@time_step
 def f1_score_style_function(f1_score, row):
     accuracy = row[1]  # Assume accuracy is the second column
     if abs(f1_score - accuracy) <= 0.05:
@@ -914,12 +1087,14 @@ def f1_score_style_function(f1_score, row):
     return None
 
 
+@time_step
 def training_time_style_function(training_time):
     if training_time > 300:
         return "orange"  # Long training time
     return None
 
 
+@time_step
 def age_style_function(age):
     if age < 18:
         return "vred"
@@ -930,6 +1105,7 @@ def age_style_function(age):
     return None
 
 
+@time_step
 def name_style_function(name):
     if name in ["Prince Charming", "John Smith"]:
         return "blue"
@@ -938,6 +1114,7 @@ def name_style_function(name):
     return None
 
 
+@time_step
 def occupation_style_function(occupation):
     if occupation in ['Prince', 'Princess']:
         return "orange"
@@ -950,6 +1127,7 @@ def occupation_style_function(occupation):
     return None
 
 
+@time_step
 def create_style_table_data(pc: PrintsCharming):
     table_data = [["Style Name", "Styled Text", "Styled Definition"]]
     for style_name, style_definition in pc.styles.items():
@@ -961,6 +1139,7 @@ def create_style_table_data(pc: PrintsCharming):
     return table_data
 
 
+@time_step
 def create_color_table_data(pc: PrintsCharming):
     table_data = [["Color Name", "Foreground Text", "Background Block"]]
     for color_name in pc.color_map.keys():
@@ -970,6 +1149,7 @@ def create_color_table_data(pc: PrintsCharming):
     return table_data
 
 
+@time_step
 def welcome():
     # None of these parameters are required for simple use cases as will be shown soon. You can simply init PrintsCharming with pc_instance = PrintsCharming()
     # To interactively create your own color_map where you can pick and name your own colors and default color do python -m prints_charming.show_colors. The point of this is to
@@ -1245,6 +1425,7 @@ def welcome():
     builder.print_border_boxed_table(less_simple_table, horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom, text_style="default", text_align="left")
 
 
+@time_step
 def experiment():
     style_conditions = StyleConditionsManager()
     pc = PrintsCharming(style_conditions=style_conditions)
@@ -1264,6 +1445,7 @@ def experiment():
 
 
 # Define the markdown printer using def
+@time_step
 def create_markdown_printer(pc_instance):
     def printer(*args, **kwargs):
         pc_instance.print_markdown(*args, sep=' ', **kwargs)
@@ -1271,6 +1453,7 @@ def create_markdown_printer(pc_instance):
     return printer
 
 
+@time_step
 def print_markdown(pc):
     printer = create_markdown_printer(pc)
     md_text = """
@@ -1307,10 +1490,20 @@ def print_markdown(pc):
     print()
 
 
+def highlight(text, style_name=None, return_list=False):
+    if not style_name:
+        style_name = 'highlight_arg'
+
+    if isinstance(text, str):
+        return pc.apply_style(style_name, text)
+    else:
+        return pc.apply_indexed_styles(text, style_name, return_list=return_list)
 
 
 
 class NewClass():
+
+    @time_step
     def __init__(self, pc, instance_name, arg1):
         self.pc = pc
         self.class_name = self.__class__.__name__
@@ -1318,17 +1511,29 @@ class NewClass():
         self.arg1 = arg1
         self.logger = setup_logger(pc=pc, name=self.class_name)
 
-    def highlight(self, text, style_name='highlight_arg'):
-        return self.pc.apply_style(style_name, text)
+    def highlight(self, text, style_name=None, return_list=False):
+        if not style_name:
+            style_name = 'highlight_arg'
 
+        if isinstance(text, str):
+            return self.pc.apply_style(style_name, text)
+        else:
+            return self.pc.apply_indexed_styles(text, style_name, return_list=return_list)
+
+
+    @time_step
     def get_names(self):
-        self.logger.debug('Getting name of class: {} from class_instance: {} with instance arg1 value: {}',
-                          self.highlight(self.class_name), self.highlight(self.instance_name), self.highlight(self.arg1))
+        text_args = [self.class_name, self.instance_name, self.arg1, self.pc.name]
+        style_name = ['red', 'orange', 'yellow', 'green']
+        highlighted_args = self.highlight(text_args, style_name=style_name, return_list=True)
+        self.logger.debug('Getting name of class: {} from class_instance: {} with instance arg1 value: {} using pc_instance_name: {}',
+                          *highlighted_args)
 
         return self.class_name, self.instance_name, self.arg1
 
 
 
+@time_step
 def play_around_with_logging():
     logger = setup_logger()
     pc = logger.pc
@@ -1355,7 +1560,7 @@ def play_around_with_logging():
     ###########################################################################################################
 
     # default_bg_color set to match jupyter notebook background in pycharm
-    logger2 = setup_logger(name='scratch', styles=copy.deepcopy(DEFAULT_STYLES), default_bg_color='jupyter')
+    logger2 = setup_logger(name='scratch', default_bg_color='jupyter')
 
     init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.print_dict(logger2.pc.config)}"
     logger2.debug(init_message)
@@ -1375,69 +1580,102 @@ def play_around_with_logging():
     return logger, logger2
 
 
+@time_step
+def set_shared_pc_exception_instance():
+    PrintsCharmingException.shared_pc_instance = PrintsCharming()
 
 
-def main(internal_logging=False):
 
-    # uncomment to play around with logging
-    logger, logger2 = play_around_with_logging()
+@time_step
+def custom_errors_orig(loggers):
 
-    random_examples()
+    for logger in loggers:
 
-    welcome()
+        try:
+            # Raise a CustomError
+            raise CustomError(f"CustomError occurred!", logger.pc, f"Logging with {logger.pc.name}")
+        except CustomError as e:
+            logger.error(f"Error caught: {e}")
 
-    pc = PrintsCharming(config={'internal_logging': True}) if internal_logging else PrintsCharming()
-    builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
-    pc.add_string('function', 'blue')
+        try:
+            # Raise a CustomError
+            raise CustomError("CustomError occurred!", logger.pc, "Logging with logger2")
+        except CustomError as e:
+            logger.error(f"Error caught: {e}")
 
-    print_colors_and_styles()
 
-    simple_use_case(pc)
+def custom_errors_2(logger1):
+    CustomError2.set_pc(pc)
 
-    text_from_variable_examples = variable_examples(pc)
-    index_styling_examples(pc)
-    auto_styling_examples(pc, text_from_variable_examples)
-    print_variable_examples(pc)
-    print_horizontal_bg_strip(pc)
-    more_stuff()
-    kwargs_replace_and_style_placeholders_examples()
-    formatted_text_box_stuff()
-    my_custom_error(pc)
-    #progress_bar(pc)
-    print_markdown(pc)
+    # Raise CustomError2 with logger1's PrintsCharming instance (subclass-specific)
+    try:
+        raise CustomError2("Error in CustomError2", additional_info="Context for CustomError2")
+    except CustomError2 as e:
+        print(f"CustomError2 caught with pc instance: {e.pc.name}")
+        e.handle_exception()
 
     try:
-        # Raise a CustomError
-        raise CustomError("Custom error occurred!", pc, "Additional context-specific information")
-    except CustomError as e:
-        logger.error(f"Error caught: {e}")
+        raise CustomError2("Custom error occurred!", additional_info="Logging CustomError2")
+    except CustomError2 as e:
+        logger1.error(f"Error caught: {e}")
 
+    # Change pc_instance
+    CustomError2.set_pc(pc)
 
+    # Raise CustomError2 using the shared PrintsCharming instance
     try:
-        # Raise a CustomError
-        raise CustomError("Custom error2 occurred!", pc, "Additional context-specific information2")
-    except CustomError as e:
-        logger2.error(f"Error caught: {e}")
+        raise CustomError2("Error in CustomError2 (Shared)", additional_info="Shared context for CustomError2", use_shared_pc=True)
+    except CustomError2 as e:
+        print(f"CustomError2 (Shared) caught with pc instance: {e.pc.name}")
+        e.handle_exception()
 
 
+def custom_errors_3():
+    # Raise CustomError3 with logger2's PrintsCharming instance (subclass-specific)
+    try:
+        raise CustomError3("Error in CustomError3", additional_info="Context for CustomError3", pc_error=pc, use_shared_pc=True)
+    except CustomError3 as e:
+        print(f"CustomError3 caught with pc instance: {e.pc.name}")
+        e.handle_exception()
+
+    # Raise CustomError3 using the shared PrintsCharming instance
+    try:
+        raise CustomError3("Error in CustomError3 (Shared)", additional_info="Shared context for CustomError3", use_shared_pc=True)
+    except CustomError3 as e:
+        print(f"CustomError3 (Shared) caught with pc instance: {e.pc.name}")
+        e.handle_exception()
+
+
+def custom_excepthook_error_example():
+    zero_div_error = 1 / 0
+
+
+def exception_examples(logger1, logger2, enable_custom_excepthook_error_example=False):
+    # Set different PrintsCharming instances for each CustomError subclass
+    CustomError2.set_pc(logger1.pc)
+    CustomError3.set_pc(logger2.pc)
+
+    loggers = [logger1, logger2]
+    custom_errors_orig(loggers)
+
+    custom_errors_2(logger1)
+
+    custom_errors_3()
+
+    # Default to False because script will exit
+    if enable_custom_excepthook_error_example:
+        custom_excepthook_error_example()
+
+
+def example_menu():
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
     menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
     menu.run()
 
 
-
-
-if __name__ == "__main__":
-    PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP.copy())
-    term_width = os.get_terminal_size().columns
-    quick_pc = PrintsCharming()
-    mini_border = '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    styled_mini_border = quick_pc.apply_color('orange', mini_border)
-
-
-
+def example_dynamic_formatter():
     # Example usage
     formatter = DynamicFormatter()
 
@@ -1477,15 +1715,15 @@ if __name__ == "__main__":
     formatter.write(multiple_lines, start="Start:\n", end="\nEnd.\n\n\n", spacing=0)
 
     # Conditional formatting for a negative number
-    neg_string = formatter.conditional_format(-42, quick_pc)
+    neg_string = formatter.conditional_format(-42, pc)
     print(neg_string)
 
     # Conditional formatting for a positive number
-    pos_string = formatter.conditional_format(42, quick_pc)
+    pos_string = formatter.conditional_format(42, pc)
     print(pos_string)
 
     # Conditional formatting for zero
-    zero_string = formatter.conditional_format(0, quick_pc)
+    zero_string = formatter.conditional_format(0, pc)
     print(zero_string)
 
     # Formatting datetime objects
@@ -1493,7 +1731,6 @@ if __name__ == "__main__":
     dt_now = formatter.format(datetime.now(), newlines=1)
 
     formatter.write(dt_now)
-
 
     # Set left and right padding characters, fill char, and format a string
     formatter.set_pad_char_left('*')
@@ -1524,20 +1761,7 @@ if __name__ == "__main__":
     print(formatted_output)
     print(f'\n\n\n')
 
-    styled_strings2 = {
-        "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "Starting", "True", "C++"],
-        "green": ["apple"],
-        "vred": ["Error", "Failed", "None", "Skipping.", "Canceling", "Canceled", "Hobbies", "Skills", "False"],
-        "blue": ["CoinbaseWebsocketClient", "server", "Python"],
-        "yellow": ["1", "returned", "Flask", "Some", ],
-        "vyellow": ["File modified:", "File modified AGAIN", "subscribed", "=", "JavaScript"],
-        "magenta": ["within 10 seconds.", "how", "React", "this is a test"],
-        "cyan": ["|", "#", "are", "your", "Project Management System"],
-        "orange": ["New Message,", "Prints", "Software Developer", "Prince Charming"],
-        "purple": ["My color is purple", "Reading"],
-        # Uncomment the next line to hide API keys or sensitive information
-        # "conceal": [os.environ[key] for key in os.environ if "API" in key],
-    }
+
 
     pc2 = PrintsCharming(styled_strings=styled_strings2)
 
@@ -1552,10 +1776,8 @@ if __name__ == "__main__":
     pc2.print(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
     print(f'\n\n\n')
 
-
     pc2.print2(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
     print(f'\n\n\n')
-
 
     styles = ['green', 'red', 'yellow', 'yellow', 'red']
     pc2.print2(*print_statements, start="\nStart:\n\t", end="\nEnd.\n", sep='\n\n\t\t', style=styles, style_args_as_one=False)
@@ -1582,11 +1804,81 @@ if __name__ == "__main__":
     formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
 
 
+def example_dynamic_method_injection():
+    quick_pc = PrintsCharming()
+    quick_pc2 = PrintsCharming(styles=DEFAULT_LOGGING_STYLES)
+    quick_pc.set_obj(quick_pc2)
+
+    print(f'quick_pc: {quick_pc}')
+    print(f'quick_pc2: {quick_pc2}')
+
+    quick_pc.dynamic_method("\n\nDynamic method used to print\n\n")
+
+
+
+@time_total_execution
+def main():
+
+    #################################################
+    # Logging
+    #################################################
+    logger1, logger2 = play_around_with_logging()
+
+    #################################################
+    # Exceptions
+    #################################################
+    exception_examples(logger1, logger2)
+
+    #################################################
+    # Random Examples
+    #################################################
+    random_examples()
+
+    #################################################
+
+    welcome()
+
+    #pc = PrintsCharming(config={'internal_logging': True}) if internal_logging else PrintsCharming()
+    builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
+
+    pc.add_string('function', 'blue')
+
+    print_colors_and_styles()
+
+    simple_use_case(pc)
+
+    text_from_variable_examples = variable_examples(pc)
+    index_styling_examples(pc)
+    auto_styling_examples(pc, text_from_variable_examples)
+    print_variable_examples(pc)
+    print_horizontal_bg_strip(pc)
+    more_stuff()
+    kwargs_replace_and_style_placeholders_examples()
+    formatted_text_box_stuff()
+    my_custom_error(pc)
+    #progress_bar(pc)
+    print_markdown(pc)
+
+    example_menu()
+
+    example_dynamic_formatter()
+
+    example_dynamic_method_injection()
+
+
+def divide_term_width(divisor):
+    return term_width // divisor
+
+
+
+if __name__ == "__main__":
+    PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP.copy())
+    term_width = os.get_terminal_size().columns
+    pc = PrintsCharming()
+
+    mini_border = '!' * divide_term_width(6)
+    styled_mini_border = pc.apply_color('orange', mini_border)
+
     main()
-
-
-
-
-
 
 

@@ -74,7 +74,7 @@ class ColorMapManager:
         os.system('clear')
 
 
-        pc.print(f'{pc.apply_index_style(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
+        pc.print(f'{pc.apply_indexed_styles(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
 
         print(' ')
 
@@ -122,7 +122,7 @@ class ColorMapManager:
                     message = self._add_color(user_input)
 
 
-            pc.print(f'{pc.apply_index_style(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
+            pc.print(f'{pc.apply_indexed_styles(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
 
             if message:
                 pc.print(f'{message}', style='message')
