@@ -262,46 +262,11 @@ class PrintsCharming:
         self.logger = shared_logger
         self.setup_internal_logging(self.config.get("log_level", "DEBUG"))
 
-        self._obj = None
-
         # Setup logging
         # self.logger = None
         # self.setup_logging(self.config["internal_logging"], self.config["log_level"])
 
-    def set_obj(self, new_obj):
-        """
-        Method to set or update the object that `obj` refers to.
-        """
-        self._obj = new_obj
-        print(f"Object set to: {self._obj}")
 
-    def inject_obj(method):
-        """
-        A decorator to dynamically inject `self._obj` as the first parameter `obj`.
-        """
-
-        @wraps(method)
-        def wrapper(self, *args, **kwargs):
-            # Inject `self._obj` into the method as the first parameter `obj`
-            obj = self._obj
-            if obj is None:
-                raise ValueError("No object has been set for obj.")
-            return method(obj, *args, **kwargs)
-
-        return wrapper
-
-    @inject_obj
-    def dynamic_method(obj, method, *args, **kwargs):
-        """
-        Method where `obj` is dynamically injected.
-        Calls the method on obj if it exists.
-        """
-        # Use getattr with a default value of None
-        target_method = getattr(obj, method, None)
-        if target_method:
-            target_method(*args, **kwargs)
-        else:
-            print(f"The object {obj} does not have a method {method}.")
 
 
     def escape_ansi_codes(self, ansi_string):

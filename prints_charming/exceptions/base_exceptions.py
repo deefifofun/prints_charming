@@ -28,52 +28,7 @@ class PrintsCharmingException(Exception):
     # Critical Exceptions
     critical_exceptions = (SystemExit, MemoryError, KeyboardInterrupt, OSError)
 
-    # Builtin Exceptions
-    builtin_exceptions = [
-        OverflowError,
-        ZeroDivisionError,
-        FloatingPointError,
-        AssertionError,
-        AttributeError,
-        BufferError,
-        EOFError,
-        ImportError,
-        ModuleNotFoundError,
-        IndexError,
-        KeyError,
-        MemoryError,
-        NameError,
-        UnboundLocalError,
-        BlockingIOError,
-        FileNotFoundError,
-        PermissionError,
-        ReferenceError,
-        RuntimeError,
-        RecursionError,
-        SyntaxError,
-        TypeError,
-        ValueError,
-        UnicodeEncodeError,
-        ChildProcessError,
-        ConnectionError,
-        BrokenPipeError,
-        ProcessLookupError,
-        TimeoutError,
-        NotImplementedError,
-        StopIteration,
-        StopAsyncIteration,
-        SystemError,
-        TabError,
-        DeprecationWarning,
-        PendingDeprecationWarning,
-        SyntaxWarning,
-        UserWarning,
-        ResourceWarning,
-        BytesWarning,
-        GeneratorExit,
-        KeyboardInterrupt,
-        SystemExit
-    ]
+
 
     def __init__(self,
                  message: str,
@@ -234,13 +189,6 @@ class PrintsCharmingException(Exception):
             # Print the styled traceback to stderr
             for line in styled_tb_lines:
                 print(line, file=sys.stderr)
-
-        """
-
-        # Print the stylized traceback
-        for line in styled_tb_lines:
-            print(line, file=sys.stderr)
-        """
 
         print()
 

@@ -72,13 +72,15 @@ styled_strings2 = {
 
 
 
+
+
 class CustomError(PrintsCharmingException):
     """Custom error for specific use cases."""
     def __init__(self, message: str, pc: 'PrintsCharming', additional_info: str):
         super().__init__(message, pc)
         self.additional_info = additional_info
 
-    def handle_exception(self):
+    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
         super().handle_exception()
         print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
 
@@ -207,6 +209,15 @@ def time_total_execution(main_func):
 
 
 
+@time_step
+def example_menu():
+    # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
+    menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
+    menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
+    menu.run()
+
+
+
 class BorderBoxStyles:
 
     def __init__(self):
@@ -312,17 +323,6 @@ class StyleConditionsManager:
     def welcome_style(self, position: str) -> str:
         return "purple" if position in ['top', 'right'] else "orange"
 
-
-class CustomError(PrintsCharmingException):
-    """Custom error for specific use cases."""
-
-    def __init__(self, message: str, pc: 'PrintsCharming', additional_info: str):
-        super().__init__(message, pc, pc.apply_style)
-        self.additional_info = additional_info
-
-    def handle_exception(self):
-        super().handle_exception()
-        print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
 
 
 @time_step
@@ -594,67 +594,84 @@ def add_styled_substrings_to_instance(pc):
 
 
 @time_step
-def random_examples():
-    # Create a preconfigured instance of PrintsCharming
-    # The first couple print statements though ugly demonstrate the nuanced and highly customizable and unbreakable relationship between color, bg_color, underlines, overlines, etc
-    # and how they are configured to behave in the spacing between words dependent on the share_alike parameters in the print statement, which default to what made the most sense to
-    # me but is highly customizable for different use cases. Like when spacing/gaps/etc between words are filled with bg, underline etc they need to share fg_colors for underline,
-    # bg_colors for bg_color in the space/gap/sep, the rules and relationships depend on the different styles associated with the indexes of the different
-    # words/phrases/substrings/variables/numbers/other/styles/etc/highly dynamic and like i said configurable...legit documentation
-    # to come. In the meantime you can keep as is or mess around with the PrintsCharming print method parameters.
-
-    pc = PrintsCharming(styled_strings=styled_strings)
-
-    add_styled_substrings_to_instance(pc)
-
+def print1(pc):
     pc.print(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
-
-    pc.print2(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
-
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
-
-    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
-
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
-
-    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
-
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=3)
-
-    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=3)
-
-    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=5)
-
-    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=5)
-
-    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=1)
-
-    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=1)
-
-    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
-
-    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
-
-    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
-
-    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', subword_style_option=2)
-
-    pc.print(f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', phrase_norm=True, subword_style_option=2)
-
-    pc.print2(f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n', color='purple', phrase_norm=True, subword_style_option=2)
-
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=5)
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=1)
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=2)
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=2)
+    pc.print(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', phrase_norm=True, subword_style_option=2)
     pc.print(' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True, end='\n\n')
 
+
+
+
+
+@time_step
+def print2(pc):
+    pc.print2(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
+    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
+    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
+    pc.print2(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=3)
+    pc.print2(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=5)
+    pc.print2(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=1)
+    pc.print2(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=2)
+    pc.print2(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it this is a test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', subword_style_option=2)
+    pc.print2(
+        f'Here    are    some examples of substringsse.     Some make the whole please word it this\nis\na test is part of colored others only color the substring. part of the word.     apple     snapple    pineapple!\n\n',
+        color='purple', phrase_norm=True, subword_style_option=2)
     pc.print2(' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True, end='\n\n')
 
+
+@time_step
+def test1(pc):
     # Basic printing with ColorPrinter using default style and color
     pc.print("Hello, world!")
+
+
+@time_step
+def test2(pc):
+    # Basic printing with ColorPrinter using default style and color
     pc.print2("Hello, world!")
 
+
+
+@time_step
+def test1_reversed(pc):
     # Print with default style reversed foreground and background colors
     pc.print("Hello, world!", reverse=True)
+
+
+
+@time_step
+def test2_reversed(pc):
+    # Print with default style reversed foreground and background colors
     pc.print2("Hello, world!", reverse=True)
 
+
+@time_step
+def test_my_style_code(pc):
     my_style_code = pc.create_style_code(PStyle(color='green', bg_color='white', underline=True))
 
     my_style_code2 = pc.create_style_code(dict(color='orange', bg_color='white'))
@@ -669,7 +686,41 @@ def random_examples():
 
     mytext3_styled = pc.apply_style_code(my_style_code3, mytext3)
 
-    print(mytext3_styled)
+    pc.print(mytext3_styled, skip_ansi_check=True)
+
+    pc.print2(mytext3_styled, skip_ansi_check=True)
+
+    print(f'{mytext3_styled}\n\n')
+
+
+@time_step
+def random_examples():
+    # Create a preconfigured instance of PrintsCharming
+    # The first couple print statements though ugly demonstrate the nuanced and highly customizable and unbreakable relationship between color, bg_color, underlines, overlines, etc
+    # and how they are configured to behave in the spacing between words dependent on the share_alike parameters in the print statement, which default to what made the most sense to
+    # me but is highly customizable for different use cases. Like when spacing/gaps/etc between words are filled with bg, underline etc they need to share fg_colors for underline,
+    # bg_colors for bg_color in the space/gap/sep, the rules and relationships depend on the different styles associated with the indexes of the different
+    # words/phrases/substrings/variables/numbers/other/styles/etc/highly dynamic and like i said configurable...legit documentation
+    # to come. In the meantime you can keep as is or mess around with the PrintsCharming print method parameters.
+
+    pc = PrintsCharming(styled_strings=styled_strings)
+
+    add_styled_substrings_to_instance(pc)
+
+    print1(pc)
+    print2(pc)
+
+    test1(pc)
+    test2(pc)
+
+    test1_reversed(pc)
+    test2_reversed(pc)
+
+
+    test_my_style_code(pc)
+
+
+
 
     pc.add_string('This phrase styled in green', 'green')
     pc.add_string("I'm completely yellow!", 'vyellow')
@@ -689,9 +740,6 @@ def random_examples():
     pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
              '   orange phrase          white bg', color='green', underline=True, overline=True, skip_ansi_check=True)
 
-    pc.print(mytext3_styled, skip_ansi_check=True)
-
-    pc.print2(mytext3_styled, skip_ansi_check=True)
 
     some_var = 21
 
@@ -1611,16 +1659,6 @@ def example_dynamic_formatter():
     formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
 
 
-def example_dynamic_method_injection():
-    quick_pc.set_obj(quick_pc2)
-
-    print(f'quick_pc: {quick_pc}')
-    print(f'quick_pc2: {quick_pc2}')
-
-    quick_pc.dynamic_method("\n\nDynamic method used to print\n\n")
-
-
-
 
 def highlight(text, style_name=None, return_list=False):
     if not style_name:
@@ -1793,22 +1831,12 @@ def exception_examples(logger1, logger2, enable_custom_excepthook_error_example=
 
     loggers = [logger1, logger2]
     custom_errors_orig(loggers)
-
     custom_errors_2(logger1)
-
     custom_errors_3()
 
     # Default to False because script will exit
     if enable_custom_excepthook_error_example:
         custom_excepthook_error_example()
-
-
-@time_step
-def example_menu():
-    # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
-    menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
-    menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
-    menu.run()
 
 
 
@@ -1858,7 +1886,8 @@ def main():
     example_menu()
 
     #example_dynamic_formatter()
-    #example_dynamic_method_injection()
+
+
 
 
 def divide_term_width(divisor):
@@ -1877,6 +1906,11 @@ if __name__ == "__main__":
     quick_pc = PrintsCharming()
     quick_pc2 = PrintsCharming(styles=DEFAULT_LOGGING_STYLES)
 
-    main()
+    try:
+        main()
+    except CustomError2 as e:
+        print(f"Caught CustomError2: {e}")
+        print(f"Additional info: {e.additional_info}")
+        e.handle_exception()
 
 
