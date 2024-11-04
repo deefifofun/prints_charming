@@ -3,19 +3,31 @@
 import sys
 import traceback
 import warnings
+import logging
+from typing import Any, Callable, Optional, Tuple, Type, Union
 from .base_exceptions import PrintsCharmingException
 
 
-def set_excepthook(pc, logger=None, log_exc_info=False, critical_exceptions=None, update_exception_logging=False):
+def set_excepthook(
+        pc: 'PrintsCharming',
+        logger: Optional[logging.Logger] = None,
+        log_exc_info: bool = False,
+        critical_exceptions: Optional[Tuple[Type[BaseException], ...]] = None,
+        update_exception_logging: bool = False
+) -> None:
     """
-    Common helper to set sys.excepthook for handling exceptions with PrintsCharming.
-    Optionally, add logging functionality if logger is provided.
+    Configures a custom exception handler for unhandled exceptions, optionally
+    logging them if a logger is provided.
 
     Args:
         pc (PrintsCharming): Instance of PrintsCharming used for styling exceptions.
-        logger (logging.Logger): Logger instance for logging unhandled exceptions.
-        log_exc_info (bool): Whether to log exception info when logging is enabled.
-        critical_exceptions (tuple): List of critical exceptions to log as critical.
+        logger (Optional[logging.Logger]): Logger instance for logging unhandled
+            exceptions, if provided.
+        log_exc_info (bool): Whether to include exception info when logging.
+        critical_exceptions (Optional[Tuple[Type[BaseException], ...]]): Tuple
+            of exception types considered critical.
+        update_exception_logging (bool): Whether to override an existing custom
+            exception hook.
     """
 
     if pc:
@@ -26,55 +38,99 @@ def set_excepthook(pc, logger=None, log_exc_info=False, critical_exceptions=None
 
 
 
-    def custom_excepthook(exc_type, exc_value, exc_traceback):
+    def custom_excepthook(
+        exc_type: Union[Type[BaseException], Type[PrintsCharmingException]],
+        exc_value: Union[BaseException, PrintsCharmingException],
+        exc_traceback: Optional[Any]
+    ) -> None:
+        """
+        Custom exception hook to handle both PrintsCharming-specific and general exceptions.
+
+        Args:
+            exc_type (Union[Type[BaseException], Type[PrintsCharmingException]]):
+                Type of the exception raised.
+            exc_value (Union[BaseException, PrintsCharmingException]):
+                Exception instance raised.
+            exc_traceback (Optional[Any]):
+                Traceback object of the exception.
+        """
+
         # Check if the exception is a subclass of PrintsCharmingException
         if issubclass(exc_type, PrintsCharmingException):
             exc_value.handle_exception()
         else:
             # Handle non-PrintsCharming exceptions
-            general_exception = PrintsCharmingException(str(exc_value), pc, use_shared_pc=True)
-            general_exception.handle_exception(logger=logger, exc_type=exc_type, exc_value=exc_value, exc_info=log_exc_info)
-
-            """
-            
-            tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-            styled_tb_lines = general_exception.stylize_traceback(tb_lines, check_subclass_names=False)
-            """
-
-            """
-            # Log the exception if a logger is provided
-            if logger:
-                if issubclass(exc_type, critical_exceptions):
-                    for line in styled_tb_lines:
-                        logger.critical(line, exc_info=log_exc_info)
-                else:
-                    for line in styled_tb_lines:
-                        logger.error(line, exc_info=log_exc_info)
-            else:
-                # Print the styled traceback to stderr
-                for line in styled_tb_lines:
-                    print(line, file=sys.stderr)
-            """
+            general_exception = PrintsCharmingException(
+                str(exc_value),
+                pc,
+                use_shared_pc=True
+            )
+            general_exception.handle_exception(
+                logger=logger,
+                exc_type=exc_type,
+                exc_value=exc_value,
+                exc_info=log_exc_info
+            )
 
     # Store the original excepthook
     default_excepthook = sys.__excepthook__
 
+
     # Check if the current excepthook is custom
-    def is_custom_excepthook():
+    def is_custom_excepthook() -> bool:
+        """
+        Checks if the current excepthook is custom.
+
+        Returns:
+            bool: True if a custom excepthook is already set, False otherwise.
+        """
         return sys.excepthook is not default_excepthook
 
-    # Check if it's custom
+
     if is_custom_excepthook():
         if not update_exception_logging:
+            msg_parts = [
+                pc.apply_style(
+                    'red',
+                    'sys.excepthook has already been custom set.'
+                ),
+                pc.apply_style(
+                    'blue',
+                    'Change'
+                ),
+                pc.apply_style(
+                    'orange',
+                    'update_custom_excepthook ='
+                ),
+                "True to update the custom excepthook."
+            ]
+
+            """
+            msg_sec1 = pc.apply_style(
+                'red',
+                'sys.excepthook has already been custom set.'
+            )
+            msg_sec2 = pc.apply_style(
+                'blue',
+                'Change'
+            )
+            msg_sec3 = pc.apply_style(
+                'orange',
+                'update_custom_excepthook ='
+            )
+            msg_sec4 = f"True to update the custom excepthook."
+            msg = f'{msg_sec1} {msg_sec2} {msg_sec3} {msg_sec4}'
+            """
+
+            msg = ' '.join(msg_parts)
             if logger:
-                pc.print(
-                    f"{pc.apply_style('red', 'sys.excepthook has already been custom set.')} {pc.apply_style('blue', 'Change')} {pc.apply_style('orange', 'update_custom_excepthook =')} True to update the custom excepthook.", color='blue')
+                logger.info(msg)
+
             else:
-                pc.print(f"{pc.apply_style('red', 'sys.excepthook has already been custom set.')} {pc.apply_style('blue', 'Change')} {pc.apply_style('orange', 'update_custom_excepthook =')} True to update the custom excepthook.", color='blue')
+                #pc.print(f"{msg_sec1} {msg_sec2} {msg_sec3} {msg_sec4}", color='blue')
+                pc.print(msg, color='green')
         else:
             sys.excepthook = custom_excepthook
     else:
         sys.excepthook = custom_excepthook
 
-    # Set the custom excepthook globally
-    #sys.excepthook = custom_excepthook

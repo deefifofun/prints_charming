@@ -14,8 +14,36 @@ import copy
 
 
 class TableManager:
+    _shared_pc_instance = None
+
+    @classmethod
+    def get_shared_pc_instance(cls):
+        """
+        Get the shared PrintsCharming instance for TableManager.
+
+        Returns:
+            PrintsCharming: The shared PrintsCharming instance for TableManager, or None if not set.
+        """
+        return cls._shared_pc_instance
+
+    @classmethod
+    def set_shared_pc_instance(cls, pc_instance):
+        """
+        Set the shared PrintsCharming instance for TableManager.
+
+        Args:
+            pc_instance (PrintsCharming): The PrintsCharming instance to set as shared for TableManager.
+        """
+        cls._shared_pc_instance = pc_instance
+
+
     def __init__(self, pc: PrintsCharming = None, style_themes: dict = None, conditional_styles: dict = None):
-        self.pc = pc or PrintsCharming(color_map=DEFAULT_COLOR_MAP.copy(), styles=copy.deepcopy(DEFAULT_STYLES))
+        self.pc = (
+                pc
+                or self.__class__.get_shared_pc_instance()
+                or PrintsCharming.get_shared_instance()
+                or PrintsCharming(color_map=DEFAULT_COLOR_MAP.copy(), styles=copy.deepcopy(DEFAULT_STYLES))
+        )
         self.style_themes = style_themes
         self.conditional_styles = conditional_styles
         self.tables = {}
@@ -148,7 +176,7 @@ class TableManager:
                         aligned_cell = self.pc.apply_color(color_name, aligned_cell)
                     elif header[i] == 'Background Block':
                         color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.pc.return_bg(color_name, length=max_length)
+                        aligned_cell = self.pc.generate_bg_bar_strip(color_name, length=max_length)
                     elif header[i] == 'Style Name':
                         aligned_cell = self.pc.apply_style(cell_str, aligned_cell)
                     elif header[i] == 'Styled Text':

@@ -3,7 +3,7 @@
 import logging
 
 # Use the library's name as the logger's name
-shared_logger = logging.getLogger('prints_charming')
+shared_logger = logging.getLogger(__package__)
 shared_logger.setLevel(logging.NOTSET)  # allow users to configure the level
 
 # Ensure the logger only gets configured once

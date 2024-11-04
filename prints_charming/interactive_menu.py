@@ -24,6 +24,28 @@ from .utils import get_key
 
 
 class InteractiveMenu:
+    _shared_pc_instance = None
+
+    @classmethod
+    def get_shared_pc_instance(cls):
+        """
+        Get the shared PrintsCharming instance for InteractiveMenu.
+
+        Returns:
+            PrintsCharming: The shared PrintsCharming instance for InteractiveMenu, or None if not set.
+        """
+        return cls._shared_pc_instance
+
+    @classmethod
+    def set_shared_pc_instance(cls, pc_instance):
+        """
+        Set the shared PrintsCharming instance for InteractiveMenu.
+
+        Args:
+            pc_instance (PrintsCharming): The PrintsCharming instance to set as shared for InteractiveMenu.
+        """
+        cls._shared_pc_instance = pc_instance
+
     def __init__(self, selected_style, *initial_menu_configs, pc=None,
                  unselected_style=None,
                  confirmed_style=None,
@@ -33,7 +55,12 @@ class InteractiveMenu:
                  ):
 
 
-        self.pc = pc or PrintsCharming()
+        self.pc = (
+                pc
+                or self.__class__.get_shared_pc_instance()
+                or PrintsCharming.get_shared_instance()
+                or PrintsCharming()
+        )
         self.reset = self.pc.reset
 
         # Dictionary to hold menus and their types (vertical or horizontal)

@@ -4,6 +4,7 @@ import logging
 import copy
 import time
 from socket import gethostname
+from typing import Any, Callable, Dict, Optional, Union
 
 from ..prints_charming_defaults import (
     DEFAULT_CONFIG,
@@ -19,8 +20,43 @@ from ..prints_charming import PrintsCharming
 
 
 class PrintsCharmingFormatter(logging.Formatter):
+    """
+    Custom logging formatter using PrintsCharming for styling log messages.
 
-    def __init__(self, pc, datefmt=None, style='%', timestamp_style_name=None, level_styles=None, use_styles=True, internal_logging=False):
+    Attributes:
+        pc (PrintsCharming): PrintsCharming instance for styling.
+        apply_style (Callable): Method to apply styles.
+        get_style_code (Callable): Method to get style codes.
+        reset (str): ANSI reset code.
+        hostname (str): Hostname of the machine.
+        timestamp_style (Optional[str]): Style name for the timestamp.
+        level_styles (Dict[int, str]): Mapping from log levels to style names.
+        use_styles (bool): Whether to apply styles.
+        _style_cache (Dict[str, str]): Cache for style codes.
+    """
+
+    def __init__(
+        self,
+        pc: Optional[PrintsCharming],
+        datefmt: Optional[str] = None,
+        style: str = '%',
+        timestamp_style_name: Optional[str] = None,
+        level_styles: Optional[Dict[int, str]] = None,
+        use_styles: bool = True,
+        internal_logging: bool = False
+    ) -> None:
+        """
+        Initialize the PrintsCharmingFormatter.
+
+        Args:
+            pc (Optional[PrintsCharming]): PrintsCharming instance for styling.
+            datefmt (Optional[str]): Date format string.
+            style (str): Style for formatting.
+            timestamp_style_name (Optional[str]): Style name for the timestamp.
+            level_styles (Optional[Dict[int, str]]): Mapping from log levels to style names.
+            use_styles (bool): Whether to apply styles.
+            internal_logging (bool): Whether internal logging is enabled.
+        """
         super().__init__(datefmt=datefmt, style=style)
         self.pc = pc or PrintsCharming(styles=copy.deepcopy(DEFAULT_LOGGING_STYLES))
 
@@ -35,13 +71,18 @@ class PrintsCharmingFormatter(logging.Formatter):
         self.timestamp_style = timestamp_style_name
         self.level_styles = level_styles or self.default_level_styles
         self.use_styles = use_styles
-        self._style_cache = {}
+        self._style_cache: Dict[str, str] = {}
 
 
 
     @property
-    def default_level_styles(self):
-        """Default log level to style mapping."""
+    def default_level_styles(self) -> Dict[int, str]:
+        """
+        Default log level to style mapping.
+
+        Returns:
+            Dict[int, str]: Mapping from log levels to style names.
+        """
         return {
             logging.DEBUG: 'debug',
             logging.INFO: 'info',
@@ -51,7 +92,23 @@ class PrintsCharmingFormatter(logging.Formatter):
         }
 
 
-    def formatTime(self, record, datefmt=None, ms_format="{:04.0f}"):
+    def formatTime(
+        self,
+        record: logging.LogRecord,
+        datefmt: Optional[str] = None,
+        ms_format: str = "{:04.0f}"
+    ) -> str:
+        """
+        Format the time of the log record.
+
+        Args:
+            record (logging.LogRecord): The log record.
+            datefmt (Optional[str]): Date format string.
+            ms_format (str): Milliseconds format.
+
+        Returns:
+            str: Formatted timestamp.
+        """
         t = time.localtime(record.created)
         if datefmt:
             s = time.strftime(datefmt, t)
@@ -63,35 +120,93 @@ class PrintsCharmingFormatter(logging.Formatter):
         return s
 
 
-    def get_log_level_style(self, record):
-        """Returns the style for the current log level."""
+    def get_log_level_style(self, record: logging.LogRecord) -> str:
+        """
+        Returns the style for the current log level.
+
+        Args:
+            record (logging.LogRecord): The log record.
+
+        Returns:
+            str: Style name.
+        """
         return self.level_styles.get(record.levelno, 'default')
 
-    def format_log_level_label(self, record):
-        """Constructs the log level label."""
+
+    def format_log_level_label(self, record: logging.LogRecord) -> str:
+        """Constructs the log level label.
+
+        Args:
+            record (logging.LogRecord): The log record.
+
+        Returns:
+            str: Styled log level label.
+        """
         log_level_label = f"LOG[{record.levelname}]" + ' ' * (8 - len(record.levelname))
         return self.apply_style(self.get_log_level_style(record), log_level_label)
 
-    def style_record_attributes(self, record):
-        """Styles the record attributes (hostname, filename, etc.)."""
+
+    def style_record_attributes(self, record: logging.LogRecord) -> None:
+        """
+        Styles the record attributes (hostname, filename, etc.).
+
+        Args:
+            record (logging.LogRecord): The log record.
+        """
         record.hostname = self.apply_style('hostname', self.hostname)
         record.filename = self.apply_style('filename', record.filename)
         record.name = self.apply_style('record_name', record.name)
         record.funcName = self.apply_style('method_name', record.funcName)
         record.lineno = self.apply_style('line_number', record.lineno)
 
-    def format_message(self, record, log_level_style_code, log_level_label, timestamp):
-        """Constructs the final log message."""
+
+    def format_message(
+        self,
+        record: logging.LogRecord,
+        log_level_style_code: str,
+        log_level_label: str,
+        timestamp: str
+    ) -> str:
+        """
+        Constructs the final log message.
+
+        Args:
+            record (logging.LogRecord): The log record.
+            log_level_style_code (str): Style code for the log level.
+            log_level_label (str): Styled log level label.
+            timestamp (str): Formatted timestamp.
+
+        Returns:
+            str: Final formatted log message.
+        """
         styled_timestamp = self.apply_style(self.get_timestamp_style(record), timestamp) + f"{int(record.msecs):04.0f}"
         styled_log_level_prefix = log_level_label
         return f"{styled_timestamp} {styled_log_level_prefix} {record.msg}"
 
-    def get_timestamp_style(self, record):
-        """Gets the style for the timestamp."""
+
+    def get_timestamp_style(self, record: logging.LogRecord) -> str:
+        """
+        Gets the style for the timestamp.
+
+        Args:
+            record (logging.LogRecord): The log record.
+
+        Returns:
+            str: Style name for the timestamp.
+        """
         return self.timestamp_style or self.get_log_level_style(record)
 
+
     def format(self, record: logging.LogRecord) -> str:
-        """Main format method that builds the log message."""
+        """
+        Main format method that builds the log message.
+
+        Args:
+            record (logging.LogRecord): The log record.
+
+        Returns:
+            str: Formatted log message.
+        """
         timestamp = f"{self.formatTime(record, self.datefmt)}"
         log_level_style_code = self.get_style_code(self.get_log_level_style(record))
         log_level_label = self.format_log_level_label(record)
@@ -105,8 +220,19 @@ class PrintsCharmingFormatter(logging.Formatter):
 
         return log_message
 
-    def format_record_message(self, record, log_level_style_code):
-        """Formats the `record.msg`."""
+
+    def format_record_message(
+        self,
+        record: logging.LogRecord,
+        log_level_style_code: str
+    ) -> None:
+        """
+        Formats the `record.msg`.
+
+        Args:
+            record (logging.LogRecord): The log record.
+            log_level_style_code (str): Style code for the log level.
+        """
         if record.args:
             args_style_code = self.get_style_code('args')
             record.msg = record.msg.format(*[
@@ -114,15 +240,38 @@ class PrintsCharmingFormatter(logging.Formatter):
             ])
             record.args = ()  # Clear args to prevent further formatting
         record.msg = f"{log_level_style_code}{record.msg}{self.reset}"
-        record.msg = f"{record.hostname} - {record.filename} {record.name} {record.funcName}:{record.lineno} - {record.msg}"
+        record.msg = (
+            f"{record.hostname} - {record.filename} {record.name} "
+            f"{record.funcName}:{record.lineno} - {record.msg}"
+        )
 
-    def format_plain_message(self, record, timestamp, log_level_label):
-        """Formats a plain (non-styled) log message."""
+
+    def format_plain_message(
+        self,
+        record: logging.LogRecord,
+        timestamp: str,
+        log_level_label: str
+    ) -> str:
+        """
+        Formats a plain (non-styled) log message.
+
+        Args:
+            record (logging.LogRecord): The log record.
+            timestamp (str): Formatted timestamp.
+            log_level_label (str): Log level label.
+
+        Returns:
+            str: Plain formatted log message.
+        """
         if record.args:
             record.msg = record.msg.format(record.args)
             record.args = ()  # Prevent further formatting attempts
-        return f"{timestamp} {log_level_label} {self.hostname} - {record.filename} {record.name} {record.funcName}:{record.lineno} - {record.msg}"
-
+        #return f"{timestamp} {log_level_label} {self.hostname} - {record.filename} {record.name} {record.funcName}:{record.lineno} - {record.msg}"
+        record.msg = (
+            f"{self.hostname} - {record.filename} {record.name} "
+            f"{record.funcName}:{record.lineno} - {record.msg}"
+        )
+        return f"{timestamp} {log_level_label} {record.msg}"
 
     def format_orig(self, record: logging.LogRecord) -> str:
 

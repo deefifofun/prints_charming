@@ -4,13 +4,25 @@ import re
 import traceback
 import sys
 import copy
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 from ..prints_charming_defaults import DEFAULT_STYLES
 
 
 
 
-def get_all_subclass_names(cls, trailing_char=None):
+def get_all_subclass_names(cls: Type[Any],
+                           trailing_char: Optional[str] = None
+                           ) -> Set[str]:
+    """
+    Recursively get the names of all subclasses of a given class.
+
+    Args:
+        cls (Type[Any]): The base class to find subclasses of.
+        trailing_char (Optional[str]): A character to append to each subclass name.
+
+    Returns:
+        Set[str]: A set of subclass names.
+    """
     subclasses = set(cls.__subclasses__())
     result = {subclass.__name__ + (trailing_char or '') for subclass in subclasses}
     for subclass in subclasses.copy():
@@ -20,31 +32,52 @@ def get_all_subclass_names(cls, trailing_char=None):
 
 
 class PrintsCharmingException(Exception):
-    """Base class for all exceptions using PrintsCharming."""
+    """Base class for all exceptions using PrintsCharming.
+
+    Attributes:
+        message (str): The exception message.
+        pc (PrintsCharming): Instance of PrintsCharming for styling.
+        reset (str): ANSI reset code.
+        apply_style (Callable): Method to apply styles.
+        tb_style_name (str): Name of the traceback style to use.
+        format_specific_exception (bool): Whether to format specific exceptions.
+        file_line_regex (re.Pattern): Compiled regex pattern for file lines in tracebacks.
+        check_subclass_names (bool): Whether to check subclass names when styling.
+    """
 
     # Class-level instance as the fallback
-    shared_pc_exception_instance = None
+    shared_pc_exception_instance: Optional['PrintsCharming'] = None
 
     # Critical Exceptions
-    critical_exceptions = (SystemExit, MemoryError, KeyboardInterrupt, OSError)
+    critical_exceptions: Tuple[Type[BaseException], ...] = (
+        SystemExit, MemoryError, KeyboardInterrupt, OSError
+    )
 
 
 
-    def __init__(self,
-                 message: str,
-                 pc: 'PrintsCharming',
-                 use_shared_pc: bool = False,
-                 tb_style_name: str = 'default',
-                 format_specific_exception: bool = False,
-                 file_line_regex: Optional[str] = r'(File ")(.*?)(/[^/]+)(", line )(\d+)(, )(in )(.*)',
-                 check_subclass_names: bool = True) -> None:
+    def __init__(
+        self,
+        message: str,
+        pc: 'PrintsCharming',
+        use_shared_pc: bool = False,
+        tb_style_name: str = 'default',
+        format_specific_exception: bool = False,
+        file_line_regex: Optional[str] = r'(File ")(.*?)(/[^/]+)(", line )(\d+)(, )(in )(.*)',
+        check_subclass_names: bool = True
+    ) -> None:
 
         """
         Initialize the exception.
-        If `use_shared_pc` is True, use the shared `PrintsCharming` instance across all subclasses.
-        Otherwise, use the provided or subclass-specific `PrintsCharming` instance.
-        """
 
+        Args:
+            message (str): The exception message.
+            pc (PrintsCharming): Instance of PrintsCharming for styling.
+            use_shared_pc (bool): Use shared PrintsCharming instance across subclasses.
+            tb_style_name (str): Name of the traceback style to use.
+            format_specific_exception (bool): Format specific exceptions.
+            file_line_regex (Optional[str]): Regex pattern for file lines in tracebacks.
+            check_subclass_names (bool): Check subclass names when styling tracebacks.
+        """
         super().__init__(message)
         self.message = message
 
@@ -55,43 +88,75 @@ class PrintsCharmingException(Exception):
             self.pc = self.__class__.shared_pc_exception_instance  # Use shared instance if flagged
         else:
             self.pc = pc  # Use provided instance
+
+        self.reset = self.pc.__class__.RESET
         self.apply_style = self.pc.apply_style
         self.tb_style_name = tb_style_name
         self.format_specific_exception = format_specific_exception
         self.file_line_regex = re.compile(file_line_regex)
         self.check_subclass_names = check_subclass_names
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return the exception message as a string."""
         return self.message
 
-    def format_traceback(self, tb):
+    def format_traceback(self, tb: str) -> str:
+        """
+        Apply style to the traceback.
+
+        Args:
+            tb (str): The traceback string.
+
+        Returns:
+            str: The styled traceback.
+        """
         return self.apply_style(self.tb_style_name, tb)
 
-    def print_error(self):
-        print(self.message)
-        print()
+    def print_error(self) -> None:
+        """Print the error message."""
+        print(f'{self.message}\n')
 
-    def stylize_traceback(self, tb_lines, check_subclass_names=True):
+    def stylize_traceback(self,
+                          tb_lines: List[str],
+                          check_subclass_names: bool = True
+                          ) -> List[str]:
+        """
+        Apply custom styles to the lines of a traceback.
 
-        styled_lines = []
+        Args:
+            tb_lines (List[str]): List of traceback lines.
+            check_subclass_names (bool): Whether to check subclass names.
+
+        Returns:
+            List[str]: List of styled traceback lines.
+        """
+
+        styled_lines: List[str] = []
 
         # Only fetch subclass names if the flag is set to True
-        subclass_names_with_colon = []
+        subclass_names_with_colon: List[str] = []
         if check_subclass_names:
-            subclass_names_with_colon = list(get_all_subclass_names(PrintsCharmingException, trailing_char=':'))
+            subclass_names_with_colon = list(
+                get_all_subclass_names(
+                    PrintsCharmingException,
+                    trailing_char=':'
+                )
+            )
 
         for line in tb_lines:
-            leading_whitespace = re.match(r"^\s*", line).group()
+            leading_whitespace_match = re.match(r"^\s*", line)
+            leading_whitespace = leading_whitespace_match.group() if leading_whitespace_match else ''
 
             if line.startswith("Traceback"):
                 styled_line = self.apply_style('header', line)
-                styled_lines.append(' ')
-                styled_lines.append(styled_line)
-                styled_lines.append(' ')
+                styled_lines.extend([' ', styled_line, ' '])
 
             elif line.strip().startswith("File"):
                 match = self.file_line_regex.search(line)
                 if match:
+                    path_style_code = self.pc.get_style_code('path')
+                    reset = self.reset
+
                     section1 = match.group(1) + match.group(2)  # File path excluding last part
                     section2 = match.group(3)  # Last part of the path (filename)
                     section3 = match.group(4)  # ", line "
@@ -101,33 +166,38 @@ class PrintsCharmingException(Exception):
                     section7 = match.group(8)  # Function name
 
                     # Apply styles to each section
-                    styled_section1 = self.apply_style('path', section1)
-                    styled_section2 = self.apply_style('error_filename', section2)
-                    styled_section3 = self.apply_style('line_info', section3)
-                    styled_section4 = self.apply_style('error_line_number', section4)
-                    styled_section5 = self.apply_style('path', section5)
-                    styled_section6 = self.apply_style('path', section6)
-                    styled_section7 = self.apply_style('function_name', section7)
+                    styled_sections = [
+                        path_style_code + section1 + reset,
+                        self.apply_style('error_filename', section2),
+                        self.apply_style('line_info', section3),
+                        self.apply_style('error_line_number', section4),
+                        path_style_code + section5 + reset,
+                        path_style_code + section6 + reset,
+                        self.apply_style('function_name', section7)
+                    ]
 
                     # Combine the styled sections
-                    styled_line = f"{styled_section1}{styled_section2}{styled_section3}{styled_section4}{styled_section5}{styled_section6}{styled_section7}"
+                    styled_line = ''.join(styled_sections)
                     styled_lines.append(f"{leading_whitespace}{styled_line}")
+
                 else:
                     # If regex matching fails, style the whole line as fallback
                     styled_line = self.apply_style('regex_fail_line_fb', line)
                     styled_lines.append(f"{leading_whitespace}{styled_line}")
 
-            #elif line.strip().startswith("raise") or line.strip().startswith("ValueError") or 'ValueError' in line:
             elif line.strip().startswith("raise"):
-                styled_line = line.replace("raise", self.apply_style('vcyan', 'raise'))
+                styled_line = line.replace(
+                    "raise",
+                    self.apply_style('vcyan', 'raise'))
                 if "ColorNotFoundError" in styled_line:
-                    styled_line = styled_line.replace("ColorNotFoundError", self.apply_style("lav", "ColorNotFoundError"))
+                    styled_line = styled_line.replace(
+                        "ColorNotFoundError",
+                        self.apply_style("lav", "ColorNotFoundError"))
                 if "ValueError" in styled_line:
-                    styled_line = styled_line.replace("ValueError", self.apply_style('lav', 'ValueError'))
-                #styled_line = self.apply_style('red', line)
-                styled_lines.append(' ')
-                styled_lines.append(styled_line)
-                styled_lines.append(' ')
+                    styled_line = styled_line.replace(
+                        "ValueError",
+                        self.apply_style('lav', 'ValueError'))
+                styled_lines.extend([' ', styled_line, ' '])
 
             else:
                 # Skip subclass name checks if the flag is False
@@ -139,32 +209,54 @@ class PrintsCharmingException(Exception):
                             subclass_name = line[start_index:start_index + len(name)]
                             after_name = line[start_index + len(name):]
 
-                            # Apply styles
-                            styled_before_name = self.apply_style('subclass_name_before', before_name)
-                            styled_subclass_name = self.apply_style('subclass_name', subclass_name)
-                            styled_after_name = self.apply_style('subclass_name_after', after_name)
+                            styled_parts = [
+                                self.apply_style(
+                                    'subclass_name_before',
+                                    before_name
+                                ),
+                                self.apply_style(
+                                    'subclass_name',
+                                    subclass_name
+                                ),
+                                self.apply_style(
+                                    'subclass_name_after',
+                                    after_name
+                                )
+                            ]
 
                             # Combine the styled parts
-                            styled_line = f"{styled_before_name}{styled_subclass_name}{styled_after_name}"
-                            styled_lines.append(' ')
-                            styled_lines.append(f"{leading_whitespace}{styled_line}")
-                            styled_lines.append(' ')
+                            styled_line = ''.join(styled_parts)
+                            styled_lines.extend(
+                                [' ', f"{leading_whitespace}{styled_line}", ' ']
+                            )
                             break
 
                     else:
                         styled_line = self.apply_style('default', line)
-                        styled_lines.append(styled_line)
-                        styled_lines.append(' ')
+                        styled_lines.extend([styled_line, ' '])
 
                 else:
                     styled_line = self.apply_style('unhandled_exception_line', line)
-                    styled_lines.append(styled_line)
-                    styled_lines.append(' ')
+                    styled_lines.extend([styled_line, ' '])
 
         return styled_lines
 
 
-    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
+    def handle_exception(self,
+                         logger: Optional[Any] = None,
+                         exc_type: Optional[Type[BaseException]] = None,
+                         exc_value: Optional[BaseException] = None,
+                         exc_info: Optional[Any] = None
+                         ) -> None:
+        """
+        Handle the exception by printing or logging the styled traceback.
+
+        Args:
+            logger (Optional[Any]): Logger to log the exception.
+            exc_type (Optional[Type[BaseException]]): Exception type.
+            exc_value (Optional[BaseException]): Exception value.
+            exc_info (Optional[Any]): Exception info.
+        """
         self.print_error()
 
         if self.format_specific_exception:
@@ -175,11 +267,11 @@ class PrintsCharmingException(Exception):
         tb_lines = tb.split('\n')
 
         # Stylize the traceback
-        styled_tb_lines = self.stylize_traceback(tb_lines)
+        styled_tb_lines = self.stylize_traceback(tb_lines, self.check_subclass_names)
 
         # Log the exception if a logger is provided
         if logger:
-            if issubclass(exc_type, self.__class__.critical_exceptions):
+            if exc_type and issubclass(exc_type, self.__class__.critical_exceptions):
                 for line in styled_tb_lines:
                     logger.critical(line, exc_info=exc_info)
             else:
@@ -191,44 +283,5 @@ class PrintsCharmingException(Exception):
                 print(line, file=sys.stderr)
 
         print()
-
-
-
-
-
-"""
-# Custom exception hook to log unhandled exceptions using the logger
-def set_custom_excepthook_with_logging(logger, pc=None, unhandled_exception_debug=False, log_exc_info=False, critical_exceptions=None):
-    # Default critical exceptions if none are provided
-    if critical_exceptions is None:
-        critical_exceptions = (SystemExit, MemoryError, KeyboardInterrupt, OSError)
-
-    def custom_excepthook(exc_type, exc_value, exc_traceback):
-        if issubclass(exc_type, PrintsCharmingException):
-            # Handle PrintsCharming-specific exceptions
-            exc_value.handle_exception()
-        else:
-            # Use the passed `pc` or fallback to the class-level instance
-            pc_to_use = pc or PrintsCharmingException.pc_exception_instance
-            general_exception = PrintsCharmingException(str(exc_value), pc_to_use)
-            tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-            styled_tb_lines = general_exception.stylize_traceback(tb_lines, check_subclass_names=False)
-
-            if issubclass(exc_type, critical_exceptions):
-                # Log the styled traceback as critical for system-exiting or fatal errors
-                for line in styled_tb_lines:
-                    logger.critical(line, exc_info=log_exc_info)
-            else:
-                # Log the styled traceback as error for non-critical exceptions
-                for line in styled_tb_lines:
-                    logger.error(line, exc_info=log_exc_info)
-
-
-            if unhandled_exception_debug:
-                # Call the default system excepthook
-                sys.__excepthook__(exc_type, exc_value, exc_traceback)
-
-    sys.excepthook = custom_excepthook
-"""
 
 

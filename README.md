@@ -211,7 +211,7 @@ def play_around_with_logging():
 
     my_logger = setup_logger(pc)
 
-    init_message = f"PrintsCharmingLogHandler initialized with configuration:\n{pc.print_dict(pc.config)}"
+    init_message = f"PrintsCharmingLogHandler initialized with configuration:\n{pc.format_dict(pc.config)}"
     my_logger.debug(init_message)
 
     apply_style = lambda a, b: pc.apply_logging_style(a, b)
@@ -229,7 +229,7 @@ def play_around_with_logging():
     pc.update_logging()
 
 
-    pc.debug(f"PrintsCharming enabled internal logging:\n{pc.print_dict(pc.config)}")
+    pc.debug(f"PrintsCharming enabled internal logging:\n{pc.format_dict(pc.config)}")
 
 
 

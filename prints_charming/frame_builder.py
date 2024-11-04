@@ -17,8 +17,36 @@ from .utils import get_terminal_width
 
 
 class FrameBuilder:
+    _shared_pc_instance = None
+
+    @classmethod
+    def get_shared_pc_instance(cls):
+        """
+        Get the shared PrintsCharming instance for FrameBuilder.
+
+        Returns:
+            PrintsCharming: The shared PrintsCharming instance for FrameBuilder, or None if not set.
+        """
+        return cls._shared_pc_instance
+
+    @classmethod
+    def set_shared_pc_instance(cls, pc_instance):
+        """
+        Set the shared PrintsCharming instance for FrameBuilder.
+
+        Args:
+            pc_instance (PrintsCharming): The PrintsCharming instance to set as shared for FrameBuilder.
+        """
+        cls._shared_pc_instance = pc_instance
+
+
     def __init__(self, pc=None, horiz_width=None, horiz_char=' ', vert_width=None, vert_padding=1, vert_char='|'):
-        self.pc = pc if pc else PrintsCharming()
+        self.pc = (
+                pc
+                or self.__class__.get_shared_pc_instance()
+                or PrintsCharming.get_shared_instance()
+                or PrintsCharming()
+        )
         self.terminal_width = get_terminal_width()
         self.horiz_width = horiz_width if horiz_width else self.terminal_width
         self.horiz_char = horiz_char

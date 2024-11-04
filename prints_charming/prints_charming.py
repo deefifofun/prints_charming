@@ -14,8 +14,11 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .exceptions.base_exceptions import PrintsCharmingException
-from .exceptions.internal_exceptions import InvalidLengthError, ColorNotFoundError
 
+from .exceptions.internal_exceptions import (
+    InvalidLengthError,
+    ColorNotFoundError
+)
 
 from .prints_charming_defaults import (
     DEFAULT_CONFIG,
@@ -29,6 +32,7 @@ from .prints_charming_defaults import (
 from .prints_style import PStyle
 from .utils import compute_bg_color_map
 from .trie_manager import KeyTrie
+from .formatter import Formatter
 from .internal_logging_utils import shared_logger
 
 if sys.platform == 'win32':
@@ -36,101 +40,180 @@ if sys.platform == 'win32':
 
 
 
-
 class PrintsCharming:
-    instance_count = 0  # Class-level counter
+    """
+    The `PrintsCharming` class is the core component of the prints_charming
+    library, a comprehensive terminal toolkit designed for advanced text
+    styling, layouts, printing, and interactive console applications in Python.
+
+    **Overview:**
+    `PrintsCharming` provides advanced text styling capabilities, allowing
+    developers to apply complex styles, manage configurations, and enhance
+    console output with interactive elements.
+
+    **Key Features:**
+
+    - **Text Styling and Printing:**
+      - Apply complex styles (colors, background colors, effects) to console output.
+      - Define and manage custom styles using `PStyle` instances.
+      - Style individual words, phrases, substrings, or entire blocks of text.
+      - Support for dynamic and condition-based styling.
+
+    - **Configuration Management:**
+      - Manage shared configurations across instances for consistent styling.
+      - Customize color maps, effect maps, and control codes.
+      - Provide mechanisms for instance-specific overrides and customizations.
+
+    **Note:**
+    The `PrintsCharming` class serves as the foundation for other components
+    within the library, such as logging, exception handling, tables, boxes,
+    borders, interactive utilities, and more which build upon its
+    functionalities to provide a cohesive toolkit for terminal applications.
+
+    **Usage Example:**
+
+    ```python
+    pc = PrintsCharming()
+    pc.print("Hello, PrintsCharming!", style="header")
+    ```
+
+    **Extensibility:**
+    Designed with extensibility in mind, `PrintsCharming` allows developers to subclass
+    and extend its capabilities to suit specific application needs.
+    """
+
     RESET = "\033[0m"
     _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
+    ansi_escape_pattern = re.compile(r'\033\[[0-9;]*[mK]')
+    words_and_spaces_pattern = re.compile(r'\S+|\s+')
+
+    # For package wide internal and subclass logging purposes.
+    _shared_internal_logging_styles: Optional[Dict[str, PStyle]] = (
+        copy.deepcopy(DEFAULT_LOGGING_STYLES)
+    )
 
     _shared_instance = None
 
     @classmethod
     def get_shared_instance(cls):
-        if cls._shared_instance is None:
-            cls._shared_instance = cls("default_data")
+        """
+        Get the shared instance of PrintsCharming.
+
+        Returns:
+            PrintsCharming: The shared PrintsCharming instance for PrintsCharming
+                or None if not set.
+        """
         return cls._shared_instance
 
+    @classmethod
+    def set_shared_instance(cls, instance):
+        """
+        Set the shared instance of PrintsCharming.
+
+        Args:
+            instance (PrintsCharming): The instance to set as shared.
+        """
+        cls._shared_instance = instance
 
 
-    ansi_escape_pattern = re.compile(r'\033\[[0-9;]*[mK]')
-    words_and_spaces_pattern = re.compile(r'\S+|\s+')
+    log_level_style_names = ['debug', 'info', 'warning', 'error', 'critical']
+
+    @classmethod
+    def set_log_level_style_names(cls, levels) -> None:
+        """
+        Sets the log levels for the class.
+
+        :param levels: A list of log level strings.
+        """
+        if (
+            not isinstance(levels, list)
+            or not all(isinstance(lvl, str) for lvl in levels)
+        ):
+            raise ValueError("log_levels must be a list of strings.")
+        cls.log_levels = levels
 
 
-
-    """
-    This module provides a PrintsCharming class for handling colored text printing tasks.
-    It also includes PStyle, a dataclass for managing text styles. In the COLOR_MAP "v" before a color stands for "vibrant".
-
-    Optional Feature: The `set_shared_maps` class method allows for shared configurations across all instances, 
-    but it is entirely optional. If you do not need shared configurations, you can skip this method and proceed 
-    with individual instance configurations.
-
-    """
-
-    # These maps are optionally available to be shared between all instances of the class if the set_shared_maps classmethod is called.
     shared_color_map: Optional[Dict[str, str]] = None
     shared_bg_color_map: Optional[Dict[str, str]] = None
     shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
     shared_styles: Optional[Dict[str, PStyle]] = None
     shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
 
-    # This style map is shared across all instances for package wide internal logging purposes.
-    _shared_internal_logging_styles: Optional[Dict[str, PStyle]] = copy.deepcopy(DEFAULT_LOGGING_STYLES)
 
-    # This method is entirely optional and not required for the usage of the PrintsCharming class.
     @classmethod
     def set_shared_maps(cls,
                         shared_color_map: Optional[Dict[str, str]] = None,
                         shared_bg_color_map: Optional[Dict[str, str]] = None,
                         shared_effect_map: Optional[Dict[str, str]] = None,
                         shared_styles: Optional[Dict[str, PStyle]] = None,
-                        shared_ctl_map: Optional[Dict[str, str]] = None):
+                        shared_ctl_map: Optional[Dict[str, str]] = None
+                        ) -> None:
         """
         Set shared maps across all instances of the PrintsCharming class.
 
         **Purpose:**
-        The `set_shared_maps` method allows you to define shared configurations that are accessible by all instances of the
-        PrintsCharming class. This method lets you establish a consistent set of color maps, styles, and effects that will be
-        applied uniformly across all instances unless specifically overridden. This behavior is similar to having default
-        configurations that other libraries might hardcode, but with the added flexibility that you can modify these shared
-        configurations at runtime.
+        The `set_shared_maps` method allows you to define shared configurations
+        that are accessible by all instances of the PrintsCharming class. This
+        method lets you establish a consistent set of color maps, styles, and
+        effects that will be applied uniformly across all instances unless
+        specifically overridden. This behavior is similar to having default
+        configurations that other libraries might hardcode, but with the added
+        flexibility that you can modify these shared configurations at runtime.
 
         **Flexibility & Power:**
-        While this method allows you to set shared configurations that apply to all instances—similar to class-level
-        defaults—PrintsCharming’s true strength lies in its flexibility. Unlike many similar libraries with rigid,
-        predefined constants, PrintsCharming offers the freedom to configure each instance individually. This approach
-        gives you the power to either enforce consistency across all instances or tailor the behavior and styling of text
-        printing according to the specific needs of your application.
+        While this method allows you to set shared configurations that apply to
+        all instances—similar to class-level defaults—PrintsCharming’s true
+        strength lies in its flexibility. Unlike many similar libraries with
+        rigid, predefined constants, PrintsCharming offers the freedom to
+        configure each instance individually. This approach gives you the power
+        to either enforce consistency across all instances or tailor the
+        behavior and styling of text printing according to the specific needs
+        of your application.
 
         **When to Use This Method:**
-        - If you have a scenario where consistent styling or configurations are required across all instances, using
-          `set_shared_maps` can be very powerful.
-        - For many other cases, where instance-specific customization is more appropriate, you can skip this method
-          altogether and rely on individual configurations for each instance.
+        - If you have a scenario where consistent styling or configurations are
+          required or preferred across all instances, using `set_shared_maps`
+          can be very powerful.
+        - For many other cases, where instance-specific customization is more
+          appropriate, you can skip this method altogether and rely on
+          individual configurations for each instance.
 
         **Important Considerations:**
-        - This method is an option, not a requirement. Use it when it makes sense for your project.
-        - Shared maps set through this method will be applied to all future instances unless overridden in the instance's
-          `__init__` method.
+        - This method is an option, not a requirement. Use it when it makes
+          sense for your project.
+        - Shared maps set through this method will be applied to all future
+          instances unless overridden in the instance's `__init__` method.
 
         **Parameters:**
-        :param shared_color_map: (Optional) A dictionary of shared color mappings to be accessible globally across
-                                 all instances. If not provided, `DEFAULT_COLOR_MAP.copy()` will be used.
-        :param shared_bg_color_map: (Optional) A dictionary of shared background color mappings. to be accessible globally across
-                                    all instances. If None (as it should be unless your really know what your doing), it will be computed
-                                    from shared_color_map.
+        :param shared_color_map: (Optional) A dictionary of shared color
+                                 mappings to be accessible globally across all
+                                 instances. If not provided,
+                                 `DEFAULT_COLOR_MAP.copy()` will be used.
+
+        :param shared_bg_color_map: (Optional) A dictionary of shared
+                                    background color mappings. to be accessible
+                                    globally across all instances. If None
+                                    (as it should be unless your really know
+                                    what your doing), it will be computed from
+                                    shared_color_map.
+
         :param shared_effect_map: (Optional) A dictionary of effect mappings.
-                                  **This should not be changed unless you are certain of what you're doing.**
-        :param shared_styles: (Optional) A dictionary of shared styles. This allows for the consistent application
-                              of text styles across all instances.
+                                  **This should not be changed unless you are
+                                  certain of what you're doing.**
+
+        :param shared_styles: (Optional) A dictionary of shared styles. This
+                              allows for the consistent application of text
+                              styles across all instances.
+
+        :param shared_ctl_map: (Optional) A dictionary of shared control codes.
         """
 
-        # Setting the shared maps to be used globally across instances
         cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
         cls.shared_color_map.setdefault('default', PrintsCharming.RESET)
         cls.shared_bg_color_map = shared_bg_color_map or {
-            color: compute_bg_color_map(code) for color, code in cls.shared_color_map.items()
+            color: compute_bg_color_map(code)
+            for color, code in cls.shared_color_map.items()
         }
 
         if shared_effect_map:
@@ -153,9 +236,7 @@ class PrintsCharming:
 
 
 
-
     def __init__(self,
-                 name: str = None,
                  config: Optional[Dict[str, Union[bool, str, int]]] = None,
                  color_map: Optional[Dict[str, str]] = None,
                  bg_color_map: Optional[Dict[str, str]] = None,
@@ -164,62 +245,104 @@ class PrintsCharming:
                  styles: Optional[Dict[str, PStyle]] = None,
                  styled_strings: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
+                 formatter: Optional['Formatter'] = None,
                  autoconf_win: bool = False
                  ) -> None:
 
         """
-        Initialize PrintsCharming with args to any of these optional parameters.
+        Initialize PrintsCharming with args to any of these optional params.
 
         :param config: enable or disable various functionalities of this class.
-        :param color_map: supply your own color_map dictionary. 'color_name': 'ansi_code'
-        :param bg_color_map: supply your own bg_color_map dictionary. Default is computed from color_map dictionary
-        :param effect_map: supply your own effect_map dictionary. Default is the PrintsCharming.EFFECT_MAP dictionary above
-        :param styles: supply your own styles dictionary. Default is a copy of the DEFAULT_STYLES dictionary unless cls.shared_styles is defined.
-        :param printscharming_variables: calls the add_variables_from_dict method with your provided dictionary. See README for more info.
-        :param style_conditions: A custom class for implementing dynamic application of styles to text based on conditions.
-        :param autoconf_win: If your using legacy windows cmd prompt and not getting colored/styled text then change this to True to make things work.
+
+        :param color_map: supply your own color_map dictionary.
+                          'color_name': 'ansi_code'
+
+        :param bg_color_map: supply your own bg_color_map dictionary. Default
+                             is computed from color_map dictionary.
+
+        :param default_bg_color: change the default background color to a color
+                                 other than your terminal's background color.
+
+        :param effect_map: supply your own effect_map dictionary. Default is
+                           PrintsCharming.shared_effect_map
+
+        :param styles: supply your own styles dictionary. Default is a copy of
+                       the DEFAULT_STYLES dictionary unless cls.shared_styles
+                       is defined.
+
+        :param styled_strings: calls the add_strings_from_dict method with your
+                               provided styled_strings dictionary. See README
+                               for more info.
+
+        :param style_conditions: A custom class for implementing dynamic
+                                 application of styles to text based on
+                                 conditions.
+
+        :param formatter: supply your own formatter class instance to be used
+                          for formatting text printed using the print method in
+                          this class.
+
+        :param autoconf_win: If your using legacy windows cmd prompt and not
+                             getting colored/styled text then change this to
+                             True to make things work.
         """
-
-        PrintsCharming.instance_count += 1
-
-        if name is None:
-            # Assign a default name based on the current count
-            name = f'pc{PrintsCharming.instance_count}'
-
-        self.name = name
 
         self.config = {**DEFAULT_CONFIG, **(config or {})}
 
-        # Set self.color_map based on the provided arguments and class-level settings
-        self.color_map = color_map or PrintsCharming.shared_color_map or DEFAULT_COLOR_MAP.copy()
+        self.color_map = (
+            color_map
+            or PrintsCharming.shared_color_map
+            or DEFAULT_COLOR_MAP.copy()
+        )
         self.color_map.setdefault('default', PrintsCharming.RESET)
 
-        # Set self.bg_color_map based on the provided arguments and class-level settings
-        self.bg_color_map = bg_color_map or PrintsCharming.shared_bg_color_map or {
-                    color: compute_bg_color_map(code) for color, code in self.color_map.items()
-                }
+        self.bg_color_map = (
+            bg_color_map
+            or PrintsCharming.shared_bg_color_map
+            or {
+                color: compute_bg_color_map(code)
+                for color, code in self.color_map.items()
+            }
+        )
 
         self.effect_map = effect_map or PrintsCharming.shared_effect_map
 
         self.ctl_map = self.shared_ctl_map
 
-        self.styles = copy.deepcopy(styles) or PrintsCharming.shared_styles or copy.deepcopy(DEFAULT_STYLES)
+        self.styles = (
+            copy.deepcopy(styles)
+            or PrintsCharming.shared_styles
+            or copy.deepcopy(DEFAULT_STYLES)
+        )
+
+        self.default_bg_color = default_bg_color
 
         if default_bg_color is not None and default_bg_color in self.bg_color_map:
             for style_key, style_value in self.styles.items():
-                if not hasattr(style_value, 'bg_color') or getattr(style_value, 'bg_color') is None:
+                if (
+                    not hasattr(style_value, 'bg_color')
+                    or getattr(style_value, 'bg_color') is None
+                ):
                     setattr(style_value, 'bg_color', default_bg_color)
 
         self.style_codes: Dict[str, str] = {
-            name: self.create_style_code(style) for name, style in self.styles.items() if self.styles[name].color in self.color_map
+            name: self.create_style_code(style)
+            for name, style in self.styles.items()
+            if self.styles[name].color in self.color_map
         }
 
 
-        self._internal_logging_styles = PrintsCharming._shared_internal_logging_styles
+        self._internal_logging_styles = (
+            PrintsCharming._shared_internal_logging_styles
+        )
 
 
         self._internal_logging_style_codes: Dict[str, str] = {
-            name: self.create_style_code(style) for name, style in self._internal_logging_styles.items() if self._internal_logging_styles[name].color in self.color_map
+            name: self.create_style_code(style)
+            for name, style in self._internal_logging_styles.items()
+            if (
+                self._internal_logging_styles[name].color in self.color_map
+            )
         }
 
         self.reset = PrintsCharming.RESET
@@ -228,11 +351,14 @@ class PrintsCharming:
 
         self.phrase_trie = KeyTrie()
         self.word_trie = KeyTrie()
+        self.word_map: Dict[str, Dict[str, str]] = {}
         self.subword_trie = KeyTrie()
 
         self.enable_conceal_map = False
         self.enable_styled_phrases = False
         self.enable_styled_words = False
+        self.enable_word_trie = False
+        self.enable_word_map = False
         self.enable_styled_subwords = False
         self.enable_styled_variable_map = False
 
@@ -256,105 +382,30 @@ class PrintsCharming:
                     logging.error("Failed to enable ANSI handling on Windows")
 
         # Instance-level flag to control logging
-        self.internal_logging_enabled = self.config.get("internal_logging", False)
+        self.internal_logging_enabled = (
+            self.config.get("internal_logging", False)
+        )
 
         # Use shared logger but don't disable it
         self.logger = shared_logger
         self.setup_internal_logging(self.config.get("log_level", "DEBUG"))
 
-        # Setup logging
-        # self.logger = None
-        # self.setup_logging(self.config["internal_logging"], self.config["log_level"])
-
+        self.formatter = formatter or Formatter()
 
 
 
     def escape_ansi_codes(self, ansi_string):
-        self.debug("Escaping ANSI codes in string: {}", ansi_string)
+        self.debug(
+            "Escaping ANSI codes in string: {}",
+            ansi_string
+        )
         escaped_ansi_string = ansi_string.replace("\033", "\\033")
-        self.debug("Escaped ANSI codes in string: {}", escaped_ansi_string)
+        self.debug(
+            "Escaped ANSI codes in string: {}",
+            escaped_ansi_string
+        )
+
         return escaped_ansi_string
-
-
-    def print_dict(self, d, indent=4):
-        def pprint_dict(d, level=0):
-            result = ""
-            for key, value in d.items():
-                result += " " * (level * indent) + self.apply_style('dict_key', f"{key}: ")
-                if isinstance(value, dict):
-                    result += "{\n" + pprint_dict(value, level + 1) + " " * (level * indent) + "}\n"
-                elif isinstance(value, bool):
-                    bool_style = 'true' if value else 'false'
-                    result += self.apply_style(bool_style, str(value)) + "\n"
-                elif value is None:
-                    result += self.apply_style('none', str(value)) + "\n"
-                elif isinstance(value, int):
-                    result += self.apply_style('int', str(value)) + "\n"
-                elif isinstance(value, float):
-                    result += self.apply_style('float', str(value)) + "\n"
-                elif isinstance(value, str) and value.isupper() and value.lower() in ['debug', 'info', 'warning', 'error', 'critical']:
-                    result += self._apply_style_internal(value.lower(), str(value)) + "\n"
-
-                else:
-                    result += f"{value}\n"
-
-            return result
-
-        return "{\n" + pprint_dict(d) + "}"
-
-
-
-    def print_bg(self, color_name: str, length: int = 1) -> None:
-        """
-        Prints a "block" of background color.
-
-        :param color_name: The name of the color as per self.color_map.
-        :param length: The length of the color block in terms of spaces.
-        :raises ColorNotFoundError: If the background color is not found in the background color map.
-        :raises InvalidLengthError: If the length is not valid.
-        """
-        self.debug("Printing background color: {} with length: {}", color_name, length)
-
-        if length <= 0:
-            message = f"Invalid length '{length}'. Length must be positive."
-            styled_message = self.apply_style('vred', message)
-            raise InvalidLengthError(styled_message, self, self.apply_style)
-
-        bg_color_code = self.bg_color_map.get(color_name)
-        if not bg_color_code:
-            message = f"Key '{color_name}' not found in the 'self.bg_color_map' dictionary."
-            styled_message = self.apply_style('vred', message)
-            raise ColorNotFoundError(styled_message, self, self.apply_style, format_specific_exception=True)
-
-        # Print the color block
-        print(f"{bg_color_code}{' ' * length}{self.reset}")
-
-
-    def return_bg(self, color_name: str, length: int = 10) -> str:
-
-        if length <= 0:
-            message = f"Invalid length '{length}'. Length must be positive."
-            styled_message = self.apply_style('vred', message)
-            raise InvalidLengthError(styled_message, self, self.apply_style)
-
-        bg_color_code = self.bg_color_map.get(color_name)
-        if not bg_color_code:
-            message = f"Key '{color_name}' not found in the 'self.bg_color_map' dictionary."
-            styled_message = self.apply_style('vred', message)
-            raise ColorNotFoundError(styled_message, self, self.apply_style, format_specific_exception=True)
-
-        # style the color block
-        bg_bar_strip = f"{bg_color_code}{' ' * length}{self.reset}"
-
-        return bg_bar_strip
-
-
-    def get_bg_bar_strip(self, color_name: str, length: int = 1) -> str:
-        bg_color_code = self.bg_color_map.get(color_name)
-        bg_bar_strip = f"{bg_color_code}{' ' * length}{self.reset}"
-
-        return bg_bar_strip
-
 
 
     def create_style_code(self, style: Union[PStyle, Dict[str, Any]]):
@@ -409,8 +460,16 @@ class PrintsCharming:
 
 
     def apply_style(self, style_name, text, fill_space=True, reset=True):
-        #self.debug("Applying style_name: {} to text: {}", self.apply_logging_style('info', style_name), self.apply_logging_style('info', text))
-        #self.debug("Applying style_name: %s to text: %s", self.apply_logging_style('info', style_name), self.apply_logging_style('info', text))
+        self.debug(
+            "Applying style_name: {} to text: {}",
+            self._apply_style_internal('info', style_name),
+            self._apply_style_internal('info', text)
+        )
+        self.debug(
+            "Applying style_name: %s to text: %s",
+            self._apply_style_internal('info', style_name),
+            self._apply_style_internal('info', text))
+
         text = str(text)
         if text.isspace() and fill_space:
             style_code = self.bg_color_map.get(
@@ -421,14 +480,19 @@ class PrintsCharming:
             )
 
         else:
-            style_code = self.style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
+            style_code = self.style_codes.get(
+                style_name,
+                self.color_map.get(
+                    style_name,
+                    self.color_map.get('default')
+                )
+            )
 
-        # Append the style code at the beginning of the text and the reset code at the end
         styled_text = f"{style_code}{text}{self.reset if reset else ''}"
 
-        #escaped_string = self.escape_ansi_codes(styled_text)
-        #self.debug('escaped_string: {}', escaped_string)
-        #self.debug(styled_text)
+        escaped_string = self.escape_ansi_codes(styled_text)
+        self.debug('escaped_string: {}', escaped_string)
+        self.debug(styled_text)
 
         return styled_text
 
@@ -441,14 +505,20 @@ class PrintsCharming:
         # If a single style string is passed, repeat it for the entire list
         if isinstance(styles_list, str):
             styles_list = [styles_list] * strings_list_len
+
         # If a list of styles is passed
         elif isinstance(styles_list, list):
             if len(styles_list) < strings_list_len:
-                # Repeat the styles_list pattern until it matches the length of strs_list
-                styles_list = (styles_list * (strings_list_len // len(styles_list) + 1))[:strings_list_len]
+                # Repeat styles_list pattern until it matches len of strs_list
+                styles_list = (
+                    styles_list * (strings_list_len // len(styles_list) + 1)
+                )[:strings_list_len]
 
         # Apply the styles to the strings
-        styled_strs = [self.apply_style(style, str(text)) for style, text in zip(styles_list, strs_list)]
+        styled_strs = [
+            self.apply_style(style, str(text))
+            for style, text in zip(styles_list, strs_list)
+        ]
 
         # Return either the list of styled strings or a joined string
         return ' '.join(styled_strs) if not return_list else styled_strs
@@ -488,6 +558,53 @@ class PrintsCharming:
 
         return bg_color_block
 
+
+    def generate_bg_bar_strip(self, color_name: str, length: int = 10) -> str:
+        """
+        Generates a block of background color as a string.
+
+        :param color_name: The name of the color as per self.color_map.
+        :param length: The length of the color block in terms of spaces.
+        :raises ColorNotFoundError: If the background color is not found in
+                                    the background color map.
+        :raises InvalidLengthError: If the length is not valid.
+        """
+        self.debug(
+            "Printing background color: {} with length: {}",
+            color_name,
+            length
+        )
+
+        if length <= 0:
+            message = f"Invalid length '{length}'. Length must be positive."
+            styled_message = self.apply_style('vred', message)
+            raise InvalidLengthError(styled_message,
+                                     self,
+                                     format_specific_exception=True)
+
+        bg_color_code = self.bg_color_map.get(color_name)
+        if not bg_color_code:
+            message = f"Key '{color_name}' not in 'self.bg_color_map'."
+            styled_message = self.apply_style('vred', message)
+            raise ColorNotFoundError(styled_message,
+                                     self,
+                                     format_specific_exception=True)
+
+        # style the color block
+        bg_bar_strip = f"{bg_color_code}{' ' * length}{self.reset}"
+
+        return bg_bar_strip
+
+
+    def print_bg_bar_strip(self, color_name: str, length: int = 10) -> None:
+        """Prints a block of background color."""
+        try:
+            bg_bar_strip = self.generate_bg_bar_strip(color_name, length)
+            print(bg_bar_strip)
+        except (ColorNotFoundError, InvalidLengthError) as e:
+            e.handle_exception()
+
+
     def get_effect_code(self, effect_name):
         return self.effect_map.get(effect_name, '')
 
@@ -511,7 +628,9 @@ class PrintsCharming:
             # Get the style attributes
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
-                attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
+                attribs['color'], attribs['bg_color'] = (
+                    attribs.get('bg_color'), attribs.get('color')
+                )
 
             # Insert the subword into the subword trie
             self.subword_trie.insert(subword, {
@@ -526,12 +645,18 @@ class PrintsCharming:
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
-    def add_string(self, string: str, style_name: str) -> None:
+    def add_string(self,
+                   string: str,
+                   style_name: str,
+                   word_trie: bool = False
+                   ) -> None:
         """
-        Adds a string (word or phrase) to the appropriate trie with a specific style.
+        Adds a string (word or phrase) to the appropriate trie with a specific
+        style.
 
         :param string: The string to be styled.
         :param style_name: The name of the style to apply.
+        :param word_trie: Insert in word_trie if True otherwise word_map
         """
 
         string = str(string)
@@ -542,7 +667,9 @@ class PrintsCharming:
             # Copy the style attributes
             attribs = vars(self.styles.get(style_name)).copy()
             if attribs.get('reversed'):
-                attribs['color'], attribs['bg_color'] = attribs.get('bg_color'), attribs.get('color')
+                attribs['color'], attribs['bg_color'] = (
+                    attribs.get('bg_color'), attribs.get('color')
+                )
 
             # Handle concealment separately if needed
             if style_name == 'conceal':
@@ -559,7 +686,9 @@ class PrintsCharming:
 
             if contains_inner_space:
                 # Insert the phrase into the phrase trie
-                phrase_words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(string)
+                phrase_words_and_spaces = (
+                    PrintsCharming.words_and_spaces_pattern.findall(string)
+                )
                 phrase_length = len(phrase_words_and_spaces)
                 self.phrase_trie.insert(string, {
                     "phrase_words_and_spaces": phrase_words_and_spaces,
@@ -572,65 +701,125 @@ class PrintsCharming:
                 if not self.enable_styled_phrases:
                     self.enable_styled_phrases = True
             else:
-                # Insert the word into the word trie
-                self.word_trie.insert(string, {
-                    "style": style_name,
-                    "style_code": style_code,
-                    "styled": styled_string,
-                    "attribs": attribs
-                })
-                if not self.enable_styled_words:
-                    self.enable_styled_words = True
+                if word_trie:
+                    # Insert the word into the word trie
+                    self.word_trie.insert(string, {
+                        "style": style_name,
+                        "style_code": style_code,
+                        "styled": styled_string,
+                        "attribs": attribs
+                    })
+                    if not self.enable_styled_words:
+                        self.enable_styled_words = True
+                    if not self.enable_word_trie:
+                        self.enable_word_trie = True
+                else:
+                    # Insert the word into the word map
+                    self.word_map[string] = {
+                        "style": style_name,
+                        "style_code": style_code,
+                        "styled": styled_string,
+                        "attribs": attribs
+                    }
+                    if not self.enable_styled_words:
+                        self.enable_styled_words = True
+                    if not self.enable_word_map:
+                        self.enable_word_map = True
 
         else:
             print(f"Style {style_name} not found in styles dictionary.")
 
 
-    def add_strings(self, strings: List[str], style_name: str) -> None:
+    def add_strings(self,
+                    strings: List[str],
+                    style_name: str,
+                    word_trie: bool = False
+                    ) -> None:
+        """
+        Adds a list of strings (can be a mix of phrases and words) to an
+        instance trie or dictionary depending on if it is a phrase (contains
+        one or more ' ' characters) then will be added to self.phrase_trie or
+        if it is a word (does not contain any ' ' characters) then it is added
+        to self.word_map unless word_trie param is set to True which in that
+        case the word will be added to self.word_trie.
+        """
         if style_name in self.styles:
             style_code = self.style_codes[style_name]
             for string in strings:
-                self.add_string(string, style_name)
+                self.add_string(string, style_name, word_trie)
 
 
-    def add_strings_from_dict(self, strings_dict: Dict[str, List[str]]) -> None:
+    def add_strings_from_dict(self,
+                              strings_dict: Dict[str, List[str]],
+                              word_trie: bool = False,
+                              ) -> None:
+        """
+        Adds strings (can be a mix of phrases and words) to an instance trie or
+        dictionary depending on if it is a phrase (contains one or more ' '
+        characters) then will be added to self.phrase_trie or if it is a word
+        (does not contain any ' ' characters) then it is added to
+        self.word_map unless word_trie param is set to True which in that case
+        the word will be added to self.word_trie.
+        """
         for style_name, strings in strings_dict.items():
             if style_name in self.styles:
-                self.add_strings(strings, style_name)
+                self.add_strings(strings, style_name, word_trie)
             else:
                 print(f"Style {style_name} not found in styles dictionary.")
 
 
     def remove_string(self, string: str) -> None:
         """
-        Removes a string (word or phrase) from the appropriate trie, and handles concealment.
+        Removes a string (word or phrase) from the appropriate trie, and
+        handles concealment.
 
         :param string: The string to be removed.
         """
 
         string = str(string)
 
-        # Remove from the word trie if present
-        if self.word_trie and self._remove_from_trie(self.word_trie, string):
-            print(f"Removed '{string}' from word trie")
+        # Determine if the string is a phrase (contains inner spaces)
+        contains_inner_space = ' ' in string.strip()
 
-        # Remove from the phrase trie if present
-        if self.phrase_trie and self._remove_from_trie(self.phrase_trie, string):
-            print(f"Removed '{string}' from phrase trie")
+        if contains_inner_space:
+            # Remove from the phrase trie if present
+            if (
+                self.phrase_trie
+                and self._remove_from_trie(self.phrase_trie, string)
+            ):
+                print(f"Removed '{string}' from phrase trie")
 
-        # Remove from the conceal_map if present
-        if string in self.conceal_map:
-            del self.conceal_map[string]
-            print(f"Removed '{string}' from conceal map")
+        else:
+
+            if self.enable_word_trie:
+                # Remove from the word trie if present
+                if (
+                    self.word_trie
+                    and self._remove_from_trie(self.word_trie, string)
+                ):
+                    print(f"Removed '{string}' from word trie")
+
+            if self.enable_word_map:
+                # Remove from the word map if present
+                if self.word_map and self._remove_word(string):
+                    print(f"Removed '{string}' from word map")
+
+            # Remove from the conceal_map if present
+            if string in self.conceal_map:
+                del self.conceal_map[string]
+                print(f"Removed '{string}' from conceal map")
+
 
     def _remove_from_trie(self, trie: KeyTrie, string: str) -> bool:
         """
-        Removes a string from the trie by marking the end node as non-terminal (is_end = False).
-        It does not remove the nodes themselves, because they may be shared with other words/phrases.
+        Removes a string from the trie by marking the end node as non-terminal
+        (is_end = False). It does not remove the nodes themselves, because they
+        may be shared with other words/phrases.
 
         :param trie: The trie to remove the string from.
         :param string: The string to remove.
-        :return: True if the string was removed, False if the string was not found.
+        :return: True if the string was removed, False if the string was not
+                 found.
         """
         node = trie.root
         stack = []  # To keep track of the path
@@ -648,28 +837,42 @@ class PrintsCharming:
             node.is_end = False
             node.style_info = None  # Optionally clear style information
 
-            # Optionally: clean up unused nodes if they are not part of any other words/phrases
+            # Clean up unused nodes if they are not part of other words/phrases
             self._cleanup_trie(stack)
 
             return True
         return False  # String was not found as a complete word/phrase
 
-    def _cleanup_trie(self, stack):
+    @staticmethod
+    def _cleanup_trie(stack):
         """
-        Recursively clean up the trie by removing nodes that are no longer part of any valid words/phrases.
+        Recursively clean up the trie by removing nodes that are no longer part
+        of any valid words/phrases.
 
-        :param stack: A list of (node, char) pairs that represent the path of the string in the trie.
+        :param stack: A list of (node, char) pairs that represent the path of
+                      the string in the trie.
         """
         while stack:
             node, char = stack.pop()
             child_node = node.children[char]
 
-            # If the child node has no children and is not the end of another word/phrase, remove it
+            # If the child node has no children and is not the end of another
+            # word/phrase, remove it.
             if not child_node.children and not child_node.is_end:
                 del node.children[char]
             else:
-                # If the child node has children or marks the end of another word/phrase, stop cleaning
+                # If the child node has children or marks the end of another
+                # word/phrase, stop cleaning.
                 break
+
+    def _remove_word(self, word: str) -> bool:
+        if word in self.word_map:
+            del self.word_map[word]
+            return True
+        elif word in self.conceal_map[word]:
+            del self.conceal_map[word]
+            return True
+        return False
 
 
 
@@ -688,22 +891,104 @@ class PrintsCharming:
         return concealed_text
 
 
+    def format_dict(self, d, indent=4) -> str:
+        """
+        Formats a dictionary as a styled string.
 
-    def print_variables(self, text: str, text_style: str = None, **kwargs) -> None:
-        # Apply styles to each variable in kwargs
-        for key, value in kwargs.items():
-            variable, var_style = value
-            styled_var = f"{self.style_codes[var_style]}{str(variable)}{self.reset}"
-            kwargs[key] = styled_var
+        :param d: The dictionary to format.
+        :param indent: The number of spaces to use for indentation.
+        :return: A string representing the formatted dictionary.
+        """
 
-        # Replace placeholders with styled variables
-        text = text.format(**kwargs)
+        def pprint_dict(d, level=0):
+            result = ""
+            for key, value in d.items():
+                result += (
+                    " " * (level * indent)
+                    + self.apply_style('dict_key', f"{key}: ")
+                )
+                if isinstance(value, dict):
+                    result += (
+                        "{\n"
+                        + pprint_dict(value, level + 1)
+                        + " " * (level * indent)
+                        + "}\n"
+                    )
+                elif isinstance(value, bool):
+                    bool_style = 'true' if value else 'false'
+                    result += (
+                        self.apply_style(bool_style, str(value))
+                        + "\n"
+                    )
+                elif value is None:
+                    result += (
+                        self.apply_style('none', str(value))
+                        + "\n"
+                    )
+                elif isinstance(value, int):
+                    result += (
+                        self.apply_style('int', str(value))
+                        + "\n"
+                    )
+                elif isinstance(value, float):
+                    result += (
+                        self.apply_style('float', str(value))
+                        + "\n"
+                    )
+                elif (
+                    isinstance(value, str)
+                    and value.isupper()
+                    and value.lower() in self.__class__.log_level_style_names
+                ):
+                    result += (
+                        self._apply_style_internal(value.lower(), str(value))
+                        + "\n"
+                    )
+                else:
+                    result += f"{value}\n"
+            return result
 
-        self.print(text, style=text_style, skip_ansi_check=True)
+        return "{\n" + pprint_dict(d) + "}"
 
 
+    def segment_with_splitter_and_style(self,
+                                        text: str,
+                                        splitter_match: str,
+                                        splitter_swap: Union[str, bool],
+                                        splitter_show: bool,
+                                        splitter_style: Union[str, List[str]],
+                                        splitter_arms: bool,
+                                        string_style: List[str]
+                                        ) -> str:
+        """
+        Segments a text string using a specified splitter, applies style to
+        each segment and splitter, and returns the styled result.
 
-    def segment_with_splitter_and_style(self, text: str, splitter_match: str, splitter_swap: Union[str, bool], splitter_show: bool, splitter_style: Union[str, List[str]], splitter_arms: bool, string_style: List[str]) -> str:
+        This method splits `text` based on `splitter_match`, applies a list of
+        styles to each segment and optionally to the splitter, then reassembles
+        and returns the styled text.
+
+        Parameters:
+            text (str): The text to be segmented and styled.
+            splitter_match (str): The string that identifies where to split `text`.
+            splitter_swap (Union[str, bool]): The string to replace the splitter with;
+                if set to False, `splitter_match` is used as the splitter.
+            splitter_show (bool): Determines if the splitter should be included in
+                the output between segments.
+            splitter_style (Union[str, List[str]]): A single style or list of styles
+                to apply to the splitter; if a list is provided, styles rotate
+                across instances of the splitter.
+            splitter_arms (bool): If True, applies styles to both the splitter
+                and padding around it.
+            string_style (List[str]): List of styles to apply to each segment;
+                styles rotate across segments if the list length is shorter than
+                the number of segments.
+
+        Returns:
+            str: The fully assembled, styled text with segments and splitters
+            styled according to the parameters.
+
+        """
         if isinstance(splitter_style, str):
             splitter_styles = [splitter_style]
         else:
@@ -718,19 +1003,31 @@ class PrintsCharming:
 
         for i, segment in enumerate(segments):
             # Apply string style to the segment
-            segment_style = string_style[i % len(string_style)] if string_style else 'default'
-            styled_segment = f"{self.style_codes[segment_style]}{segment}{self.reset}"
+            segment_style = (
+                string_style[i % len(string_style)]
+                if string_style else 'default'
+            )
+            styled_segment = (
+                f"{self.style_codes[segment_style]}{segment}{self.reset}"
+            )
             #styled_segment = segment  # Start with the original segment
 
             if splitter_show and i > 0:
 
                 if len(splitter_styles) == 1:
-                    styled_splitter = f"{self.style_codes[splitter_styles[0]]}{actual_splitter}{self.reset}"
+                    styled_splitter = (
+                        f"{self.style_codes[splitter_styles[0]]}"
+                        f"{actual_splitter}{self.reset}"
+                    )
                 else:
-                    styled_splitter = f"{self.style_codes[splitter_styles[i % len(splitter_styles)]]}{actual_splitter}{self.reset}"
+                    splitter_len = len(splitter_styles)
+                    styled_splitter = (
+                        f"{self.style_codes[splitter_styles[i % splitter_len]]}"
+                        f"{actual_splitter}{self.reset}"
+                    )
                     #styled_segment = styled_splitter + styled_segment
 
-                # Apply the appropriate style to the splitter and padding if splitter_arms is True
+                # Apply the appropriate style to the splitter and padding
                 if splitter_arms:
                     styled_segment = styled_splitter + styled_segment
                 else:
@@ -742,7 +1039,45 @@ class PrintsCharming:
 
 
 
-    def segment_and_style2(self, text: str, styles_dict: Dict[str, Union[str, int, List[Union[str, int]]]]) -> str:
+    def segment_and_style2(self,
+                           text: str,
+                           styles_dict: Dict[str, Union[str, int, List[Union[str, int]]]]
+                           ) -> str:
+        """
+        Segments the input text and applies specified styles to words based on
+        indices or word matches provided in a styles dictionary.
+
+        This method splits the `text` into words, then applies styling to specific
+        words according to `styles_dict`, where each style is associated with either
+        word indices or word content. Optionally, a final style can be applied to
+        any words not styled by previous operations.
+
+        Parameters:
+            text (str): The input text to be segmented and styled.
+            styles_dict (Dict[str, Union[str, int, List[Union[str, int]]]]):
+                A dictionary mapping styles to indices or words. Each key is a style,
+                and each value indicates the words to style with that style.
+                - If the value is an integer, it represents a 1-based index of a word
+                  in `text` to style with the key's style.
+                - If the value is a list, it can contain a mix of integers (1-based
+                  indices) and words, where each item specifies words to style with
+                  the corresponding key.
+                - If the value is an empty string (""), the style will be applied as
+                  the final style to any remaining unstyled words.
+
+        Returns:
+            str: The fully styled text, with each word styled according to the
+            mappings specified in `styles_dict`.
+
+        Example:
+            Given `text = "This is a sample text"` and
+            `styles_dict = {"bold": [1, "sample"], "italic": "", "underline": 3}`,
+            the method will:
+            - Apply "bold" style to the 1st word and the word "sample".
+            - Apply "underline" style to the 3rd word.
+            - Apply "italic" style to any remaining unstyled words.
+
+        """
         words = text.split()
         word_indices = {word: i for i, word in enumerate(words)}  # Map words to their indices
         operations = []
@@ -787,7 +1122,44 @@ class PrintsCharming:
 
 
 
-    def segment_and_style(self, text: str, styles_dict: Dict[str, Union[str, int]]) -> str:
+    def segment_and_style(self,
+                          text: str,
+                          styles_dict: Dict[str, Union[str, int]]
+                          ) -> str:
+        """
+        Segments the input text and applies specified styles to words based on
+        indices or word matches from a dictionary of styles.
+
+        This method divides `text` into individual words, then iterates over
+        `styles_dict` to apply styles to specific words, based on either their
+        index or content. Additionally, a final style can be applied to all
+        remaining words after the last specified index or match.
+
+        Parameters:
+           text (str): The input text to be segmented and styled.
+           styles_dict (Dict[str, Union[str, int]]): A dictionary where each key
+               is a style to apply, and each value specifies either the index
+               or the word in `text` to which the style should be applied.
+               - If the value is an integer, it represents a 1-based index of the
+                 word in `text` to style with the corresponding style.
+               - If the value is a string, it matches the word in `text` to style
+                 with the corresponding style.
+               - If the value is an empty string or `None`, the style will be applied
+                 as the final style to all remaining unstyled words in `text`.
+
+        Returns:
+           str: The fully styled text, with each word styled according to the
+           mappings specified in `styles_dict`.
+
+        Example:
+           Given `text = "This is a sample text"` and
+           `styles_dict = {"bold": 1, "italic": "sample", "underline": ""}`,
+           the method will:
+           - Apply "bold" style to the 1st word ("This").
+           - Apply "italic" style to the word "sample".
+           - Apply "underline" style to any remaining words after "sample".
+
+        """
         words = text.split()
         previous_index = 0
         value_style = None
@@ -825,7 +1197,9 @@ class PrintsCharming:
 
 
 
-    def style_words_by_index(self, text: str, style: Dict[Union[int, Tuple[int, int]], str]) -> str:
+    def style_words_by_index(self,
+                             text: str, style: Dict[Union[int, Tuple[int, int]], str]
+                             ) -> str:
 
         words = text.split()
 
@@ -843,28 +1217,6 @@ class PrintsCharming:
 
         return " ".join(words)
 
-        words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
-
-        # Initialize list to hold the final styled words and spaces
-        styled_words_and_spaces = [None] * len(words_and_spaces)
-
-        # Initialize the lists to keep track of which indexes are used by what
-        indexes_used_by_phrases = set()  # should include all indexes
-        indexes_used_by_words = set()
-        indexes_used_by_default_styling = set()
-        indexes_used_by_spaces = set()
-        indexes_used_by_none_styling = set()
-
-        boundary_indices_dict = {}
-
-        # Define sentence-ending characters
-        sentence_ending_characters = ".,!?:;"
-
-
-
-
-
-
 
     @staticmethod
     def contains_ansi_codes(s: str) -> bool:
@@ -874,16 +1226,21 @@ class PrintsCharming:
     def remove_ansi_codes(cls, text):
         return cls.ansi_escape_pattern.sub('', text)
 
-
-    def write_file(self, text, filename, end, mode='a'):
+    @staticmethod
+    def write_file(text, filename, end, mode='a'):
         with open(filename, mode) as file:
             file.write(text + end)
 
 
-
-
-
-    def format_with_sep(self, *args, converted_args=None, sep=' ', prog_sep='', prog_step=1, start='', prog_direction='forward'):
+    def format_with_sep(self,
+                        *args,
+                        converted_args=None,
+                        sep=' ',
+                        prog_sep='',
+                        prog_step=1,
+                        start='',
+                        prog_direction='forward'
+                        ) -> str:
 
         if not converted_args:
             # Convert args to strings if required
@@ -926,10 +1283,6 @@ class PrintsCharming:
         final_text = start + text
 
         return final_text
-
-
-    def check_any_not_none(self, *args):
-        return any((arg is not None for arg in args))
 
 
 
@@ -1184,12 +1537,22 @@ class PrintsCharming:
                         self.debug(f'stripped_word[{i}]: {stripped_word}')
                         trailing_chars = word[len(stripped_word):]  # Capture any trailing punctuation
 
-                        # Check if the word is in the word trie
-                        word_match = self.word_trie.search_longest_prefix(stripped_word)
-                        self.debug(f'word_match: {word_match}')
-                        if word_match:
-                            matched_word, word_details = word_match
-                            self.debug(f'word_match True:\nmatched_word: {matched_word}\nword_details: {word_details}')
+                        word_details = None
+
+                        if self.enable_word_trie:
+                            # Check if the word is in the word trie
+                            word_match = self.word_trie.search_longest_prefix(stripped_word)
+                            self.debug(f'word_match: {word_match}')
+                            if word_match:
+                                matched_word, word_details = word_match
+                                self.debug(f'word_match True:\nmatched_word: {matched_word}\nword_details: {word_details}')
+
+                        elif self.enable_word_map:
+                            word_details = self.word_map.get(stripped_word)
+
+
+                        if word_details:
+                            self.debug(f'word_details: {word_details}')
                             style_start = word_details.get('style_code', '')
                             self.debug(f'style_start: {style_start}')
 
@@ -1212,137 +1575,102 @@ class PrintsCharming:
                             if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
                                 boundary_indices_dict[i + 1] = word_details.get('attribs')
 
-
-
                             # Mark the word as styled
                             indexes_used_by_words.add(i)
 
                         else:
-                            if self.enable_styled_subwords:
-                                if subword_search:
-                                    if isinstance(subword_style_option, int):
-                                        if subword_style_option == 1:
-                                            # Use the specialized prefix search method
-                                            prefix_match = self.subword_trie.search_prefix(stripped_word)
-                                            if prefix_match:
-                                                matched_substring, substring_details = prefix_match
+                            if self.enable_styled_subwords and subword_search:
+                                if isinstance(subword_style_option, int) and subword_style_option in range(1, 6):
+                                    subword_match = False
+
+                                    if subword_style_option == 1:
+                                        # Use the specialized prefix search method
+                                        prefix_match = self.subword_trie.search_prefix(stripped_word)
+                                        if prefix_match:
+                                            matched_substring, substring_details = prefix_match
+                                            subword_match = True
+
+                                    elif subword_style_option == 2:
+                                        # Use the specialized suffix search method
+                                        suffix_match = self.subword_trie.search_suffix(stripped_word)
+                                        if suffix_match:
+                                            matched_substring, substring_details = suffix_match
+                                            subword_match = True
+
+                                    elif subword_style_option == 3:
+                                        # Earliest added match
+                                        substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                        if substring_matches:
+                                            matched_substring, substring_details, _ = substring_matches[0]
+                                            subword_match = True
+
+                                    elif subword_style_option == 4:
+                                        # Most recently added match
+                                        substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                        if substring_matches:
+                                            matched_substring, substring_details, _ = substring_matches[-1]
+                                            subword_match = True
+
+                                    elif subword_style_option == 5:
+                                        # Style only the matching substrings
+                                        substring_matches = self.subword_trie.search_any_substring(stripped_word)
+                                        if substring_matches:
+                                            sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
+                                            current_position = 0
+                                            styled_word_parts = []
+
+                                            for matched_substring, substring_details in sorted_matches:
                                                 style_start = substring_details.get('style_code', '')
-                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                                styled_words_and_spaces[i] = styled_word_or_space
+                                                substring_start = stripped_word.find(matched_substring, current_position)
+                                                substring_end = substring_start + len(matched_substring)
 
-                                                # Update boundary information
-                                                if i > 0 and i - 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                                # Style the part before the substring
+                                                if substring_start > current_position:
+                                                    unstyled_part = stripped_word[current_position:substring_start]
+                                                    styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
 
-                                                if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+                                                # Apply style to the matched substring
+                                                styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
+                                                current_position = substring_end
 
-                                                indexes_used_by_substrings.add(i)
-                                                continue
+                                            # Handle any remaining part after the last substring
+                                            if current_position < len(stripped_word):
+                                                remaining_part = stripped_word[current_position:]
+                                                styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
 
-                                        elif subword_style_option == 2:
+                                            # Combine parts and store the result
+                                            styled_word_or_space = ''.join(styled_word_parts)
+                                            styled_words_and_spaces[i] = styled_word_or_space
 
-                                            # Use the specialized suffix search method
-                                            suffix_match = self.subword_trie.search_suffix(stripped_word)
-                                            if suffix_match:
-                                                matched_substring, substring_details = suffix_match
-                                                style_start = substring_details.get('style_code', '')
-                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                                styled_words_and_spaces[i] = styled_word_or_space
+                                            # Update boundary information
+                                            if i > 0 and (i - 1) not in boundary_indices_dict:
+                                                boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
 
-                                                # Update boundary information
-                                                if i > 0:
-                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-                                                if i + 1 < len(words_and_spaces):
-                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+                                            if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                                boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
 
-                                                indexes_used_by_substrings.add(i)
-                                                continue
+                                            indexes_used_by_substrings.add(i)
+                                            continue
 
+                                    if subword_match and subword_style_option != 5:
+                                        style_start = substring_details.get('style_code', '')
+                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                        styled_words_and_spaces[i] = styled_word_or_space
 
-                                        elif subword_style_option == 3:
-                                            # Use the modified search_any_substring to get matches in trie insertion order
-                                            substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
-                                            if substring_matches:
-                                                # The first match in the list will be the one added to the trie first
-                                                matched_substring, substring_details, _ = substring_matches[0]  # Get the earliest added match
-                                                style_start = substring_details.get('style_code', '')
-                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                                styled_words_and_spaces[i] = styled_word_or_space
+                                        # Update boundary information
+                                        if i > 0 and (i - 1) not in boundary_indices_dict:
+                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
 
-                                                # Update boundary information
-                                                if i > 0 and i - 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                        if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
 
-                                                if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                                indexes_used_by_substrings.add(i)
-                                                continue
-
-                                        elif subword_style_option == 4:
-                                            # Use the modified search_any_substring to get matches sorted by insertion order
-                                            substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
-                                            if substring_matches:
-                                                # The last match in the list will be the one added to the trie last
-                                                matched_substring, substring_details, _ = substring_matches[-1]  # Get the most recently added match
-                                                style_start = substring_details.get('style_code', '')
-                                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                                styled_words_and_spaces[i] = styled_word_or_space
-
-                                                # Update boundary information
-                                                if i > 0 and i - 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-
-                                                if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                                indexes_used_by_substrings.add(i)
-                                                continue
+                                        indexes_used_by_substrings.add(i)
+                                        continue
 
 
-                                        elif subword_style_option == 5:
-                                            substring_matches = self.subword_trie.search_any_substring(stripped_word)
-                                            if substring_matches:
-                                                sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
 
-                                                # Original behavior: style only the matching substring(s)
-                                                current_position = 0
-                                                styled_word_parts = []
 
-                                                for matched_substring, substring_details in sorted_matches:
-                                                    style_start = substring_details.get('style_code', '')
-                                                    substring_start = stripped_word.find(matched_substring, current_position)
-                                                    substring_end = substring_start + len(matched_substring)
 
-                                                    # Style the part before the substring
-                                                    if substring_start > current_position:
-                                                        unstyled_part = stripped_word[current_position:substring_start]
-                                                        styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
-
-                                                    # Apply style to the matched substring
-                                                    styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
-                                                    current_position = substring_end
-
-                                                # Handle any remaining part after the last substring
-                                                if current_position < len(stripped_word):
-                                                    remaining_part = stripped_word[current_position:]
-                                                    styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
-
-                                                # Combine parts and store the result
-                                                styled_word_or_space = ''.join(styled_word_parts)
-                                                styled_words_and_spaces[i] = styled_word_or_space
-
-                                                # Update boundary information
-                                                if i > 0:
-                                                    if i - 1 not in boundary_indices_dict:
-                                                        boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
-
-                                                if i + 1 < len(words_and_spaces):
-                                                    if i + 1 not in boundary_indices_dict:
-                                                        boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
-
-                                                indexes_used_by_substrings.add(i)
 
         self.debug(f'after words and substrings:\nindexes_used_by_words:\n{indexes_used_by_words}\nindexes_used_by_substrings:\n{indexes_used_by_substrings}\nboundary_indices_dict:\n{boundary_indices_dict}\nstyled_words_and_spaces:\n{styled_words_and_spaces}')
         self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
@@ -1415,13 +1743,22 @@ class PrintsCharming:
         # Step 5: Join the styled_words_and_spaces to form the final styled text
         styled_text = ''.join(filter(None, styled_words_and_spaces))
 
+        # Step 6: Wrap the final styled text if needed
+        wrapped_styled_text = self.formatter.format(styled_text, skip_format=True)
+
+        # Step 7: Add start and end to the final styled text
+        if not wrapped_styled_text:
+            all_text = start + styled_text + end
+        else:
+            all_text = start + wrapped_styled_text + end
+
 
         # Print or write to file
         if filename:
             with open(filename, 'a') as file:
-                file.write(start + styled_text + end)
+                file.write(all_text)
         else:
-            sys.stdout.write(start + styled_text + end)
+            sys.stdout.write(all_text)
             #print(start + styled_text, end=end)
 
 
@@ -1438,32 +1775,31 @@ class PrintsCharming:
                 results[key] = dict1.get(key) == dict2.get(key) and dict1.get(key) is True
         return results
 
-
-    def apply_reverse_effect(self, style_dict):
+    @staticmethod
+    def apply_reverse_effect(style_dict):
         if style_dict.get('reversed'):
-            style_dict['color'], style_dict['bg_color'] = style_dict.get('bg_color'), style_dict.get('color')
+            style_dict['color'], style_dict['bg_color'] = (
+                style_dict.get('bg_color'), style_dict.get('color')
+            )
         return style_dict
 
 
+    def print_variables(self, text: str, text_style: str = None, **kwargs) -> None:
+        # Apply styles to each variable in kwargs
+        for key, value in kwargs.items():
+            variable, var_style = value
+            styled_var = f"{self.style_codes[var_style]}{str(variable)}{self.reset}"
+            kwargs[key] = styled_var
 
-    def print_progress_bar(self, total_steps: int = 4, bar_symbol: str = ' ', bar_length: int = 40, color: str = 'vgreen'):
-        for i in range(total_steps):
-            progress = (i + 1) / total_steps
-            block = int(bar_length * progress)
-            if bar_symbol == ' ':
-                bar_symbol = self.apply_bg_color(color, bar_symbol)
-            bar = bar_symbol * block + "-" * (bar_length - block)
-            time.sleep(0.4)
-            self.clear_line()
-            self.print(f"Progress: |{bar}| {int(progress * 100)}%", end='', color=color)
-            sys.stdout.flush()
-            time.sleep(0.25)  # Simulate work
+        # Replace placeholders with styled variables
+        text = text.format(**kwargs)
 
+        self.print(text, style=text_style, skip_ansi_check=True)
 
 
     def replace_and_style_placeholders(self,
                                        text: str,
-                                       kwargs: Dict[str, Any],
+                                       placeholders: Dict[str, Any],
                                        enable_label_style: bool = True,
                                        top_level_label: str = 'top_level_label',
                                        sub_level_label: str = 'sub_level_label',
@@ -1472,7 +1808,11 @@ class PrintsCharming:
                                        **style_kwargs) -> str:
 
         """Replace placeholders with actual values and apply colors."""
-        self.debug("Replacing and styling placeholders in text: {} with kwargs: {}", text, kwargs)
+        self.debug(
+            "Replace and style text: {} with placeholders: {}",
+            text,
+            placeholders
+        )
         top_level_label_style_code = self.get_style_code(top_level_label) if enable_label_style else ''
         sub_level_label_style_code = self.get_style_code(sub_level_label) if enable_label_style else ''
         lines = text.split('\n')
@@ -1494,7 +1834,7 @@ class PrintsCharming:
         styled_text = '\n'.join(lines)
 
         # Replace placeholders with actual values and apply styles
-        for key, value in kwargs.items():
+        for key, value in placeholders.items():
             styled_value = str(value)
             if key in self.style_conditions_map:
                 style_name = self.style_conditions_map[key](value)
@@ -1543,61 +1883,18 @@ class PrintsCharming:
         return styled_text
 
 
-
-    def ugly_print_map(self, d: Dict, style_name: str, indent: int = 2, is_last_item: bool = True):
-        style_code = self.style_codes[style_name]
-        value_style = self.style_codes.get('default', self.style_codes['default'])
-
-        print(' ' * indent + '{')
-
-        total_items = len(d)
-        current_item = 0
-
-        for key, value in d.items():
-            current_item += 1
-            indented_key = ' ' * (indent + 4) + style_code + repr(key) +  self.reset
-            indented_value = value_style + repr(value) + self.reset
-
-            if isinstance(value, dict):
-                print(f"{indented_key}: ", end="")
-                self.ugly_print_map(value, style_name, indent + 4, current_item == total_items)
-            else:
-                separator = "," if current_item < total_items else ""
-                sep2 = "\n"
-                print(f"{indented_key}{style_code}{value}{self.reset}{separator}{sep2}")
-
-        closing_brace = ' ' * indent + '}'
-        if is_last_item:
-            print(closing_brace)
-        else:
-            print(f"{closing_brace},")
-
-
-
-    """
-    def setup_logging(self, internal_logging: bool, log_level: str, log_format: str = '%(message)s'):
-        self.logger = shared_logger
-        self.logger.propagate = False  # Prevent propagation to root logger
-        if internal_logging:
-            self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
-            if not self.logger.hasHandlers():
-                console_handler = logging.StreamHandler()
-                console_handler.setFormatter(logging.Formatter(log_format))
-                self.logger.addHandler(console_handler)
-                self.logger.disabled = False
-
-            logging_enabled_init_message = f"Internal Logging Enabled:\n{self.print_dict(self.config)}"
-            self.debug(logging_enabled_init_message)
-
-        else:
-            self.logger.disabled = True
-
-
-    def update_logging(self, log_format: str = '%(message)s'):
-        self.logger.handlers = []  # Clear existing handlers
-        self.setup_logging(self.config["internal_logging"], self.config["log_level"], log_format)
-
-    """
+    def print_progress_bar(self, total_steps: int = 4, bar_symbol: str = ' ', bar_length: int = 40, color: str = 'vgreen'):
+        for i in range(total_steps):
+            progress = (i + 1) / total_steps
+            block = int(bar_length * progress)
+            if bar_symbol == ' ':
+                bar_symbol = self.apply_bg_color(color, bar_symbol)
+            bar = bar_symbol * block + "-" * (bar_length - block)
+            time.sleep(0.4)
+            self.clear_line()
+            self.print(f"Progress: |{bar}| {int(progress * 100)}%", end='', color=color)
+            sys.stdout.flush()
+            time.sleep(0.25)  # Simulate work
 
     # This is for internal logging within this class!!!
     def setup_internal_logging(self, log_level: str, log_format: str = '%(message)s'):
@@ -1610,7 +1907,7 @@ class PrintsCharming:
         # Logging is controlled by the instance, not by disabling the logger itself
         if self.internal_logging_enabled:
             self.info("Internal Logging Enabled for this instance.")
-            logging_enabled_init_message = f"Instance config dict:\n{self.print_dict(self.config)}"
+            logging_enabled_init_message = f"Instance config dict:\n{self.format_dict(self.config)}"
             self.debug(logging_enabled_init_message)
 
 
@@ -1705,8 +2002,23 @@ class PrintsCharming:
 
 
 
-
-    def handle_other_styled_text_and_spaces(self, words_and_spaces, styled_words_and_spaces, indexes_used_by_phrases, indexes_used_by_words, indexes_used_by_subwords, indexes_used_by_spaces, indexes_used_by_default_styling, style_instance, style_code, share_alike_sep_bg, share_alike_sep_ul, share_alike_sep_ol, share_alike_sep_st, share_alike_sep_bl, boundary_indices_dict):
+    def handle_other_styled_text_and_spaces(self,
+                                            words_and_spaces,
+                                            styled_words_and_spaces,
+                                            indexes_used_by_phrases,
+                                            indexes_used_by_words,
+                                            indexes_used_by_subwords,
+                                            indexes_used_by_spaces,
+                                            indexes_used_by_default_styling,
+                                            style_instance,
+                                            style_code,
+                                            share_alike_sep_bg,
+                                            share_alike_sep_ul,
+                                            share_alike_sep_ol,
+                                            share_alike_sep_st,
+                                            share_alike_sep_bl,
+                                            boundary_indices_dict
+                                            ):
 
         for i, word_or_space in enumerate(words_and_spaces):
             if i in indexes_used_by_phrases or i in indexes_used_by_words or i in indexes_used_by_subwords:
@@ -1758,8 +2070,6 @@ class PrintsCharming:
 
 
 
-
-
     def handle_words_and_subwords(self,
                                   words_and_spaces,
                                   styled_words_and_spaces,
@@ -1769,7 +2079,8 @@ class PrintsCharming:
                                   subword_search,
                                   subword_style_option,
                                   style_code,
-                                  boundary_indices_dict):
+                                  boundary_indices_dict
+                                  ):
 
         sentence_ending_characters = self.sentence_ending_characters
 
@@ -1779,23 +2090,29 @@ class PrintsCharming:
 
             if not word_or_space.isspace():
 
-                word = word_or_space.strip()  # Strip whitespace around the word
+                word = word_or_space.strip()
                 self.debug(f'word[{i}]: {word}')
-
                 stripped_word = word.rstrip(sentence_ending_characters)
                 self.debug(f'stripped_word[{i}]: {stripped_word}')
 
-                trailing_chars = word[len(stripped_word):]  # Capture any trailing punctuation
-                self.debug(f'trailing_chars: {trailing_chars}')
+                # Capture any trailing punctuation
+                trailing_chars = word[len(stripped_word):]
 
-                # Check if the word is in the word trie
-                word_match = self.word_trie.search_longest_prefix(stripped_word)
-                self.debug(f'word_match: {word_match}')
+                word_details = None
 
-                if word_match:
-                    matched_word, word_details = word_match
-                    self.debug(f'word_match True:\nmatched_word: {matched_word}\nword_details: {word_details}')
+                if self.enable_word_trie:
+                    # Check if the word is in the word trie
+                    word_match = self.word_trie.search_longest_prefix(stripped_word)
+                    self.debug(f'word_match: {word_match}')
+                    if word_match:
+                        matched_word, word_details = word_match
+                        self.debug(f'word_match True:\nmatched_word: {matched_word}\nword_details: {word_details}')
 
+                elif self.enable_word_map:
+                    word_details = self.word_map.get(stripped_word)
+
+                if word_details:
+                    self.debug(f'word_details: {word_details}')
                     style_start = word_details.get('style_code', '')
                     self.debug(f'style_start: {style_start}')
 
@@ -1822,123 +2139,95 @@ class PrintsCharming:
                     indexes_used_by_words.add(i)
 
                 else:
+                    if self.enable_styled_subwords and subword_search:
+                        if isinstance(subword_style_option, int) and subword_style_option in range(1, 6):
+                            subword_match = False
 
-                    if self.enable_styled_subwords:
-                        if subword_search:
-                            if isinstance(subword_style_option, int):
-                                if subword_style_option == 1:
-                                    # Use the specialized prefix search method
-                                    prefix_match = self.subword_trie.search_prefix(stripped_word)
-                                    if prefix_match:
-                                        matched_substring, substring_details = prefix_match
+                            if subword_style_option == 1:
+                                # Use the specialized prefix search method
+                                prefix_match = self.subword_trie.search_prefix(stripped_word)
+                                if prefix_match:
+                                    matched_substring, substring_details = prefix_match
+                                    subword_match = True
+
+                            elif subword_style_option == 2:
+                                # Use the specialized suffix search method
+                                suffix_match = self.subword_trie.search_suffix(stripped_word)
+                                if suffix_match:
+                                    matched_substring, substring_details = suffix_match
+                                    subword_match = True
+
+                            elif subword_style_option == 3:
+                                # Earliest added match
+                                substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                if substring_matches:
+                                    matched_substring, substring_details, _ = substring_matches[0]
+                                    subword_match = True
+
+                            elif subword_style_option == 4:
+                                # Most recently added match
+                                substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                if substring_matches:
+                                    matched_substring, substring_details, _ = substring_matches[-1]
+                                    subword_match = True
+
+                            elif subword_style_option == 5:
+                                # Style only the matching substrings
+                                substring_matches = self.subword_trie.search_any_substring(stripped_word)
+                                if substring_matches:
+                                    sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
+                                    current_position = 0
+                                    styled_word_parts = []
+
+                                    for matched_substring, substring_details in sorted_matches:
                                         style_start = substring_details.get('style_code', '')
-                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                        styled_words_and_spaces[i] = styled_word_or_space
+                                        substring_start = stripped_word.find(matched_substring, current_position)
+                                        substring_end = substring_start + len(matched_substring)
 
-                                        # Update boundary information
-                                        if i > 0 and i - 1 not in boundary_indices_dict:
-                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                        # Style the part before the substring
+                                        if substring_start > current_position:
+                                            unstyled_part = stripped_word[current_position:substring_start]
+                                            styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
 
-                                        if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+                                        # Apply style to the matched substring
+                                        styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
+                                        current_position = substring_end
 
-                                        indexes_used_by_subwords.add(i)
-                                        continue
+                                    # Handle any remaining part after the last substring
+                                    if current_position < len(stripped_word):
+                                        remaining_part = stripped_word[current_position:]
+                                        styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
 
-                                elif subword_style_option == 2:
+                                    # Combine parts and store the result
+                                    styled_word_or_space = ''.join(styled_word_parts)
+                                    styled_words_and_spaces[i] = styled_word_or_space
 
-                                    # Use the specialized suffix search method
-                                    suffix_match = self.subword_trie.search_suffix(stripped_word)
-                                    if suffix_match:
-                                        matched_substring, substring_details = suffix_match
-                                        style_start = substring_details.get('style_code', '')
-                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                        styled_words_and_spaces[i] = styled_word_or_space
+                                    # Update boundary information
+                                    if i > 0 and (i - 1) not in boundary_indices_dict:
+                                        boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
 
-                                        # Update boundary information
-                                        if i > 0:
-                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-                                        if i + 1 < len(words_and_spaces):
-                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+                                    if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                        boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
 
-                                        indexes_used_by_subwords.add(i)
-                                        continue
+                                    indexes_used_by_subwords.add(i)
+                                    continue
 
+                            if subword_match and subword_style_option != 5:
+                                style_start = substring_details.get('style_code', '')
+                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                styled_words_and_spaces[i] = styled_word_or_space
 
-                                elif subword_style_option in [3, 4]:
-                                    # Use the modified search_any_substring to get matches in trie insertion order
-                                    substring_matches = self.subword_trie.search_any_substring_by_insertion_order(stripped_word)
-                                    if substring_matches:
-                                        # The first match in the list will be the one added to the trie first
-                                        # The last match in the list will be the one added to the trie last
-                                        # Choose the match based on whether the option is 3 or 4
-                                        matched_substring, substring_details, _ = (
-                                            substring_matches[0] if subword_style_option == 3 else substring_matches[-1]
-                                        )  # Get the earliest added match or the most recently added match
+                                # Update boundary information
+                                if i > 0 and (i - 1) not in boundary_indices_dict:
+                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
 
-                                        style_start = substring_details.get('style_code', '')
-                                        styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
-                                        styled_words_and_spaces[i] = styled_word_or_space
+                                if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
 
-                                        # Update boundary information
-                                        if i > 0 and i - 1 not in boundary_indices_dict:
-                                            boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
-
-                                        if i + 1 < len(words_and_spaces) and i + 1 not in boundary_indices_dict:
-                                            boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
-
-                                        indexes_used_by_subwords.add(i)
-                                        continue
-
-
-
-                                elif subword_style_option == 5:
-                                    substring_matches = self.subword_trie.search_any_substring(stripped_word)
-                                    if substring_matches:
-                                        sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
-
-                                        # Original behavior: style only the matching substring(s)
-                                        current_position = 0
-                                        styled_word_parts = []
-
-                                        for matched_substring, substring_details in sorted_matches:
-                                            style_start = substring_details.get('style_code', '')
-                                            substring_start = stripped_word.find(matched_substring, current_position)
-                                            substring_end = substring_start + len(matched_substring)
-
-                                            # Style the part before the substring
-                                            if substring_start > current_position:
-                                                unstyled_part = stripped_word[current_position:substring_start]
-                                                styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
-
-                                            # Apply style to the matched substring
-                                            styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
-                                            current_position = substring_end
-
-                                        # Handle any remaining part after the last substring
-                                        if current_position < len(stripped_word):
-                                            remaining_part = stripped_word[current_position:]
-                                            styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
-
-                                        # Combine parts and store the result
-                                        styled_word_or_space = ''.join(styled_word_parts)
-                                        styled_words_and_spaces[i] = styled_word_or_space
-
-                                        # Update boundary information
-                                        if i > 0:
-                                            if i - 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
-
-                                        if i + 1 < len(words_and_spaces):
-                                            if i + 1 not in boundary_indices_dict:
-                                                boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
-
-                                        indexes_used_by_subwords.add(i)
-
+                                indexes_used_by_subwords.add(i)
+                                continue
 
         return styled_words_and_spaces, indexes_used_by_words, indexes_used_by_subwords, boundary_indices_dict
-
-
 
 
     def handle_phrases(self,
@@ -2002,9 +2291,20 @@ class PrintsCharming:
         return styled_words_and_spaces, indexes_used_by_phrases, boundary_indices_dict
 
 
-
-
-    def get_style_instance_and_code(self, style, color, bg_color, reverse, bold, dim, italic, underline, overline, strikethru, conceal, blink):
+    def get_style_instance_and_code(self,
+                                    style,
+                                    color,
+                                    bg_color,
+                                    reverse,
+                                    bold,
+                                    dim,
+                                    italic,
+                                    underline,
+                                    overline,
+                                    strikethru,
+                                    conceal,
+                                    blink
+                                    ):
 
         style_instance, style_code = (
             (self.styles.get(style, self.styles['default']), self.style_codes.get(style, self.style_codes['default'])) if style and isinstance(style, str)
@@ -2068,9 +2368,6 @@ class PrintsCharming:
         return style_instance, style_code
 
 
-
-
-
     def print2(self,
                *args: Any,
                style: Union[None, str, Dict[Union[int, Tuple[int, int]], str], List[Union[None, str, Dict[Union[int, Tuple[int, int]], str]]]] = None,
@@ -2106,7 +2403,8 @@ class PrintsCharming:
                subword_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
                style_args_as_one: bool = True,
                return_styled_args_list: bool = False,
-               **kwargs: Any) -> Union[None, List[str]]:
+               **kwargs: Any
+               ) -> Union[None, List[str]]:
 
 
 

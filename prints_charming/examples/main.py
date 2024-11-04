@@ -23,7 +23,7 @@ from prints_charming import (
     get_key,
 )
 
-from prints_charming.exceptions import PrintsCharmingException, ColorNotFoundError, set_excepthook, setup_exceptions
+from prints_charming.exceptions import PrintsCharmingException, ColorNotFoundError, InvalidLengthError, set_excepthook, setup_exceptions
 
 from prints_charming.logging import PrintsCharmingFormatter, PrintsCharmingLogHandler, setup_logger
 
@@ -167,7 +167,7 @@ class CustomError3(PrintsCharmingException):
         self.additional_info = additional_info
         super().__init__(message, pc=self.pc, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
 
-    def handle_exception(self):
+    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
         """Handle the exception and print additional information."""
         super().handle_exception()
         print(self.pc.apply_style('green', self.additional_info), file=sys.stderr)
@@ -477,12 +477,6 @@ def formatted_text_box_stuff():
     print(f'{orange_vert_border}{three_col_strings_mixed}{purple_vert_border}')
     print(f'{orange_horiz_border}\n\n\n\n')
 
-    pc.print(f'These will purposely cause an error that is styled\n\n', color='vgreen')
-    print_horizontal_bg_strip(pc)
-
-    my_custom_error(pc)
-    print('\n\n')
-
     # Print a simple border boxed text for the welcome message in the welcome function
     builder.print_simple_border_boxed_text("Prints Charming", subtitle="Hope you find the user guide helpful!", align='center')
     print()
@@ -495,43 +489,22 @@ def progress_bar(pc):
     print("\nProcess complete.")
 
 
-
-# Dynamic Value Functions
-def get_dynamic_name():
-    return "John Doe"
-
-
-
-def get_dynamic_age():
-    return 20
-
-
-
-def get_dynamic_balance():
-    return 5
-
-
-
-def get_dynamic_occupation():
-    return "Software Developer"
-
-
 @time_step
 def kwargs_replace_and_style_placeholders_examples():
     pc = PrintsCharming(style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
 
-    # Assign dynamic values to my_kwargs
-    my_kwargs = {
-        "name": get_dynamic_name(),
-        "age": get_dynamic_age(),
-        "balance": get_dynamic_balance(),
-        "occupation": get_dynamic_occupation(),
+    # Assign dynamic values to my_placeholders
+    my_placeholders = {
+        "name": "John Doe",
+        "age": 20,
+        "balance": 5,
+        "occupation": "Software Developer",
     }
 
     my_text = "Hello, {name}. You are {age} years old, your occupation is {occupation}, and you have {balance} USD in your account."
-    pc.print(my_text, **my_kwargs)  # print my_text directly thru the PrintCharming print method
+    pc.print(my_text, **my_placeholders)  # print my_text directly thru the PrintCharming print method
 
-    colored_text = pc.replace_and_style_placeholders(text=my_text, kwargs=my_kwargs)  # return the styled text from the method
+    colored_text = pc.replace_and_style_placeholders(text=my_text, placeholders=my_placeholders)  # return the styled text from the method
     print(colored_text)  # print the styled text with standard python print
 
     structured_text = """
@@ -560,9 +533,9 @@ def kwargs_replace_and_style_placeholders_examples():
                 - Chess
                 """
 
-    pc.print(structured_text, **my_kwargs)  # print with the PrintsCharming print method. This will be directed to the replace_and_style_placeholders method because of the kwargs
+    pc.print(structured_text, **my_placeholders)  # print with the PrintsCharming print method. This will be directed to the replace_and_style_placeholders method because of the kwargs
 
-    styled_structured_text = pc.replace_and_style_placeholders(text=structured_text, kwargs=my_kwargs)  # return the styled text from the method
+    styled_structured_text = pc.replace_and_style_placeholders(text=structured_text, placeholders=my_placeholders)  # return the styled text from the method
 
     print(f'reg print command styled_structured_text:')
     print(styled_structured_text)
@@ -577,7 +550,7 @@ def kwargs_replace_and_style_placeholders_examples():
     custom_style_with_params = partial(custom_style_function, label_style='main_bullets', label_delimiter=':', pc=pc)
 
     # Usage example
-    custom_replace_and_style_placeholders = pc.replace_and_style_placeholders(structured_text, my_kwargs, style_function=custom_style_with_params)
+    custom_replace_and_style_placeholders = pc.replace_and_style_placeholders(structured_text, my_placeholders, style_function=custom_style_with_params)
 
     print(f'result of custom function with replace_and_style_placeholders method:')
     print(custom_replace_and_style_placeholders)
@@ -772,12 +745,17 @@ def print_horizontal_bg_strip(pc):
     print(styled_mini_border)
     print(f'function: print_horizontal_bg_strip:')
     print(f'{styled_mini_border}\n')
-    try:
-        pc.print_bg('green', 50)
-        pc.print_bg('vyellow')
-        pc.print_bg('tree_color')
-    except ColorNotFoundError as e:
-        e.handle_exception()
+
+    pc.print_bg_bar_strip('green', 50)
+    pc.print_bg_bar_strip('vyellow')
+
+    pc.print(f'These will purposely cause an error that is styled\n\n', color='vgreen')
+
+    # Will raise and Except COLORNOTFOUNDERROR
+    pc.print_bg_bar_strip('tree_color')
+
+    # Will raise and Except INVALIDLENGTHERROR
+    pc.print_bg_bar_strip('green', -10)
 
 
 @time_step
@@ -830,11 +808,10 @@ def auto_styling_examples(pc, text):
 
 
 @time_step
-def index_styling_examples(pc):
+def style_words_by_index_examples(local_pc):
     print(styled_mini_border)
-    print(f'function: index_styling_examples:')
+    print(f'function: style_words_by_index_examples:')
     print(f'{styled_mini_border}\n')
-
     indexed_style = {
         1: "vgreen",
         (2, 4): "blue",
@@ -842,22 +819,53 @@ def index_styling_examples(pc):
         7: "purple",
         (8, 10): "pink"
     }
-    pc.print("These, words are going to be styled by their indexes.", style=indexed_style)
-    pc.print2("These, words are going to be styled by their indexes.", style=indexed_style)
+    local_pc.print("These, words are going to be styled by their indexes.", style=indexed_style)
+    local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style)
     print()
 
-    index_styled_text = pc.style_words_by_index("These, words are going to be styled by their indexes.", indexed_style)
+    index_styled_text = local_pc.style_words_by_index("These, words are going to be styled by their indexes.", indexed_style)
     print(f'{index_styled_text}\n\n\n')
+
+
+@time_step
+def segment_and_style_example_1(local_pc, text):
+    print(styled_mini_border)
+    print(f'function: segment_and_style_example_1:')
+    print(f'{styled_mini_border}\n')
+
+    splits = dict(green='sentence', red='2', orange='gets', blue='word:', yellow='')
+    styled_sentence = local_pc.segment_and_style(text, splits)
+    print(f'{styled_sentence}\n')
+
+
+@time_step
+def segment_and_style_example_2(local_pc, text):
+    print(styled_mini_border)
+    print(f'function: segment_and_style_example_2:')
+    print(f'{styled_mini_border}\n')
+
+    splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
+    styled_sentence2 = local_pc.segment_and_style2(text, splits2)
+    print(f'{styled_sentence2}\n\n')
+
+
+@time_step
+def segment_and_style_examples(local_pc):
+    print(styled_mini_border)
+    print(f'function: segment_and_style_examples:')
+    print(f'{styled_mini_border}\n')
 
     text = f'This is a sentence where the way we determine 1 how and 2 where the text gets styled depends on: where the word: that is the dictionary key falls within this text.'
 
-    splits = dict(green='sentence', red='2', orange='gets', blue='word:', yellow='')
-    styled_sentence = pc.segment_and_style(text, splits)
-    print(f'{styled_sentence}\n')
+    segment_and_style_example_1(local_pc, text)
+    segment_and_style_example_2(local_pc, text)
 
-    splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
-    styled_sentence2 = pc.segment_and_style2(text, splits2)
-    print(f'{styled_sentence2}\n\n')
+
+@time_step
+def segment_with_splitter_example(local_pc):
+    print(styled_mini_border)
+    print(f'function: segment_with_splitter_example:')
+    print(f'{styled_mini_border}\n')
 
     splitter_text = f' | This is a sentence | where the way we determine 1 how and 2 | where the text gets | styled depends on: where the word: | that is the dictionary key falls within this text. |'
 
@@ -868,9 +876,22 @@ def index_styling_examples(pc):
     splitter_style = 'vcyan' if single_splitter_style else ['vcyan', 'red', 'green', 'yellow', 'blue', 'orange']
     splitter_arms = True
     string_style = ['yellow', 'orange', 'purple', 'vgreen', 'blue']
-    styled_sentence3 = pc.segment_with_splitter_and_style(splitter_text, splitter_match, splitter_swap, splitter_show, splitter_style, splitter_arms, string_style)
-    print(styled_sentence3)
-    print()
+    styled_sentence3 = local_pc.segment_with_splitter_and_style(splitter_text, splitter_match, splitter_swap, splitter_show, splitter_style, splitter_arms, string_style)
+    print(f'{styled_sentence3}\n')
+
+
+
+@time_step
+def index_styling_examples(default_bg='jupyter'):
+    print(styled_mini_border)
+    print(f'function: index_styling_examples:')
+    print(f'{styled_mini_border}\n')
+
+    local_pc = PrintsCharming(default_bg_color=default_bg)
+
+    style_words_by_index_examples(local_pc)
+    segment_and_style_examples(local_pc)
+    segment_with_splitter_example(local_pc)
 
 
 @time_step
@@ -1061,7 +1082,7 @@ def print_background_colors(pc, builder):
         bg_available_width = builder.get_available_width()
         pc.print()
 
-        bg_bar_strip = pc.return_bg(color, length=bg_available_width)
+        bg_bar_strip = pc.generate_bg_bar_strip(color, length=bg_available_width)
         bg_bar_center_aligned = builder.align_text(bg_bar_strip, bg_available_width, 'center')
         pc.print(f"{bg_vert_border_left}{bg_bar_center_aligned}{bg_vert_border_right}")
 
@@ -1186,7 +1207,7 @@ def create_color_table_data(pc: PrintsCharming):
     table_data = [["Color Name", "Foreground Text", "Background Block"]]
     for color_name in pc.color_map.keys():
         fg_example = "Foreground Colored Text"
-        bg_example = pc.return_bg(color_name, length=10)
+        bg_example = pc.generate_bg_bar_strip(color_name, length=10)
         table_data.append([color_name, fg_example, bg_example])
     return table_data
 
@@ -1671,7 +1692,7 @@ def highlight(text, style_name=None, return_list=False):
 
 
 
-class NewClass():
+class NewClass:
 
     @time_step
     def __init__(self, pc, instance_name, arg1):
@@ -1694,10 +1715,10 @@ class NewClass():
 
     @time_step
     def get_names(self):
-        text_args = [self.class_name, self.instance_name, self.arg1, self.pc.name]
-        style_name = ['red', 'orange', 'yellow', 'green']
+        text_args = [self.class_name, self.instance_name, self.arg1]
+        style_name = ['red', 'orange', 'yellow']
         highlighted_args = self.highlight(text_args, style_name=style_name, return_list=True)
-        self.logger.debug('Getting name of class: {} from class_instance: {} with instance arg1 value: {} using pc_instance_name: {}',
+        self.logger.debug('Getting name of class: {} from class_instance: {} with instance arg1 value: {}',
                           *highlighted_args)
 
         return self.class_name, self.instance_name, self.arg1
@@ -1711,7 +1732,7 @@ def play_around_with_logging():
 
     print()
 
-    init_message = f"logger initialized with pc configuration:\n{pc.print_dict(pc.config)}"
+    init_message = f"logger initialized with pc configuration:\n{pc.format_dict(pc.config)}"
     logger.debug(init_message)
 
     logger.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
@@ -1733,7 +1754,7 @@ def play_around_with_logging():
     # default_bg_color set to match jupyter notebook background in pycharm
     logger2 = setup_logger(name='scratch', default_bg_color='jupyter')
 
-    init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.print_dict(logger2.pc.config)}"
+    init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.format_dict(logger2.pc.config)}"
     logger2.debug(init_message)
 
     logger2.info(f"default_bg_color is set to 'jupyter' for this instance of PrintsCharming.")
@@ -1764,14 +1785,14 @@ def custom_errors_orig(loggers):
 
         try:
             # Raise a CustomError
-            raise CustomError(f"CustomError occurred!", logger.pc, f"Logging with {logger.pc.name}")
+            raise CustomError(f"CustomError occurred!", logger.pc, f"Context for CustomError")
         except CustomError as e:
             logger.error(f"Error caught: {e}")
 
 
         try:
             # Raise a CustomError
-            raise CustomError("CustomError occurred!", logger.pc, "Logging with logger2")
+            raise CustomError("CustomError occurred!", logger.pc, "Context for CustomError")
         except CustomError as e:
             logger.error(f"Error caught: {e}")
 
@@ -1784,7 +1805,6 @@ def custom_errors_2(logger1):
     try:
         raise CustomError2("Error in CustomError2", additional_info="Context for CustomError2")
     except CustomError2 as e:
-        print(f"CustomError2 caught with pc instance: {e.pc.name}")
         e.handle_exception()
 
     try:
@@ -1799,7 +1819,6 @@ def custom_errors_2(logger1):
     try:
         raise CustomError2("Error in CustomError2 (Shared)", additional_info="Shared context for CustomError2", use_shared_pc=True)
     except CustomError2 as e:
-        print(f"CustomError2 (Shared) caught with pc instance: {e.pc.name}")
         e.handle_exception()
 
 
@@ -1809,14 +1828,12 @@ def custom_errors_3():
     try:
         raise CustomError3("Error in CustomError3", additional_info="Context for CustomError3", pc_error=pc, use_shared_pc=True)
     except CustomError3 as e:
-        print(f"CustomError3 caught with pc instance: {e.pc.name}")
         e.handle_exception()
 
     # Raise CustomError3 using the shared PrintsCharming instance
     try:
         raise CustomError3("Error in CustomError3 (Shared)", additional_info="Shared context for CustomError3", use_shared_pc=True)
     except CustomError3 as e:
-        print(f"CustomError3 (Shared) caught with pc instance: {e.pc.name}")
         e.handle_exception()
 
 
@@ -1872,7 +1889,7 @@ def main():
     simple_use_case(pc)
 
     text_from_variable_examples = variable_examples(pc)
-    index_styling_examples(pc)
+    index_styling_examples()
     auto_styling_examples(pc, text_from_variable_examples)
     print_variable_examples(pc)
     print_horizontal_bg_strip(pc)
@@ -1904,7 +1921,10 @@ if __name__ == "__main__":
     styled_mini_border = pc.apply_color('orange', mini_border)
 
     quick_pc = PrintsCharming()
-    quick_pc2 = PrintsCharming(styles=DEFAULT_LOGGING_STYLES)
+    quick_pc2 = PrintsCharming(styles=copy.deepcopy(DEFAULT_LOGGING_STYLES))
+
+    # Change pc_instance
+    #CustomError2.set_pc(pc)
 
     try:
         main()
