@@ -105,23 +105,6 @@ def set_excepthook(
                 "True to update the custom excepthook."
             ]
 
-            """
-            msg_sec1 = pc.apply_style(
-                'red',
-                'sys.excepthook has already been custom set.'
-            )
-            msg_sec2 = pc.apply_style(
-                'blue',
-                'Change'
-            )
-            msg_sec3 = pc.apply_style(
-                'orange',
-                'update_custom_excepthook ='
-            )
-            msg_sec4 = f"True to update the custom excepthook."
-            msg = f'{msg_sec1} {msg_sec2} {msg_sec3} {msg_sec4}'
-            """
-
             msg = ' '.join(msg_parts)
             if logger:
                 logger.info(msg)
