@@ -6,6 +6,18 @@ import termios
 
 
 
+
+
+def get_terminal_width() -> int:
+    terminal_size = os.get_terminal_size()
+    return terminal_size.columns
+
+
+def get_terminal_height() -> int:
+    terminal_size = os.get_terminal_size()
+    return terminal_size.lines
+
+
 def get_key():
     """Captures a single key press, including multi-byte sequences for arrow keys."""
     fd = sys.stdin.fileno()
@@ -315,9 +327,7 @@ def terminal_supports_truecolor() -> bool:
     return False
 
 
-def get_terminal_width() -> int:
-    terminal_size = os.get_terminal_size()
-    return terminal_size.columns
+
 
 
 

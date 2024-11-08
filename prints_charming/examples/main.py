@@ -16,6 +16,7 @@ from prints_charming import (
     PStyle,
     PrintsCharming,
     TableManager,
+    BoundCell,
     ToggleManager,
     FrameBuilder,
     InteractiveMenu,
@@ -29,10 +30,12 @@ from prints_charming.logging import PrintsCharmingFormatter, PrintsCharmingLogHa
 
 import os
 import sys
+import time
 import logging
 import inspect
 import copy
 import textwrap
+import random
 
 
 
@@ -213,7 +216,7 @@ def time_total_execution(main_func):
 def example_menu():
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
-    menu = InteractiveMenu('vcyan', menu_options, pc=quick_pc, confirmed_style='vgreen', alt_buffer=True)
+    menu = InteractiveMenu(menu_options, pc=quick_pc, selected_style='vcyan', confirmed_style='vgreen', alt_buffer=True)
     menu.run()
 
 
@@ -819,12 +822,25 @@ def style_words_by_index_examples(local_pc):
         7: "purple",
         (8, 10): "pink"
     }
-    local_pc.print("These, words are going to be styled by their indexes.", style=indexed_style)
-    local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style)
-    print()
+    local_pc.print("These,    words are going to be    styled by their indexes. ", style=indexed_style)
+    local_pc.print2("These,    words are going to be    styled by their indexes. \n", style=indexed_style)
 
-    index_styled_text = local_pc.style_words_by_index("These, words are going to be styled by their indexes.", indexed_style)
-    print(f'{index_styled_text}\n\n\n')
+
+    index_styled_text2 = local_pc.style_words_by_index("These,    words are going to be    styled by their indexes. ", indexed_style)
+    print(f'{index_styled_text2}\n\n')
+
+    indexed_style2 = {
+        (2, 4): "blue",
+        (5, 6): "yellow",
+        7: "purple",
+        (8, 9): "pink"
+    }
+
+    local_pc.print("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')
+    local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')
+
+    #index_styled_text3 = local_pc.style_words_by_index("These,    words are going to be    styled by their indexes.  ", indexed_style2)
+    #local_pc.print(f'{index_styled_text3}\n\n', skip_ansi_check=True, color='green')
 
 
 @time_step
@@ -834,8 +850,14 @@ def segment_and_style_example_1(local_pc, text):
     print(f'{styled_mini_border}\n')
 
     splits = dict(green='sentence', red='2', orange='gets', blue='word:', yellow='')
-    styled_sentence = local_pc.segment_and_style(text, splits)
-    print(f'{styled_sentence}\n')
+    #styled_sentence = local_pc.segment_and_style(text, splits)
+    #print(f'{styled_sentence}\n\n')
+
+    local_pc.print(f'{text}\n\n', style=splits)
+    local_pc.print2(f'{text}\n\n', style=splits)
+
+    #styled_sentence2 = local_pc.segment_and_style_update(text, splits)
+    #print(f'{styled_sentence2}\n')
 
 
 @time_step
@@ -844,9 +866,9 @@ def segment_and_style_example_2(local_pc, text):
     print(f'function: segment_and_style_example_2:')
     print(f'{styled_mini_border}\n')
 
-    splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
-    styled_sentence2 = local_pc.segment_and_style2(text, splits2)
-    print(f'{styled_sentence2}\n\n')
+    #splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
+    #styled_sentence2 = local_pc.segment_and_style2(text, splits2)
+    #print(f'{styled_sentence2}\n\n')
 
 
 @time_step
@@ -1242,6 +1264,8 @@ def welcome():
         col_sep_style="white",
         target_text_box=True,
         double_space=True,
+        ephemeral=True,
+        append_newline=True,
     )
 
     styles_table_data = create_style_table_data(pc)
@@ -1256,6 +1280,8 @@ def welcome():
         col_sep_style="white",
         target_text_box=True,
         double_space=True,
+        ephemeral=True,
+        append_newline=True,
     )
 
     (horiz_border_top,
@@ -1336,12 +1362,25 @@ def welcome():
         ["John Smith", 17, "Normie"]
     ]
 
-    simple_table = table_manager.generate_table(table_data=table_data, header_style="magenta", border_style="vgreen", col_sep_style="vgreen", target_text_box=True,
-                                                cell_style="header_text")
+    simple_table = table_manager.generate_table(table_data=table_data,
+                                                header_style="magenta",
+                                                border_style="vgreen",
+                                                col_sep_style="vgreen",
+                                                target_text_box=True,
+                                                cell_style="header_text",
+                                                ephemeral=True,
+                                                append_newline=True,)
     print(simple_table)
 
-    less_simple_table = table_manager.generate_table(table_data=table_data, header_style="magenta", border_style="vgreen", col_sep_style="vgreen", target_text_box=True,
-                                                     cell_style=["orange", "purple"])
+    less_simple_table = table_manager.generate_table(table_data=table_data,
+                                                     header_style="magenta",
+                                                     border_style="vgreen",
+                                                     col_sep_style="vgreen",
+                                                     target_text_box=True,
+                                                     cell_style=["orange", "purple"],
+                                                     ephemeral=True,
+                                                     append_newline=True,
+                                                      )
     print(less_simple_table)
 
     builder.print_border_boxed_tables2([less_simple_table, less_simple_table, less_simple_table, less_simple_table],
@@ -1363,7 +1402,9 @@ def welcome():
         col_sep_style="vgreen",
         target_text_box=True,
         cell_style=["orange", "purple"],
-        conditional_style_functions=conditional_style_functions1
+        conditional_style_functions=conditional_style_functions1,
+        ephemeral=True,
+        append_newline=True,
     )
 
     print(complex_table)
@@ -1398,10 +1439,94 @@ def welcome():
         table_name="ML Model Performance Summary",
         target_text_box=True,
         default_column_styles=column_styles,
-        cell_style=["orange", "purple"]
+        cell_style=["orange", "purple"],
+        ephemeral=True,
+        append_newline=True,
     )
 
     print(really_complex_table_str)
+    print('\n\n\n\n\n')
+
+
+
+    pc.print(f'live_update_bound_cells:\n\n', style='orange')
+
+    """
+    bound_data_values = {
+        "temperature": 25.0,
+        "humidity": 40.0,
+        "pressure": 1013.25,
+    }
+
+    def get_temperature(data):
+        data["temperature"] += random.uniform(-0.5, 0.5)
+        return round(data["temperature"], 2)
+
+    def get_humidity(data):
+        data["humidity"] += random.uniform(-1, 1)
+        return round(data["humidity"], 2)
+
+    def get_pressure(data):
+        data["pressure"] += random.uniform(-0.2, 0.2)
+        return round(data["pressure"], 2)
+
+
+    # Example usage
+    bound_table_data = [
+        ["Metric", "Value"],
+        ["Temperature (°C)", BoundCell(lambda: get_temperature(bound_data_values))],
+        ["Humidity (%)", BoundCell(lambda: get_humidity(bound_data_values))],
+        ["Pressure (hPa)", BoundCell(lambda: get_pressure(bound_data_values))],
+    ]
+
+    def value_style_function(value):
+        if value > 50:
+            return 'vgreen'
+        else:
+            return 'red'
+
+    bound_conditional_style_functions = {
+        "Value": value_style_function,
+    }
+
+    # Create an instance of TableManager
+    table_manager = TableManager()
+
+    gen_table_args = dict(
+        table_data=bound_table_data,
+        table_name="environmental_metrics",
+        show_table_name=True,
+        header_style="magenta",
+        border_style="vgreen",
+        col_sep_style="vgreen",
+        target_text_box=True,
+        cell_style=["orange", "purple"],
+        conditional_style_functions=bound_conditional_style_functions,
+        ephemeral=False,
+        append_newline=True,
+    )
+
+    formatted_table = table_manager.add_bound_table(**gen_table_args)
+
+    # Initial display setup
+    os.system('clear')  # Clear terminal for fresh display
+
+    print(formatted_table)
+
+
+    # Update loop for selective cell updating
+    try:
+        while True:
+            table_manager.refresh_bound_table("environmental_metrics")
+            time.sleep(1)  # Adjust interval as needed
+    except KeyboardInterrupt:
+        print("\nLive update terminated.")
+    """
+
+
+
+
+
 
     ################################################################################################################################
     # Logging Table
@@ -1470,7 +1595,8 @@ def welcome():
         target_text_box=True,
         default_column_styles={3: 'white'},
         cell_style="white",
-        double_space=True
+        double_space=True,
+        append_newline=True,
     )
 
     print(more_complex_table_str)
@@ -1727,7 +1853,7 @@ class NewClass:
 
 @time_step
 def play_around_with_logging():
-    logger = setup_logger()
+    logger = setup_logger(enable_exception_logging=True)
     pc = logger.pc
 
     print()
@@ -1752,7 +1878,7 @@ def play_around_with_logging():
     ###########################################################################################################
 
     # default_bg_color set to match jupyter notebook background in pycharm
-    logger2 = setup_logger(name='scratch', default_bg_color='jupyter')
+    logger2 = setup_logger(name='scratch', default_bg_color='jupyter', enable_exception_logging=True)
 
     init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.format_dict(logger2.pc.config)}"
     logger2.debug(init_message)
@@ -1857,6 +1983,126 @@ def exception_examples(logger1, logger2, enable_custom_excepthook_error_example=
 
 
 
+def live_realtime_updates():
+    # Initialize data for 25 sensors
+    sensor_data = {}
+    for sensor_id in range(1, 26):
+        sensor_data[sensor_id] = {
+            "temperature": random.uniform(20, 30),
+            "humidity": random.uniform(30, 70),
+            "pressure": random.uniform(1000, 1020),
+            "battery": random.uniform(50, 100),
+            "status": "OK"
+        }
+
+    # Define functions to update each sensor's data
+    def get_temperature(sensor_id):
+        data = sensor_data[sensor_id]
+        data["temperature"] += random.uniform(-0.5, 0.5)
+        return round(data["temperature"], 2)
+
+    def get_humidity(sensor_id):
+        data = sensor_data[sensor_id]
+        data["humidity"] += random.uniform(-1, 1)
+        return round(data["humidity"], 2)
+
+    def get_pressure(sensor_id):
+        data = sensor_data[sensor_id]
+        data["pressure"] += random.uniform(-0.2, 0.2)
+        return round(data["pressure"], 2)
+
+    def get_battery(sensor_id):
+        data = sensor_data[sensor_id]
+        data["battery"] -= random.uniform(0.1, 0.5)  # Battery drains over time
+        data["battery"] = max(data["battery"], 0)  # Battery can't be negative
+        return round(data["battery"], 2)
+
+    def get_status(sensor_id):
+        data = sensor_data[sensor_id]
+        # If battery low, status changes
+        if data["battery"] < 20:
+            data["status"] = "Low Battery"
+        else:
+            data["status"] = "OK"
+        return data["status"]
+
+    # Function to create BoundCell with correct closure
+    def make_bound_cell(func, sensor_id):
+        return BoundCell(lambda s_id=sensor_id: func(s_id))
+
+    # Create the table data with BoundCells
+    bound_table_data = []
+
+    # Header row
+    bound_table_data.append(["Sensor ID", "Temperature (°C)", "Humidity (%)", "Pressure (hPa)", "Battery Level (%)", "Status"])
+
+    # Rows for each sensor
+    for sensor_id in range(1, 26):
+        row = [
+            sensor_id,
+            make_bound_cell(get_temperature, sensor_id),
+            make_bound_cell(get_humidity, sensor_id),
+            make_bound_cell(get_pressure, sensor_id),
+            make_bound_cell(get_battery, sensor_id),
+            make_bound_cell(get_status, sensor_id),
+        ]
+        bound_table_data.append(row)
+
+    # Define conditional style functions
+    def battery_style_function(value):
+        value = float(value)
+        if value < 20:
+            return 'red'
+        elif value < 50:
+            return 'yellow'
+        else:
+            return 'green'
+
+    def status_style_function(value):
+        if value == "Low Battery":
+            return 'red'
+        else:
+            return 'green'
+
+    bound_conditional_style_functions = {
+        "Battery Level (%)": battery_style_function,
+        "Status": status_style_function,
+    }
+
+    # Create an instance of TableManager
+    table_manager = TableManager()
+
+    gen_table_args = dict(
+        table_data=bound_table_data,
+        table_name="sensor_metrics",
+        show_table_name=True,
+        header_style="magenta",
+        border_style="vgreen",
+        col_sep_style="vgreen",
+        target_text_box=True,
+        cell_style=["orange", "purple"],
+        conditional_style_functions=bound_conditional_style_functions,
+        ephemeral=False,
+        append_newline=True,
+    )
+
+    formatted_table = table_manager.add_bound_table(**gen_table_args)
+
+    # Initial display setup
+    os.system('clear')  # Clear terminal for fresh display
+
+    print(formatted_table)
+
+    # Update loop for selective cell updating
+    try:
+        while True:
+            table_manager.refresh_bound_table("sensor_metrics")
+            time.sleep(1)  # Adjust interval as needed
+    except KeyboardInterrupt:
+        print("\nLive update terminated.")
+
+
+
 @time_total_execution
 def main():
 
@@ -1867,6 +2113,8 @@ def main():
 
     #################################################
     # Exceptions
+    # I may have introduced some breaking changes with customn exception logging i need to correct and will soon if need be
+    # but haven't had time to test.
     #################################################
     exception_examples(logger1, logger2)
 
@@ -1901,6 +2149,11 @@ def main():
     print_markdown(pc)
 
     example_menu()
+
+    #uncomment for realtime updates example
+    #live_realtime_updates()
+
+
 
     #example_dynamic_formatter()
 

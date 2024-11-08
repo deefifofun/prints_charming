@@ -72,7 +72,7 @@ def setup_logger(
     default_bg_color: Optional[str] = None,
     internal_logging: bool = False,
     internal_log_level: str = 'DEBUG',
-    enable_exception_logging: bool = True,
+    enable_exception_logging: bool = False,
     update_exception_logging: bool = False,
     log_exc_info: bool = True,
     critical_exceptions: Optional[Tuple[Type[BaseException], ...]] = None,

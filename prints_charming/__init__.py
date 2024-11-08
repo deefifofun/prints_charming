@@ -4,6 +4,7 @@ from .prints_charming_defaults import (
     DEFAULT_CONFIG,
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
+    DEFAULT_UNICODE_MAP,
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
     DEFAULT_LEVEL_STYLES,
@@ -12,11 +13,7 @@ from .prints_charming_defaults import (
 
 from .utils import (
     get_terminal_width,
-    #set_custom_excepthook,
-    #set_custom_excepthook_with_logging,
-    #custom_excepthook,
-    #custom_excepthook_with_logging,
-    get_key
+    get_key,
 )
 
 from .prints_charming import PrintsCharming
@@ -25,7 +22,7 @@ from .prints_charming import PrintsCharming
 from .dynamic_formatter import DynamicFormatter
 from .frame_builder import FrameBuilder
 from .interactive_menu import InteractiveMenu
-from .table_manager import TableManager
+from .table_manager import TableManager, BoundCell
 from .toggle_manager import ToggleManager
 
 from .win_utils import WinUtils

@@ -10,7 +10,7 @@ from .prints_charming_defaults import (
 )
 
 from .prints_charming import PrintsCharming
-from .utils import get_terminal_width
+from .utils import get_terminal_width, get_terminal_height
 
 
 
@@ -48,6 +48,7 @@ class FrameBuilder:
                 or PrintsCharming()
         )
         self.terminal_width = get_terminal_width()
+        self.terminal_height = get_terminal_height()
         self.horiz_width = horiz_width if horiz_width else self.terminal_width
         self.horiz_char = horiz_char
         self.horiz_border = self.horiz_width * horiz_char
@@ -194,6 +195,9 @@ class FrameBuilder:
     def strip_ansi_escape_sequences(self, text):
         ansi_escape = re.compile(r'\x1b\[([0-9]+)(;[0-9]+)*m')
         return ansi_escape.sub('', text)
+
+
+
 
     def print_simple_border_boxed_text(self, title, subtitle='', align='center'):
         available_width = self.get_available_width()

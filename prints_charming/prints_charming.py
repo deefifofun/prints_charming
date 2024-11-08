@@ -24,6 +24,7 @@ from .prints_charming_defaults import (
     DEFAULT_CONFIG,
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
+    DEFAULT_UNICODE_MAP,
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
     DEFAULT_CONTROL_MAP
@@ -94,27 +95,55 @@ class PrintsCharming:
     )
 
     _shared_instance = None
+    _shared_instances = {}
 
     @classmethod
-    def get_shared_instance(cls):
+    def get_shared_instance(cls, key):
         """
-        Get the shared instance of PrintsCharming.
+        Retrieve a shared instance of PrintsCharming by key.
 
-        Returns:
-            PrintsCharming: The shared PrintsCharming instance for PrintsCharming
-                or None if not set.
-        """
-        return cls._shared_instance
-
-    @classmethod
-    def set_shared_instance(cls, instance):
-        """
-        Set the shared instance of PrintsCharming.
+        This method allows for optional shared instances, where multiple instances of other modules
+        (e.g., TableManager or FrameBuilder) can access the same PrintsCharming instance under a specified key.
 
         Args:
-            instance (PrintsCharming): The instance to set as shared.
+            key (str): The unique identifier associated with the shared instance.
+
+        Returns:
+            PrintsCharming: The shared PrintsCharming instance for the given key, or None if no instance is set for the key.
+
+        Notes:
+            - Using shared instances is entirely optional. These methods are provided for convenience
+              when users want consistency across multiple instances of other modules.
+            - For example, you might want all `TableManager` instances to share a single `PrintsCharming` instance
+              under the key 'table_manager', while `FrameBuilder` instances could use a different instance
+              under 'frame_builder'.
+            - Users who prefer to manage `PrintsCharming` instances independently can bypass this feature
+              entirely and manually pass instances to other modules as needed.
         """
-        cls._shared_instance = instance
+        return cls._shared_instances.get(key)
+
+    @classmethod
+    def set_shared_instance(cls, key, instance):
+        """
+        Set a shared instance of PrintsCharming under a specific key.
+
+        This method allows users to optionally store a shared instance that can be retrieved
+        by other parts of the application, facilitating resource sharing across multiple modules or instances.
+
+        Args:
+            key (str): The unique identifier to associate with the instance.
+            instance (PrintsCharming): The PrintsCharming instance to be stored for shared access.
+
+        Notes:
+            - This method is entirely optional. It is designed for users who want to share the same
+              PrintsCharming instance across multiple instances of other modules.
+            - For example, you may wish to set a shared instance for all `TableManager` objects
+              by storing it under the key 'table_manager'. Likewise, a separate instance could be
+              stored for `FrameBuilder` objects under a different key if desired.
+            - This feature can be ignored entirely by users who prefer to create and pass individual
+              PrintsCharming instances to each module as needed without storing them in `_shared_instances`.
+        """
+        cls._shared_instances[key] = instance
 
 
     log_level_style_names = ['debug', 'info', 'warning', 'error', 'critical']
@@ -137,6 +166,7 @@ class PrintsCharming:
     shared_color_map: Optional[Dict[str, str]] = None
     shared_bg_color_map: Optional[Dict[str, str]] = None
     shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
+    shared_unicode_map: Optional[Dict[str, str]] = DEFAULT_UNICODE_MAP
     shared_styles: Optional[Dict[str, PStyle]] = None
     shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
 
@@ -146,6 +176,7 @@ class PrintsCharming:
                         shared_color_map: Optional[Dict[str, str]] = None,
                         shared_bg_color_map: Optional[Dict[str, str]] = None,
                         shared_effect_map: Optional[Dict[str, str]] = None,
+                        shared_unicode_map: Optional[Dict[str, str]] = None,
                         shared_styles: Optional[Dict[str, PStyle]] = None,
                         shared_ctl_map: Optional[Dict[str, str]] = None
                         ) -> None:
@@ -202,6 +233,8 @@ class PrintsCharming:
                                   **This should not be changed unless you are
                                   certain of what you're doing.**
 
+        :param shared_unicode_map: (Optional) A dictionary of unicode mappings.
+
         :param shared_styles: (Optional) A dictionary of shared styles. This
                               allows for the consistent application of text
                               styles across all instances.
@@ -218,6 +251,9 @@ class PrintsCharming:
 
         if shared_effect_map:
             cls.shared_effect_map = shared_effect_map
+
+        if shared_unicode_map:
+            cls.shared_unicode_map = shared_unicode_map
 
         if shared_styles:
             cls.shared_styles = shared_styles
@@ -242,6 +278,7 @@ class PrintsCharming:
                  bg_color_map: Optional[Dict[str, str]] = None,
                  default_bg_color: Optional[str] = None,
                  effect_map: Optional[Dict[str, str]] = None,
+                 unicode_map: Optional[Dict[str, str]] = None,
                  styles: Optional[Dict[str, PStyle]] = None,
                  styled_strings: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
@@ -265,6 +302,9 @@ class PrintsCharming:
 
         :param effect_map: supply your own effect_map dictionary. Default is
                            PrintsCharming.shared_effect_map
+
+        :param unicode_map: supply your own unicode_map dictionary. Default is
+                            PrintsCharming.shared_unicode_map
 
         :param styles: supply your own styles dictionary. Default is a copy of
                        the DEFAULT_STYLES dictionary unless cls.shared_styles
@@ -306,6 +346,8 @@ class PrintsCharming:
         )
 
         self.effect_map = effect_map or PrintsCharming.shared_effect_map
+
+        self.unicode_map = unicode_map or PrintsCharming.shared_unicode_map
 
         self.ctl_map = self.shared_ctl_map
 
@@ -1038,7 +1080,7 @@ class PrintsCharming:
         return ''.join(styled_segments)
 
 
-
+    # breaking changes i need to fix and combine with another one of these methods.
     def segment_and_style2(self,
                            text: str,
                            styles_dict: Dict[str, Union[str, int, List[Union[str, int]]]]
@@ -1195,11 +1237,128 @@ class PrintsCharming:
 
         return " ".join(words)
 
+    # Work in progress made some breaking changes i need to correct.
+    def segment_and_style_update(self, text: str, styles_dict: Dict[str, Union[str, int]]) -> str:
+        """
+        Segments the input text and applies specified styles to words based on
+        indices or word matches from a dictionary of styles.
 
+        This method divides `text` into individual words and spaces, then iterates over
+        `styles_dict` to apply styles to specific words, based on either their
+        index or content. Additionally, a final style can be applied to all
+        remaining words after the last specified index or match.
 
-    def style_words_by_index(self,
-                             text: str, style: Dict[Union[int, Tuple[int, int]], str]
-                             ) -> str:
+        Parameters:
+           text (str): The input text to be segmented and styled.
+           styles_dict (Dict[str, Union[str, int]]): A dictionary where each key
+               is a style to apply, and each value specifies either the index
+               or the word in `text` to which the style should be applied.
+               - If the value is an integer, it represents a 1-based index of the
+                 word in `text` to style with the corresponding style.
+               - If the value is a string, it matches the word in `text` to style
+                 with the corresponding style.
+               - If the value is an empty string or `None`, the style will be applied
+                 as the final style to all remaining unstyled words in `text`.
+
+        Returns:
+           str: The fully styled text, with each word and space styled according to the
+           mappings specified in `styles_dict`.
+        """
+        # Use regular expression to split the text into words and spaces
+        words_and_spaces = re.findall(r'\S+|\s+', text)
+        styled_tokens = [None] * len(words_and_spaces)
+        word_indices = {}
+        word_index = 0
+        previous_token_index = -1  # Initialize to -1 to start from the beginning
+
+        # First pass: Style words based on styles_dict and record their indices
+        for i, token in enumerate(words_and_spaces):
+            if not token.isspace():
+                word_index += 1  # Increment word index
+                applied_style = False
+                for style, key in styles_dict.items():
+                    if key:  # If key is provided (not empty or None)
+                        style_code = self.style_codes.get(style, '')
+                        if isinstance(key, int):
+                            if key == word_index and style in self.styles:
+                                styled_tokens[i] = f"{style_code}{token}{self.reset}"
+                                word_indices[i] = style_code
+                                previous_token_index = i
+                                applied_style = True
+                                break
+                        else:  # key is a string (word match)
+                            if token.strip() == key and style in self.styles:
+                                styled_tokens[i] = f"{style_code}{token}{self.reset}"
+                                word_indices[i] = style_code
+                                previous_token_index = i
+                                applied_style = True
+                                break
+                if not applied_style:
+                    styled_tokens[i] = token
+                    word_indices[i] = None
+            else:
+                # Temporarily store spaces; we'll handle them in the next pass
+                styled_tokens[i] = token
+
+        # Second pass: Apply styles to words between specified indices or words
+        last_style = None
+        last_key_index = -1
+        for style, key in styles_dict.items():
+            if key:  # If key is provided
+                style_code = self.style_codes.get(style, '')
+                if isinstance(key, int):
+                    key_indices = [i for i, idx in enumerate(word_indices.values()) if idx == style_code]
+                else:
+                    key_indices = [i for i, token in enumerate(words_and_spaces) if token.strip() == key]
+                if key_indices:
+                    key_index = key_indices[0]
+                    # Apply style to tokens between last_key_index and key_index
+                    for i in range(last_key_index + 1, key_index):
+                        if styled_tokens[i] is None and not words_and_spaces[i].isspace():
+                            styled_tokens[i] = f"{style_code}{words_and_spaces[i]}{self.reset}"
+                            word_indices[i] = style_code
+                    last_key_index = key_index
+                    last_style = style_code
+            else:
+                # Store the last style code for final styling
+                last_style = self.style_codes.get(style, '')
+
+        # Apply final style to remaining unstyled words after the last key
+        if last_style:
+            for i in range(last_key_index + 1, len(words_and_spaces)):
+                if styled_tokens[i] is None and not words_and_spaces[i].isspace():
+                    styled_tokens[i] = f"{last_style}{words_and_spaces[i]}{self.reset}"
+                    word_indices[i] = last_style
+
+        # Third pass: Style spaces based on adjacent words
+        for i, token in enumerate(words_and_spaces):
+            if token.isspace():
+                prev_style = word_indices.get(i - 1)
+                next_style = word_indices.get(i + 1)
+                if prev_style == next_style and prev_style is not None:
+                    # If both adjacent words have the same style, use it
+                    styled_tokens[i] = f"{prev_style}{token}{self.reset}"
+                elif prev_style is not None:
+                    # If only the previous word is styled, use its style
+                    styled_tokens[i] = f"{prev_style}{token}{self.reset}"
+                elif next_style is not None:
+                    # If only the next word is styled, use its style
+                    styled_tokens[i] = f"{next_style}{token}{self.reset}"
+                else:
+                    # Leave space unstyled
+                    pass
+            else:
+                if styled_tokens[i] is None:
+                    # Ensure any unstyled tokens are assigned
+                    styled_tokens[i] = words_and_spaces[i]
+
+        return ''.join(styled_tokens)
+
+    # Special method called by the print method when style param is a dict
+    # Does not style spaces only words
+    def _style_words_by_index(self,
+                              text: str, style: Dict[Union[int, Tuple[int, int]], str]
+                              ) -> str:
 
         words = text.split()
 
@@ -1217,6 +1376,61 @@ class PrintsCharming:
 
         return " ".join(words)
 
+    # Public facing method that accounts for whitespace and styles it and words.
+    def style_words_by_index(self, text: str, style: Dict[Union[int, Tuple[int, int]], str]) -> str:
+        words_and_spaces = re.findall(r'\S+|\s+', text)
+        styled_words_and_spaces = [None] * len(words_and_spaces)
+        word_indices = {}
+        word_index = 0
+
+        # First pass: style words and record their indices
+        for i, token in enumerate(words_and_spaces):
+            if not token.isspace():
+                word_index += 1
+                applied_style = False
+                for key in style:
+                    style_name = style[key]
+                    style_code = self.style_codes.get(style_name, '')
+                    if isinstance(key, tuple):
+                        start, end = key
+                        if start <= word_index <= end and style_name in self.styles:
+                            styled_words_and_spaces[i] = f"{style_code}{token}{self.reset}"
+                            word_indices[i] = style_code
+                            applied_style = True
+                            break
+                    elif isinstance(key, int):
+                        if key == word_index and style_name in self.styles:
+                            styled_words_and_spaces[i] = f"{style_code}{token}{self.reset}"
+                            word_indices[i] = style_code
+                            applied_style = True
+                            break
+                if not applied_style:
+                    styled_words_and_spaces[i] = token
+                    word_indices[i] = None
+            else:
+                # Temporarily store spaces as is; we'll handle them in the next pass
+                styled_words_and_spaces[i] = token
+
+        # Second pass: style spaces based on adjacent words
+        for i, token in enumerate(words_and_spaces):
+            if token.isspace():
+                prev_style = word_indices.get(i - 1)
+                next_style = word_indices.get(i + 1)
+                if prev_style == next_style and prev_style is not None:
+                    # If both adjacent words have the same style, use it
+                    styled_words_and_spaces[i] = f"{prev_style}{token}{self.reset}"
+                elif prev_style is not None:
+                    # If only the previous word is styled, use its style
+                    styled_words_and_spaces[i] = f"{prev_style}{token}{self.reset}"
+                elif next_style is not None:
+                    # If only the next word is styled, use its style
+                    styled_words_and_spaces[i] = f"{next_style}{token}{self.reset}"
+                else:
+                    # Leave space unstyled
+                    pass
+
+        return ''.join(styled_words_and_spaces)
+
 
     @staticmethod
     def contains_ansi_codes(s: str) -> bool:
@@ -1230,6 +1444,21 @@ class PrintsCharming:
     def write_file(text, filename, end, mode='a'):
         with open(filename, mode) as file:
             file.write(text + end)
+
+    @staticmethod
+    def check_dict_structure(d):
+        has_tuple_keys = any(isinstance(pkey, tuple) for pkey in d.keys())
+        has_int_keys = any(isinstance(pkey, int) for pkey in d.keys())
+        has_str_keys = all(isinstance(pkey, str) for pkey in d.keys())
+
+        if has_tuple_keys or has_int_keys:
+            # Likely the indexed_style structure
+            return "indexed_style"
+        elif has_str_keys:
+            # Likely the splits structure
+            return "splits"
+        else:
+            return "Unknown structure"
 
 
     def format_with_sep(self,
@@ -1358,9 +1587,15 @@ class PrintsCharming:
             return
 
 
-
         if isinstance(style, dict):
-            text = self.style_words_by_index(text, style)
+            dict_type = self.check_dict_structure(style)
+            if dict_type == "indexed_style":
+                text = self._style_words_by_index(text, style)
+            elif dict_type == 'splits':
+                text = self.segment_and_style(text, style)
+            elif dict_type == 'splits_with_lists':
+                text = self.segment_and_style2(text, style)
+
 
         if self.config["kwargs"] and kwargs:
             text = self.replace_and_style_placeholders(text, kwargs)
@@ -2461,9 +2696,15 @@ class PrintsCharming:
             self.debug(f"text defined:\n{text}")
 
 
-
             if isinstance(style, dict):
-                text = self.style_words_by_index(text, style)
+                dict_type = self.check_dict_structure(style)
+                if dict_type == "indexed_style":
+                    text = self._style_words_by_index(text, style)
+                elif dict_type == 'splits':
+                    text = self.segment_and_style(text, style)
+                elif dict_type == 'splits_with_lists':
+                    text = self.segment_and_style2(text, style)
+
 
             if self.config["kwargs"] and kwargs:
                 text = self.replace_and_style_placeholders(text, kwargs)
@@ -2625,7 +2866,17 @@ class PrintsCharming:
                                                                               blinks[i])
 
                 if isinstance(styles[i], dict):
-                    arg = self.style_words_by_index(arg, styles[i])
+                    dict_type = self.check_dict_structure(styles[i])
+                    if dict_type == "indexed_style":
+                        arg = self._style_words_by_index(arg, styles[i])
+                    elif dict_type == 'splits':
+                        arg = self.segment_and_style(arg, styles[i])
+                    elif dict_type == 'splits_with_lists':
+                        arg = self.segment_and_style2(arg, styles[i])
+
+
+                #if isinstance(styles[i], dict):
+                    #arg = self._style_words_by_index(arg, styles[i])
 
 
 
@@ -2975,6 +3226,22 @@ class PrintsCharming:
         else:
             print(output, end=end)
         return
+
+
+    def write(self, *control_keys_or_text, **kwargs):
+        """
+        Writes control sequences or text passed as arguments to sys.stdout.
+        If the control sequence has formatting placeholders, it uses the kwargs for formatting.
+        """
+        for item in control_keys_or_text:
+            if isinstance(item, str):
+                # Check if the item is a control key in the ctl_map
+                control_sequence = self.ctl_map.get(item, item)  # If not found, treat it as plain text
+                # If there are kwargs like row, col, format the control sequence
+                if kwargs and '{' in control_sequence and '}' in control_sequence:
+                    control_sequence = control_sequence.format(**kwargs)
+                sys.stdout.write(control_sequence)
+        sys.stdout.flush()
 
 
 

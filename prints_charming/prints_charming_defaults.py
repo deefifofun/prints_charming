@@ -37,6 +37,7 @@ DEFAULT_COLOR_MAP: Dict[str, str] = {
         "blue": "\033[38;5;4m",
         "dblue": "\033[38;5;27m",
         "vblue": "\033[38;5;39m",
+        "indigo": "\033[38;5;54m",
         "lmagenta": "\033[38;5;205m",
         "magenta": "\033[38;5;5m",
         "vmagenta": "\033[38;5;198m",
@@ -312,7 +313,10 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "yellow"       : PStyle(color="yellow"),
         "vyellow"      : PStyle(color="vyellow"),
 
-        "conceal": PStyle(conceal=True)
+        "conceal": PStyle(conceal=True),
+
+        "selected_style": PStyle(color='vcyan'),
+        "unselected_style": PStyle(),
 }
 
 
@@ -365,207 +369,235 @@ DEFAULT_LEVEL_STYLES = {
     logging.CRITICAL: 'critical'
 }
 
-unicode_blocks = {
-        "square": "■",
-        "large_square": "⬛",
-        "large_hollow_square": "⬜",
-        "small_square": "▪",
-        "small_hollow_square": "▫",
-        "rectangle": "▮",
-        "parallelogram": "▰",
+
+
+
+DEFAULT_UNICODE_MAP = {
+        # Arrows
+        "arrow_up": "⭡",
+        "arrow_down": "⭣",
+        "arrow_left": "⇐",
+        "arrow_right": "⇒",
+
+        # Boxes and Blocks
         "full_block": "█",
         "seven_eighths_block": "▇",
         "three_quarters_block": "▆",
         "five_eighths_block": "▅",
+        "medium_block": "▄",
         "half_block": "▄",
+
+        "upper_half_block": "▀",
         "three_eighths_block": "▃",
-        "quarter_block": "▂",
+
+        "square": "■",
+        "hollow_square": "⬜",
+        "medium_hollow_square": "□",
+        "rounded_hollow_square": "▢",
+        "medium_square": "⬛",
+        "small_square": "▪",
+        "small_hollow_square": "▫",
+
+        "parallelogram": "▰",
+        "hollow_rectangle": "▭",
         "one_eighth_block": "▁",
-        "left_seven_eighths_block": "▉",
-        "left_three_quarters_block": "▊",
-        "left_five_eighths_block": "▋",
-        "left_half_block": "▌",
-        "left_three_eighths_block": "▍",
-        "left_quarter_block": "▎",
+
+        "quarter_block": "▂",
+        "quad_block": "▖",
+        "rectangle": "▮",
+        "hollow_vert_rectangle": "▯",
+
+
         "left_one_eighth_block": "▏",
+        "left_quarter_block": "▎",
+        "left_three_eighths_block": "▍",
+        "left_half_block": "▌",
+        "left_five_eighths_block": "▋",
+        "left_three_quarters_block": "▊",
+        "left_seven_eighths_block": "▉",
+        "three_quadrant_block": "▞",
+
+        "right_one_eighths_block": "▕",
+
         "light_shade": "░",
         "medium_shade": "▒",
         "dark_shade": "▓",
-        "hollow_square": "□",
-        "hollow_rectangle": "▭",
-        "rounded_square": "▢",
-        "hollow_vert_rectangle": "▯",
-        "top_left_corner": "┌",
-        "top_right_corner": "┐",
+
+        # Currency and Finance
+        "alarm_clock": "⏰",
+        "atm": "🏧",
+        "balance_scale": "⚖️",
+        "bank": "🏦",
+        "banknotes": "💴",
+        "binance_coin": "⚡",
+        "bitcoin": "₿",
+        "calendar": "📅",
+        "chart": "📊",
+        "chart_decreasing": "📉",
+        "chart_increasing": "📈",
+        "coin": "🪙",
+        "credit_card": "💳",
+        "currency_exchange": "💱",
+        "currency_signs": "💲",
+        "dollar": "$",
+        "dollar_coin": "🪙",
+        "dollar_wings": "💸",
+        "dogecoin": "Ð",
+        "deposit": "🏦⬇️",
+        "ethereum": "Ξ",
+        "euro": "€",
+        "fees": "💸",
+        "fire": "🔥",
+        "gas": "⛽",
+        "gift": "🎁",
+        "gem": "💎",
+        "gemstone": "💎",
+        "gold": "🏅",
+        "gold_coin": "🪙",
+        "gold_medal": "🥇",
+        "handshake": "🤝",
+        "hacker": "🕵️‍♂️",
+        "incoming_money": "📥💵",
+        "infinite": "♾️",
+        "investment": "📈💵",
+        "key": "🔑",
+        "ledger": "📒",
+        "legal_scales": "⚖️",
+        "litecoin": "Ł",
+        "lock_with_key": "🔐",
+        "medal": "🥇",
+        "money_bag": "💰",
+        "money_mouth_face": "🤑",
+        "money_stack": "💵",
+        "money_with_wings": "💸",
+        "network": "🌐",
+        "nodes": "🔗",
+        "outgoing_money": "📤💵",
+        "padlock": "🔐",
+        "percent": "％",
+        "piggy_bank": "🐖",
+        "pound": "£",
+        "robot_trade": "🤖💹",
+        "rocket": "🚀",
+        "ruler": "📏",
+        "rupee": "₹",
+        "safe": "🛡",
+        "scales": "⚖️",
+        "shield": "🛡",
+        "skull": "💀",
+        "smart_contract": "📜🤖",
+        "stethoscope": "🩺",
+        "stopwatch": "⏱",
+        "target": "🎯",
+        "tether": "₮",
+        "trade": "🔄",
+        "trading_floor": "🏦",
+        "vault": "🏰",
+        "wallet": "👛",
+        "withdrawal": "🏦⬆️",
+        "yen": "¥",
+
+        # Lines and Corners
         "bottom_left_corner": "└",
         "bottom_right_corner": "┘",
-        "horizontal_line": "─",
-        "vertical_line": "│",
-        "double_top_left_corner": "╔",
-        "double_top_right_corner": "╗",
+        "bottom_t": "┴",
+        "cross": "┼",
         "double_bottom_left_corner": "╚",
         "double_bottom_right_corner": "╝",
         "double_horizontal_line": "═",
+        "double_top_left_corner": "╔",
+        "double_top_right_corner": "╗",
         "double_vertical_line": "║",
-        "cross": "┼",
-        "top_t": "┬",
-        "bottom_t": "┴",
+        "horizontal_heavy_double_dash": "╍",
+        "horizontal_light_double_dash": "╌",
+        "horizontal_light_triple_dash": "┄",
+        "horizontal_line": "─",
         "left_t": "├",
         "right_t": "┤",
-        "circle": "●",  # Black circle
-        "hollow_circle": "◯",  # White circle
-        "bullet": "•",  # Bullet point
-        "triangular_bullet": "‣",  # Triangular bullet
-        "diamond": "◆",  # Black diamond
-        "hollow_diamond": "◇",  # White diamond
-        "triangle_up": "▲",  # Black up-pointing triangle
-        "triangle_down": "▼",  # Black down-pointing triangle
-        "triangle_left": "◀",  # Black left-pointing triangle
-        "triangle_right": "▶",  # Black right-pointing triangle
-        "medium_block": "▄",  # Lower half block (larger block for visual effects)
-        "upper_half_block": "▀",  # Upper half block
-        "quad_block": "▖",  # Quadrant lower left
-        "three_quadrant_block": "▞",  # Quadrant upper right and lower left
-        "left_block": "▕",  # Left half block (vertical)
-        "right_block": "▏",  # Right half block (vertical)
-        "vertical_light_double_dash": "╎",  # Light vertical double dash
-        "horizontal_light_double_dash": "╌",  # Light horizontal double dash
-        "vertical_heavy_double_dash": "╏",  # Heavy vertical double dash
-        "horizontal_heavy_double_dash": "╍",  # Heavy horizontal double dash
-        "vertical_light_triple_dash": "┆",  # Light vertical triple dash
-        "horizontal_light_triple_dash": "┄",  # Light horizontal triple dash
-        "check_mark": "✔",  # Check mark
-        "multiplication_sign": "✖",  # Multiplication sign (cross)
-        "star": "★",  # Black star
-        "hollow_star": "☆",  # White star
-        "thumbs_up": "👍",
-        "thumbs_down": "👎",
-        "warning": "⚠️",
-        "question_mark": "❓",
-        "exclamation_mark": "❗",
-        "lock": "🔒",
-        "unlock": "🔓",
-        "globe": "🌍",
+        "top_left_corner": "┌",
+        "top_right_corner": "┐",
+        "top_t": "┬",
+        "vertical_heavy_double_dash": "╏",
+        "vertical_light_double_dash": "╎",
+        "vertical_light_triple_dash": "┆",
+        "vertical_line": "│",
+
+        # Miscellaneous Icons
+        "airplane": "✈️",
+        "alien": "👽",
+        "alien_robot": "",
+        "bar_chart": "📊",
+        "barrel": "🛢",
+        "bicycle": "🚲",
+        "books": "📚",
+        "camera": "📷",
+        "clipboard": "📋",
+        "computer": "💻",
+        "cross_mark": "❌",
+        "crossed_swords": '⚔',
+        "database": "🗄",
+        "debug": "🪲",
+        "desktop_computer": "🖥",
+        "email": "✉️",
+        "exception": "⚠️",
+        "ghost": "ᗣ",
+        "keyboard": "⌨️",
+        "lambda": "λ",
+        "lightning": "⚡",
+        "magnifying_glass": "🔍",
+        "music_note": "🎵",
+        "outbox_tray": "📤",
+        "package": "📦",
+        "pacman_left": "ᗤ",
+        "pacman_right": "ᗧ",
+        "pull_request": "🔃",
+        "robot": "🤖",
+        "robot_face": "🤖",
+        "server": "🖧",
+        "soccer_ball": "⚽",
+        "terminal": "💻",
+        "trophy": "🏆",
+        "trash": "🗑",
+        "watch": "⌚",
+
+        # Shapes
+        "bullet": "•",
+        "circle": "●",
+        "diamond": "◆",
+        "hollow_circle": "◯",
+        "hollow_diamond": "◇",
+        "hollow_star": "☆",
+        "star": "★",
+        "triangle_down": "▼",
+        "triangle_left": "◀",
+        "triangle_right": "▶",
+        "triangle_up": "▲",
+        "triangular_bullet": "‣",
+
+        # Symbols
         "check_box": "☑️",
-        "play_button": "▶️",
-        "pause_button": "⏸",
-        "stop_button": "⏹",
-        "rewind_button": "⏪",
+        "check_mark": "✔",
+        "exclamation_mark": "❗",
         "fast_forward_button": "⏩",
-        "sun": "☀️",
+        "globe": "🌍",
+        "lock": "🔒",
+        "pause_button": "⏸",
+        "play_button": "▶️",
+        "question_mark": "❓",
+        "rewind_button": "⏪",
+        "stop_button": "⏹",
+        "thumbs_down": "👎",
+        "thumbs_up": "👍",
+        "unlock": "🔓",
+        "warning": "⚠️",
+        "x": "✖",
+
+        # Weather and Nature
         "cloud": "☁️",
         "rain": "🌧",
         "snowflake": "❄️",
+        "sun": "☀️",
         "umbrella": "☂️",
-        "coffee": "☕",
-        "trophy": "🏆",
-        "hourglass": "⌛",
-        "watch": "⌚",
-        "computer": "💻",
-        "email": "✉️",
-        "camera": "📷",
-        "music_note": "🎵",
-        "soccer_ball": "⚽",
-        "bicycle": "🚲",
-        "airplane": "✈️",
-        "flag": "🏳️",
-        "alien": "👽",
-        "robot": "🤖",
-        "trash": "🗑",
-        "keyboard": "⌨️",  # Keyboard
-        "desktop_computer": "🖥",  # Desktop
-        "server": "🖧",  # Network icon (symbolizes servers)
-        "database": "🗄",  # Filing cabinet, can represent a database
-        "magnifying_glass": "🔍",  # Searching (for issues in code or debugging)
-        "lightning": "⚡",  # Speed, performance boost
-        "books": "📚",  # Documentation or learning materials
-        "cross_mark": "❌",  # Failure, failed test
-        "package": "📦",  # Package (Python package or module)
-        "outbox_tray": "📤",  # Output
-        "inbox_tray": "📥",  # Input
-        "shield": "🛡",  # Security, protection (firewall)
-        "clipboard": "📋",  # Copy-pasting code, task management
-        "debug": "🪲",  # Debugging
-        "exception": "⚠️",  # Error or exception handling
-        "lambda": "λ",  # Lambda function in Python
-        "pull_request": "🔃",  # Pull request or version control actions
-        "terminal": "💻",  # Command line interface (CLI)
-        "bar_chart": "📊",  # Data analytics, machine learning
-        "robot_face": "🤖",  # Machine learning, AI
-        "barrel": "🛢",  # Docker (containerization)
-        "dollar": "$",  # Dollar sign (USD)
-        "euro": "€",  # Euro sign (EUR)
-        "yen": "¥",  # Yen sign (JPY)
-        "pound": "£",  # Pound sign (GBP)
-        "rupee": "₹",  # Indian Rupee (INR)
-        "bitcoin": "₿",  # Bitcoin symbol
-        "ethereum": "Ξ",  # Ethereum symbol
-        "litecoin": "Ł",  # Litecoin symbol
-        "monero": "ɱ",  # Monero symbol
-        "dogecoin": "Ð",  # Dogecoin symbol
-        "tether": "₮",  # Tether symbol
-        "binance_coin": "⚡",  # Binance Coin symbol (⚡ as a stand-in)
-        "currency_exchange": "💱",  # Currency exchange
-        "money_bag": "💰",  # Money bag (for wealth)
-        "bank": "🏦",  # Bank or financial institution
-        "credit_card": "💳",  # Credit card
-        "coin": "🪙",  # Coin (represents cryptocurrency or tokens)
-        "chart_increasing": "📈",  # Increasing chart (bull market, profit)
-        "chart_decreasing": "📉",  # Decreasing chart (bear market, loss)
-        "money_with_wings": "💸",  # Money flying away (loss, fees)
-        "money_stack": "💵",  # Stack of dollar bills
-        "dollar_coin": "🪙",  # Coin (could symbolize any currency)
-        "balance_scale": "⚖️",  # Balance scale (fairness, arbitrage)
-        "alarm_clock": "⏰",  # Time-sensitive trading
-        "rocket": "🚀",  # Rocket (market surge)
-        "banknotes": "💴",  # Banknotes (JPY for diversity)
-        "currency_signs": "💲",  # Currency signs (generic currency)
-        "gold": "🏅",  # Gold (store of value)
-        "piggy_bank": "🐖",  # Piggy bank (savings)
-        "lock_with_key": "🔐",  # Security (cold storage, wallet protection)
-        "ledger": "📒",  # Ledger (bookkeeping, transactions)
-        "handshake": "🤝",  # Agreement or trade deal
-        "deposit": "🏦⬇️",  # Deposit (bank or account)
-        "withdrawal": "🏦⬆️",  # Withdrawal (from bank or account)
-        "smart_contract": "📜🤖",  # Smart contract (📜 scroll + 🤖 robot)
-        "network": "🌐",  # Network (blockchain or decentralized)
-        "key": "🔑",  # Private key, access
-        "wallet": "👛",  # Crypto wallet
-        "vault": "🏰",  # Vault or secure storage
-        "gem": "💎",  # Gem (valuable asset or token)
-        "safe": "🛡",  # Safe (protection, cold storage)
-        "stopwatch": "⏱",  # Speed (fast transaction)
-        "scales": "⚖️",  # Arbitration or DeFi balance
-        "incoming_money": "📥💵",  # Incoming payments or deposits
-        "outgoing_money": "📤💵",  # Outgoing payments or transfers
-        "investment": "📈💵",  # Investment or profits
-        "fees": "💸",  # Transaction fees
-        "atm": "🏧",  # ATM (fiat withdrawal or deposit)
-        "gas": "⛽",  # Gas fees (Ethereum or blockchain transaction fees)
-        "stethoscope": "🩺",  # Audit (smart contract auditing)
-        "nodes": "🔗",  # Nodes in a decentralized network
-        "chart": "📊",  # Financial chart or statistics
-        "padlock": "🔐",  # Locked contract or token
-        "crossed_swords": "⚔️",  # Competition or trading conflict
-        "dollar_wings": "💸",  # Money going out (expenses or trading losses)
-        "calendar": "📅",  # Deadline for trading or settlement
-        "target": "🎯",  # Price target or investment goal
-        "medal": "🥇",  # High-value investment or top position
-        "infinite": "♾️",  # Infinite supply (inflationary currency)
-        "percent": "％",  # Percentage return or interest
-        "trading_floor": "🏦",  # Stock exchange or trading platform
-        "ruler": "📏",  # Measuring market performance
-        "legal_scales": "⚖️",  # Regulation, legal audits
-        "trade": "🔄",  # Trade or transaction
-        "gift": "🎁",  # Reward, staking rewards, or bonuses
-        "robot_trade": "🤖💹",  # Algorithmic trading (bot trading)
-        "hacker": "🕵️‍♂️",  # Hacker (security or vulnerabilities)
-        "gold_coin": "🪙",  # Cryptocurrency or tokens
-        "gold_medal": "🥇",  # High-value investment
-        "money_mouth_face": "🤑",  # Excited about profits or returns
-        "skull": "💀",  # Failed investment or crash
-        "fire": "🔥",  # Hot market or burning tokens (deflationary supply)
-        "gemstone": "💎",  # High-value asset or hard-to-obtain token
 }
 
 
