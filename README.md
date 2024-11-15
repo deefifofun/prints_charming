@@ -66,7 +66,7 @@ pip install .
 This will install the package from the source code.
 
 
-### Here are examples of the basics. Please check out main.py in the examples folder for more 
+### Here are examples of the basics. Please check out main.py in the examples folder for more. Will be updated soon. 
 
 - **show_colors module**: run python -m prints_charming.show_colors for an interactive way to select and name your own colors for the color_map.
 
@@ -74,175 +74,192 @@ This will install the package from the source code.
 
 ```python
 
-
-
 from prints_charming import (
-    TextStyle,
+    PStyle,
     PrintsCharming,
-    PrintsCharmingLogHandler,
-    TableManager,
-    FormattedTextBox,
-    PrintsCharmingError,
-    set_custom_excepthook
 )
 
-import os
-import sys
-import logging
+from prints_charming.logging import setup_logger
+
+
+
+def apply_logging_style(pc, level, style_name, text):
+    return pc.apply_style(style_name, text) + pc.style_codes.get(level)
+
+
+def apply_logging_debug_style(pc, style_name, text):
+    return apply_logging_style(pc, 'debug', style_name, text)
+
+
+def apply_logging_info_style(pc, style_name, text):
+    return apply_logging_style(pc, 'info', style_name, text)
+
+
+def apply_logging_warning_style(pc, style_name, text):
+    return apply_logging_style(pc, 'warning', style_name, text)
+
+
+def apply_logging_error_style(pc, style_name, text):
+    return apply_logging_style(pc, 'error', style_name, text)
+
+
+def apply_logging_critical_style(pc, style_name, text):
+    return apply_logging_style(pc, 'critical', style_name, text)
+
+
+def more_log_message_examples(logger):
+
+    # PrintsCharming instance
+    pc = logger.pc
+
+    newlines = f'\n\n'
+
+    # Dynamically populate log_methods using PrintsCharming.log_level_style_names
+    log_methods = {level_name: getattr(logger, level_name) for level_name in PrintsCharming.log_level_style_names}
+
+    # Iterate through each log level, applying unique styles and logging
+    for level_name, log_method in log_methods.items():
+        # Apply styles specific to each log level
+        styled_text1 = apply_logging_style(pc, level_name, 'purple', 'pre-styled')
+        styled_text2 = apply_logging_style(pc, level_name, 'orange', 'message.')
+
+        # Log the message with the dynamically styled texts
+        log_method(f"This is another {styled_text1} '{level_name}' {styled_text2}{newlines if level_name == 'critical' else ''}")
+
+    for level_name, log_method in log_methods.items():
+        if level_name != 'critical':
+            # Log the message using log_method with positional formatting
+            log_method("arg 1: {} and arg 2: {}", "arg1 is a phrase!", "arg2 is a phrase too!")
+        else:
+            # Log the message using log_method with positional formatting + newlines
+            log_method("arg 1: {} and arg 2: {} {}", "arg1 is a phrase!", "arg2 is a phrase too!", "\n\n")
+
+
+# use positional formatting with *args
+def positional_formatting_log_messages(logger,
+                                       arg1='argument_1',
+                                       arg2='argument_2'):
+
+    logger.debug("arg 1: {} and arg 2: {}", arg1, arg2)
+    logger.info("arg 1: {} and arg 2: {}", arg1, arg2)
+    logger.warning("arg 1: {} and arg 2: {}", arg1, arg2)
+    logger.error("arg 1: {} and arg 2: {}", arg1, arg2)
+    logger.critical("arg 1: {} and arg 2: {}\n\n", arg1, arg2)
+
+
+def prestyle_parts_of_log_messages(logger):
+    # Access pc instance with
+    pc = logger.pc
+
+    def get_level_code(level):
+        return pc.style_codes.get(level)
+
+    # Pre-style parts of log messages
+    styled_text = pc.apply_indexed_styles(
+        ['message', 'pre-styled'],
+        ['vyellow', 'purple'],
+        return_list=True
+    )
+
+    # Append log level codes to styled text
+    debug_styled_text = [styled_text[0] + get_level_code('debug'), styled_text[1] + get_level_code('debug')]
+    info_styled_text = [styled_text[0] + get_level_code('info'), styled_text[1] + get_level_code('info')]
+    warning_styled_text = [styled_text[0] + get_level_code('warning'), styled_text[1] + get_level_code('warning')]
+    error_styled_text = [styled_text[0] + get_level_code('error'), styled_text[1] + get_level_code('error')]
+    critical_styled_text = [styled_text[0] + get_level_code('critical'), styled_text[1] + get_level_code('critical')]
+
+    # Pre-styled log messages
+    logger.debug(f"This is a 'debug' {debug_styled_text[0]} with some {debug_styled_text[1]} text.")
+    logger.info(f"This is an 'info' {info_styled_text[0]} with some {info_styled_text[1]} text.")
+    logger.warning(f"This is a 'warning' {warning_styled_text[0]} with some {warning_styled_text[1]} text.")
+    logger.error(f"This is an 'error' {error_styled_text[0]} with some {error_styled_text[1]} text.")
+    logger.critical(f"This is a 'critical' {critical_styled_text[0]} with some {critical_styled_text[1]} text.\n\n")
+
+
+
+def default_log_messages(logger):
+    logger.debug("This is a plain 'debug' message.")
+    logger.info("This is a plain 'info' message.")
+    logger.warning("This is a plain 'warning' message.")
+    logger.error("This is a plain 'error' message.")
+    logger.critical("This is a plain 'critical' message.\n\n")
 
 
 
 
-printscharming_variables = {
-    "vgreen": ["Hello, world!", "string", "Connected", "Loaded", "Monitor", "ABOVE THRESHOLD", "wss://advanced-trade-ws.coinbase.com", "Starting", "True", "C++", "substring"],
-    "green": ["apple"],
-    "vred": ["Error", "Failed", "None", "Skipping.", "Canceling", "Canceled", "Hobbies", "Skills", "False"],
-    "blue": ["CoinbaseWebsocketClient", "server", "Python"],
-    "yellow": ["1", "returned", "Flask", "Some",],
-    "vyellow": ["File modified:", "File modified AGAIN", "subscribed", "=", "JavaScript"],
-    "magenta": ["within 10 seconds.", "how", "React"],
-    "cyan": ["|", "#", "are", "your", "Project Management System"],
-    "orange": ["New Message!", "Prints", "Software Developer", "Prince Charming"],
-    "purple": ["My color is purple", "Reading"],
-    # Uncomment the next line to hide API keys or sensitive information
-    # "conceal": [os.environ[key] for key in os.environ if "API" in key],
-}
 
-# Create an instance of the PrintsCharming class with default settings, but add printscharming_variables
-pc = PrintsCharming(printscharming_variables=printscharming_variables)
-pc.print("# Basic printing with ColorPrinter will print in the default style with default color.")
-pc.print("Hello, world!")
-pc.print("# Print in the default style reverse foreground and background.")
-pc.print("Hello, world!", reverse=True)
-pc.print("# Specify only the color of the args.")
-pc.print("Hello, world!", color="red", dim=True)
-pc.print("# Specify only italic and underline will print in the default color.")
-pc.print("Hello, world!", italic=True, underline=True)
-pc.print("# Specify a predefined style 'magenta'. The 'magenta' style is defined above.")
-pc.print("Hello, world!", style="magenta")
-pc.print("# Specify predefined style 'task' for printing. The 'task' style is defined above.")
-pc.print("This is a task.", style="task")
-pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
-pc.print("This is a task.", style="task", color="green", underline=True)
-pc.print("Show text with bg_color:")
-pc.print("This has a bg_color", style="bg_color_green")
-pc.print("# Show that 'Hello, world!' isn't color or style defined.")
-pc.print("Hello, world!")
-print()
+def create_logger_with_specific_pc_instance():
+    # Create specific PrintsCharming instance.
+    pc = PrintsCharming(default_bg_color='jupyter')
 
-```
+    # Pass PrintsCharming instance 'pc' and give the logger a name
+    logger = setup_logger(pc=pc, name='my_logger')
 
-```python
+    default_log_messages(logger)
+
+    prestyle_parts_of_log_messages(logger)
+
+    positional_formatting_log_messages(logger)
+
+    # Edit args styling
+    args_style = PStyle(color="vyellow", bold=True)
+    pc.edit_style("args", args_style)
+
+    positional_formatting_log_messages(logger)
+
+    more_log_message_examples(logger)
 
 
 
-from prints_charming import (
-    TextStyle,
-    PrintsCharming,
-    PrintsCharmingLogHandler,
-    TableManager,
-    FormattedTextBox,
-    PrintsCharmingError,
-    set_custom_excepthook
-)
-
-import os
-import sys
-import logging
-
-pc = PrintsCharming()
-
-pc.print("# Use the add_variable method to add 'Hello, world!' to the phrases dictionary with 'vgreen' style.")
-pc.add_variable("Hello, world!", style_name="vgreen")
-pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
-pc.print("Hello, world!")
-pc.print("# Use the remove_variable method to remove 'Hello, world!' from the styled phrases dictionary.")
-pc.remove_variable("Hello, world!")
-pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
-pc.print("Hello, world!")
-pc.print("# Define a variable.")
-text = "Hello, world!"
-pc.print(f"# Use the add_variable method to add {text} to the phrases dictionary with 'yellow' style.")
-pc.add_variable(text, style_name="yellow")
-pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
-pc.print(text)
-pc.print("# Show that 'Hello, world!' retains its style while other words are unstyled.")
-pc.print(f"This sentence says, {text}")
-pc.print("# Show how you can style other words alongside, 'Hello, world!'.")
-pc.print(f"This sentence says, {text}", style='task')
-pc.print("# Show how the order of the words doesn't matter.")
-pc.print(f"{text} Let me say that again, {text} {text} I said it again!", style="orange")
-pc.print("# Use the remove_variable method to remove 'Hello, world!' from the styled phrases dictionary.")
-pc.remove_variable("Hello, world!")
-pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
-pc.print("Hello, world!")
-print()
-
-```
-
-```python
 
 
+def create_logger_with_its_own_default_pc_instance():
+    # setup a logger with default values
+    logger = setup_logger()
+    pc = logger.pc
 
-from prints_charming import (
-    TextStyle,
-    PrintsCharming,
-    PrintsCharmingLogHandler,
-    TableManager,
-    FormattedTextBox,
-    PrintsCharmingError,
-    set_custom_excepthook
-)
+    default_log_messages(logger)
 
-import os
-import sys
-import logging
+    prestyle_parts_of_log_messages(logger)
 
-def setup_logger(pc):
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    handler = PrintsCharmingLogHandler(pc)
-    logger.addHandler(handler)
-    return logger
+    positional_formatting_log_messages(logger)
 
-def play_around_with_logging():
+    # Edit args styling
+    args_style = PStyle(color="magenta", bold=True)
+    pc.edit_style("args", args_style)
 
-    pc = PrintsCharming()
+    positional_formatting_log_messages(logger)
 
-    my_logger = setup_logger(pc)
-
-    init_message = f"PrintsCharmingLogHandler initialized with configuration:\n{pc.format_dict(pc.config)}"
-    my_logger.debug(init_message)
-
-    apply_style = lambda a, b: pc.apply_logging_style(a, b)
-
-    my_logger.debug("Debug message with argument 1: {} and argument 2: {}", apply_style('class_name', 'arg1'), apply_style('method_name', 'arg2'))
-
-    my_logger.debug("Debugging information.")
-    my_logger.info("General info.")
-    my_logger.warning("Warning message.")
-    my_logger.error("Error encountered.")
-    my_logger.critical("Critical issue.")
-    print()
-
-    pc.config['internal_logging'] = True
-    pc.update_logging()
-
-
-    pc.debug(f"PrintsCharming enabled internal logging:\n{pc.format_dict(pc.config)}")
+    more_log_message_examples(logger)
 
 
 
 def main():
-    set_custom_excepthook()
 
-    
-    play_around_with_logging()
-    
-    
-    
+    create_logger_with_its_own_default_pc_instance()
+    create_logger_with_specific_pc_instance()
+
+
 if __name__ == "__main__":
     main()
+
+
+
+```
+
+```python
+
+
+
+
+
+```
+
+```python
+
+
+
+
 
 ```
 

@@ -1,9 +1,5 @@
-from typing import Any, Dict, List, Optional, Union
 from prints_charming import (
     PStyle,
-    DEFAULT_COLOR_MAP,
-    DEFAULT_STYLES,
-    get_terminal_width,
     PrintsCharming,
 )
 
