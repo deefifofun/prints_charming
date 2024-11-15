@@ -41,6 +41,9 @@ if sys.platform == 'win32':
 
 
 
+
+
+
 class PrintsCharming:
     """
     The `PrintsCharming` class is the core component of the prints_charming
@@ -392,6 +395,7 @@ class PrintsCharming:
         self.conceal_map: Dict[str, Dict[str, str]] = {}
 
         self.phrase_trie = KeyTrie()
+        self.shortest_phrase_length = None
         self.word_trie = KeyTrie()
         self.word_map: Dict[str, Dict[str, str]] = {}
         self.subword_trie = KeyTrie()
@@ -485,6 +489,16 @@ class PrintsCharming:
 
 
     def add_style(self, name: str, style: PStyle):
+        """
+        Add a new style, applying self.default_bg_color only if no bg_color is specified
+        and self.default_bg_color is defined.
+        """
+
+        # Apply default background color if none is specified and self.default_bg_color is set
+        if (not hasattr(style, 'bg_color') or style.bg_color is None) and self.default_bg_color:
+            style.bg_color = self.default_bg_color
+
+        # Add the style and generate the style code if the color is in the color map
         self.styles[name] = style
         if self.styles[name].color in self.color_map:
             style_code = self.create_style_code(self.styles[name])
@@ -492,13 +506,107 @@ class PrintsCharming:
 
 
     def add_styles(self, styles: dict[str, PStyle]) -> None:
+        """
+        Add multiple styles, applying self.default_bg_color only if no bg_color is specified
+        and self.default_bg_color is defined.
+        """
         for style_name, style in styles.items():
+            # Apply default background color if none is specified and self.default_bg_color is set
+            if (not hasattr(style, 'bg_color') or style.bg_color is None) and self.default_bg_color:
+                style.bg_color = self.default_bg_color
+
             if style.color in self.color_map:
                 self.add_style(style_name, style)
 
 
+    def edit_style(self, name: str, new_style: Union[PStyle, Dict[str, Any]]):
+        """
+        Edit an existing style by updating its attributes and regenerating its ANSI code,
+        applying the default background color if not specified.
+        """
+        if name not in self.styles:
+            raise ValueError(f"Style '{name}' does not exist.")
+
+        # Update the style with new attributes
+        if isinstance(new_style, PStyle):
+            self.styles[name] = new_style
+        elif isinstance(new_style, Dict):
+            for key, value in new_style.items():
+                if hasattr(self.styles[name], key):
+                    setattr(self.styles[name], key, value)
+                else:
+                    raise AttributeError(f"Style '{name}' has no attribute '{key}'")
+
+        # Ensure the background color respects the default if not specified
+        if getattr(self.styles[name], 'bg_color', None) is None and self.default_bg_color:
+            self.styles[name].bg_color = self.default_bg_color
+
+        # Regenerate the ANSI code for the updated style
+        self.style_codes[name] = self.create_style_code(self.styles[name])
+
+
+    def edit_styles(self, new_styles: Dict[str, Union[PStyle, Dict[str, Any]]]):
+        """
+        Edit multiple styles by updating each style's attributes and regenerating their ANSI codes,
+        applying the default background color if not specified.
+        """
+        for name, new_style in new_styles.items():
+            if name not in self.styles:
+                raise ValueError(f"Style '{name}' does not exist.")
+
+            # Use edit_style to apply the default background color as necessary
+            self.edit_style(name, new_style)
+
+
+    def rename_style(self, current_name: str, new_name: str):
+        """
+        Rename an existing style in both self.styles and self.style_codes.
+        """
+        if current_name not in self.styles:
+            raise ValueError(f"Style '{current_name}' does not exist.")
+        if new_name in self.styles:
+            raise ValueError(f"Style '{new_name}' already exists.")
+
+        # Move style and its code to the new name
+        self.styles[new_name] = self.styles.pop(current_name)
+        if current_name in self.style_codes:
+            self.style_codes[new_name] = self.style_codes.pop(current_name)
+
+
+    def rename_styles(self, name_map: dict[str, str]):
+        """
+        Rename multiple styles using a mapping from current names to new names.
+        """
+        for current_name, new_name in name_map.items():
+            self.rename_style(current_name, new_name)
+
+
+    def remove_style(self, name: str):
+        """
+        Remove a style by its name from both self.styles and self.style_codes.
+        """
+        if name in self.styles:
+            del self.styles[name]
+            if name in self.style_codes:
+                del self.style_codes[name]
+        else:
+            raise ValueError(f"Style '{name}' does not exist.")
+
+
+    def remove_styles(self, names: list[str]):
+        """
+        Remove multiple styles by their names from both self.styles and self.style_codes.
+        """
+        for name in names:
+            self.remove_style(name)
+
+
     def get_style_code(self, style_name):
         return self.style_codes.get(style_name, self.style_codes['default'])
+
+
+    def apply_style_code(self, code, text, reset=True):
+        return f'{code}{text}{self.reset if reset else ''}'
 
 
     def apply_style(self, style_name, text, fill_space=True, reset=True):
@@ -566,8 +674,7 @@ class PrintsCharming:
         return ' '.join(styled_strs) if not return_list else styled_strs
 
 
-    def apply_style_code(self, code, text):
-        return f'{code}{text}{self.reset}'
+
 
 
     def get_color_code(self, color_name):
@@ -732,6 +839,11 @@ class PrintsCharming:
                     PrintsCharming.words_and_spaces_pattern.findall(string)
                 )
                 phrase_length = len(phrase_words_and_spaces)
+                if not self.shortest_phrase_length:
+                    self.shortest_phrase_length = phrase_length
+                else:
+                    if phrase_length < self.shortest_phrase_length:
+                        self.shortest_phrase_length = phrase_length
                 self.phrase_trie.insert(string, {
                     "phrase_words_and_spaces": phrase_words_and_spaces,
                     "phrase_length": phrase_length,
@@ -907,6 +1019,7 @@ class PrintsCharming:
                 # word/phrase, stop cleaning.
                 break
 
+
     def _remove_word(self, word: str) -> bool:
         if word in self.word_map:
             del self.word_map[word]
@@ -1078,7 +1191,6 @@ class PrintsCharming:
             styled_segments.append(styled_segment)
 
         return ''.join(styled_segments)
-
 
     # breaking changes i need to fix and combine with another one of these methods.
     def segment_and_style2(self,
@@ -1514,6 +1626,22 @@ class PrintsCharming:
         return final_text
 
 
+    @staticmethod
+    def get_words_and_spaces(text):
+        words = text.split()
+        words_and_spaces = []
+        index = 0
+        for word in words:
+            start = text.find(word, index)
+            if start > index:
+                words_and_spaces.append(text[index:start])
+            words_and_spaces.append(word)
+            index = start + len(word)
+        if index < len(text):
+            words_and_spaces.append(text[index:])
+        return words_and_spaces
+
+
 
 
     def print(self,
@@ -1674,7 +1802,8 @@ class PrintsCharming:
 
 
         # Convert the text to a list of words and spaces
-        words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
+        words_and_spaces = self.get_words_and_spaces(text)
+        #words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
         self.debug(f'words_and_spaces:\n{words_and_spaces}')
 
         # Initialize list to hold the final styled words and spaces
@@ -1702,8 +1831,7 @@ class PrintsCharming:
         if self.enable_styled_phrases:
             # Method level check
             if phrase_search:
-                # Only perform phrase lookup if there are multiple elements (implying a possible phrase)
-                if len(words_and_spaces) > 1:
+                if len(words_and_spaces) >= self.shortest_phrase_length:
                     for i in range(len(words_and_spaces)):
                         # Build the text segment starting from the current position
                         text_segment = ''.join(words_and_spaces[i:])
@@ -2848,6 +2976,10 @@ class PrintsCharming:
             conceals = ensure_list(conceal, num_args)
             blinks = ensure_list(blink, num_args)
 
+            # Handle kwargs replacements
+            if self.config["kwargs"] and kwargs:
+                converted_args = [self.replace_and_style_placeholders(arg, kwargs) for arg in converted_args]
+
             styled_parts = []
 
             for i, arg in enumerate(converted_args):
@@ -2904,8 +3036,7 @@ class PrintsCharming:
                 if self.enable_styled_phrases:
                     # Method level check
                     if phrase_search:
-                        # Only perform phrase lookup if there are multiple elements (implying a possible phrase)
-                        if words_and_spaces_length > 1:
+                        if len(words_and_spaces) >= self.shortest_phrase_length:
                             self.debug(f'Calling self.handle_phrases()')
 
                             (styled_words_and_spaces,

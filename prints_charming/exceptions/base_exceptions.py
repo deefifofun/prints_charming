@@ -246,7 +246,8 @@ class PrintsCharmingException(Exception):
                          logger: Optional[Any] = None,
                          exc_type: Optional[Type[BaseException]] = None,
                          exc_value: Optional[BaseException] = None,
-                         exc_info: Optional[Any] = None
+                         exc_info: Optional[Any] = None,
+                         print_error: bool = False,
                          ) -> None:
         """
         Handle the exception by printing or logging the styled traceback.
@@ -256,32 +257,43 @@ class PrintsCharmingException(Exception):
             exc_type (Optional[Type[BaseException]]): Exception type.
             exc_value (Optional[BaseException]): Exception value.
             exc_info (Optional[Any]): Exception info.
+            print_error (Optional[bool]): Print unstyled error message first.
         """
-        self.print_error()
+        if print_error:
+            self.print_error()
+
 
         if self.format_specific_exception:
-            tb = ''.join(traceback.format_exception(None, self, self.__traceback__))
+            # Current active exception traceback (more detailed)
+            full_traceback = traceback.format_exc()
+
+            # Specific styled traceback from this instance
+            instance_traceback = ''.join(traceback.format_exception(None, self, self.__traceback__))
+
+            # Combine both tracebacks with a separator for clarity
+            #tb = f"{full_traceback}\n{instance_traceback}"
+            tb = full_traceback
         else:
-            tb = traceback.format_exc()
+            tb = ''.join(traceback.format_exception(exc_type, exc_value, exc_info))
+            #tb = traceback.format_exc()
 
         tb_lines = tb.split('\n')
 
         # Stylize the traceback
         styled_tb_lines = self.stylize_traceback(tb_lines, self.check_subclass_names)
 
-        # Log the exception if a logger is provided
+        # Join the styled traceback lines into a single message
+        complete_traceback = '\n'.join(styled_tb_lines)
+
+        # Log the entire traceback as a single message
         if logger:
             if exc_type and issubclass(exc_type, self.__class__.critical_exceptions):
-                for line in styled_tb_lines:
-                    logger.critical(line, exc_info=exc_info)
+                logger.critical(f"\n{complete_traceback}", exc_info=exc_info)
             else:
-                for line in styled_tb_lines:
-                    logger.error(line, exc_info=exc_info)
+                logger.error(f"\n{complete_traceback}", exc_info=exc_info)
         else:
-            # Print the styled traceback to stderr
-            for line in styled_tb_lines:
-                print(line, file=sys.stderr)
+            # Print the styled traceback to stderr if no logger is provided
+            print(complete_traceback, file=sys.stderr)
 
-        print()
-
+            print()
 

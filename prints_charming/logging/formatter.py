@@ -43,6 +43,7 @@ class PrintsCharmingFormatter(logging.Formatter):
         timestamp_style_name: Optional[str] = None,
         level_styles: Optional[Dict[int, str]] = None,
         use_styles: bool = True,
+        args_style_name: str = 'args',
         internal_logging: bool = False
     ) -> None:
         """
@@ -71,6 +72,7 @@ class PrintsCharmingFormatter(logging.Formatter):
         self.timestamp_style = timestamp_style_name
         self.level_styles = level_styles or self.default_level_styles
         self.use_styles = use_styles
+        self.args_style_name = args_style_name
         self._style_cache: Dict[str, str] = {}
 
 
@@ -234,7 +236,7 @@ class PrintsCharmingFormatter(logging.Formatter):
             log_level_style_code (str): Style code for the log level.
         """
         if record.args:
-            args_style_code = self.get_style_code('args')
+            args_style_code = self.get_style_code(self.args_style_name)
             record.msg = record.msg.format(*[
                 f"{args_style_code}{arg}{self.reset}{log_level_style_code}" for arg in record.args
             ])
@@ -272,6 +274,7 @@ class PrintsCharmingFormatter(logging.Formatter):
             f"{record.funcName}:{record.lineno} - {record.msg}"
         )
         return f"{timestamp} {log_level_label} {record.msg}"
+
 
     def format_orig(self, record: logging.LogRecord) -> str:
 

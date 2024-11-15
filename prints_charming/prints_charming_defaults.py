@@ -176,7 +176,7 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
 
 
         "header1"      : PStyle(color="blue", bold=True, underline=True),
-        "header2" : PStyle(color="cyan", bold=True),
+        "header2": PStyle(color="cyan", bold=True),
         "header_main"  : PStyle(color="vcyan", bold=True),
         "header_text"  : PStyle(color="purple", bg_color="gray", bold=True, italic=True),
         "header_text2" : PStyle(color="gray", bg_color="purple", bold=True),
@@ -653,6 +653,8 @@ DEFAULT_CONTROL_MAP: Dict[str, str] = {
         # Mouse Control (Enable or disable mouse reporting)
         "enable_mouse": "\033[?1000h",  # Enable basic mouse tracking (xterm-style)
         "disable_mouse": "\033[?1000l",  # Disable mouse tracking
+        'enable_sgr_mouse': "\033[?1006h",  # Enable SGR mouse mode
+        "disable_sgr_mouse": "\033[?1006l", # Disable SGR mouse mode
         "enable_mouse_button_event_tracking": "\033[?1002h",  # Enable mouse button event tracking
         "disable_mouse_button_event_tracking": "\033[?1002l",  # Disable mouse button event tracking
 

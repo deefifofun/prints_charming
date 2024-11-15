@@ -30,9 +30,11 @@ snake_styles = {
 
     'food': PStyle(color='vgreen', bold=True),
     'border': PStyle(bg_color='blue'),
-    'blank': PStyle(bg_color='black')
+    'blank': PStyle(bg_color='black'),
+    'frame': PStyle(color='white', bold=True),
+    'title': PStyle(color='cyan', bold=True),
+    'score': PStyle(color='yellow', bold=True),
 }
-
 
 
 # Snake game implementation
@@ -46,7 +48,7 @@ class SnakeGame:
         self.builder = builder_instance or FrameBuilder(pc=self.pc, horiz_char=' ', vert_char=' ', vert_width=2)
         self.table_manager = table_manager_instance or TableManager(pc=self.pc)
         self.alt_buffer = alt_buffer
-        self.width = 40
+        self.width = 50
         self.height = 20
         self.snake = [(self.height // 2, self.width // 2)]
 
@@ -86,14 +88,13 @@ class SnakeGame:
         self.current_speed = self.level_speeds[0]  # Initial speed for level 1
         self.score = 0
         self.game_over = False
-        self.listener_thread = None
 
         # BoundCells for snake and food positions
         self.snake_cells = [BoundCell(lambda pos=segment: pos) for segment in self.snake]
         self.food_cell = BoundCell(lambda: self.food)
 
 
-
+    
     async def init_game(self):
         if self.alt_buffer:
             self.write('alt_buffer', 'cursor_home', 'hide_cursor')
@@ -103,6 +104,7 @@ class SnakeGame:
 
         self.place_food()
         await self.init_keyboard_listener()
+
 
     def place_food(self):
         while True:
@@ -142,7 +144,7 @@ class SnakeGame:
 
 
     def increase_level(self):
-        """Check if the score meets the next threshold and increase the level if so."""
+        #Check if the score meets the next threshold and increase the level if so.
         if self.level < len(self.level_thresholds) and self.score >= self.level_thresholds[self.level - 1]:
             self.level += 1
             self.current_speed = self.level_speeds[self.level - 1]
@@ -185,12 +187,11 @@ class SnakeGame:
 
                 # Clear the position of the last segment
                 self.write('cursor_position', ' ', row=tail[0] + 1, col=tail[1] + 1)
-                #self.write(' ')  # Clear the tail visually on screen
 
             # Brief pause to control the speed of the game
             await asyncio.sleep(self.current_speed)
 
-
+    
     def draw_border(self, width, height):
         horiz_line = self.pc.apply_style('border', self.builder.horiz_char * width)
         # Top border
@@ -206,7 +207,7 @@ class SnakeGame:
 
 
     def get_body_style(self, index):
-        """Return the style for the body segment at the given index based on the pattern and reversal settings."""
+        # Return the style for the body segment at the given index based on the pattern and reversal settings.
         pattern_length = len(self.body_pattern)
 
         if self.reverse_pattern:
@@ -222,6 +223,7 @@ class SnakeGame:
             # Regular repetition from the start
             return self.body_pattern[index % pattern_length]
 
+
     async def draw(self):
         while not self.game_over:
 
@@ -235,12 +237,10 @@ class SnakeGame:
                     snake_segment = self.get_body_style(i)
 
                 self.write('cursor_position', snake_segment, row=segment[0] + 1, col=segment[1] + 1)
-                #self.write(snake_segment)
 
             # Draw snake head as the last item to ensure it's visible
             head = self.snake[0]
             self.write('cursor_position', self.snake_head, row=head[0] + 1, col=head[1] + 1)
-            #self.write(self.snake_head)
 
             # Draw food only if it has moved
             if self.food_needs_update:
@@ -291,6 +291,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         game.game_over = True  # Signal to end the game
         print("Exiting game due to KeyboardInterrupt.")
-
 
 

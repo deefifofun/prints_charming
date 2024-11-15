@@ -3,6 +3,7 @@
 import logging.handlers
 import sys
 import inspect
+import uuid
 import copy
 from typing import Any, Optional, Dict, Union, List, Tuple, Type
 
@@ -59,24 +60,48 @@ def set_custom_excepthook_with_logging(
         sys.excepthook = debug_excepthook
 
 
+def get_log_level(level: Union[int, str]) -> int:
+    """
+    Converts a log level given as a string or integer to an integer.
+
+    Args:
+        level (Union[int, str]): Log level (e.g., "debug", "INFO", logging.DEBUG).
+
+    Returns:
+        int: Corresponding logging level as an integer.
+
+    Raises:
+        ValueError: If the level is invalid.
+    """
+    if isinstance(level, int):
+        return level
+    elif isinstance(level, str):
+        level = level.upper()
+        if level in logging._nameToLevel:
+            return logging._nameToLevel[level]
+        else:
+            raise ValueError(f"Invalid log level: {level}")
+    else:
+        raise TypeError("Log level must be an int or a str")
+
+
 
 def setup_logger(
     pc: Optional[PrintsCharming] = None,
     name: Optional[str] = None,
-    level: int = logging.DEBUG,
+    level: Union[int, str] = logging.DEBUG,
     datefmt: str = '%Y-%m-%d %H:%M:%S',
     handler_configs: Optional[Dict[str, Dict[str, Union[bool, str, int]]]] = None,
     color_map: Optional[Dict[str, str]] = None,
     styles: Optional[Dict[str, PStyle]] = None,
     level_styles: Optional[Dict[int, str]] = None,
     default_bg_color: Optional[str] = None,
-    internal_logging: bool = False,
-    internal_log_level: str = 'DEBUG',
-    enable_exception_logging: bool = False,
-    update_exception_logging: bool = False,
+    enable_unhandled_exception_logging: bool = False,
+    update_unhandled_exception_logging: bool = False,
     log_exc_info: bool = True,
     critical_exceptions: Optional[Tuple[Type[BaseException], ...]] = None,
-    unhandled_exception_debug: bool = False
+    unhandled_exception_debug: bool = False,
+    unique: bool = True,
 ) -> logging.Logger:
     """
     Setup and return a logger with customizable handlers and formatters, including
@@ -112,27 +137,23 @@ def setup_logger(
         level_styles (Optional[Dict[int, str]]): Dictionary mapping logging
             levels to style names.
         default_bg_color (Optional[str]): Default background color for logs.
-        internal_logging (bool): Toggle internal library logging.
-        internal_log_level (str): Logging level for internal logging.
-        enable_exception_logging (bool): Enable logging of unhandled exceptions.
-        update_exception_logging (bool): Update exception logging to new values.
+        enable_unhandled_exception_logging (bool): Enable logging of unhandled exceptions.
+        update_unhandled_exception_logging (bool): Update exception logging to new values.
         log_exc_info (bool): Enable logging of exception info.
         critical_exceptions (Optional[Tuple[Type[BaseException], ...]]): A tuple
             of exception types to log as critical.
         unhandled_exception_debug (bool): Debug mode for unhandled exceptions.
+        unique (bool): If True (default), create a unique logger if the specified
+            or derived name already exists.
 
     Returns:
         logging.Logger: Configured logger instance with specified handlers.
     """
 
-    # If internal_logging is True, include it in the config
-    config = {
-        'internal_logging': internal_logging,
-        'log_level': internal_log_level,
-    }
+    # Convert level to integer
+    level = get_log_level(level)
 
     pc = pc or PrintsCharming(
-        config=config,
         color_map=color_map or DEFAULT_COLOR_MAP.copy(),
         styles=copy.deepcopy(styles) or copy.deepcopy(DEFAULT_STYLES),
         default_bg_color=default_bg_color)
@@ -143,20 +164,26 @@ def setup_logger(
         caller_module = inspect.getmodule(caller_frame[0])
         if caller_module is not None:
             name = caller_module.__name__
+
+    # Check if a logger with this name already exists
+    if unique and name in logging.Logger.manager.loggerDict:
+        # Append a unique identifier to ensure a unique logger name
+        name = f"{name}_{uuid.uuid4().hex}"
+
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
     # Attach the `pc` instance to the logger for future access
     logger.pc = pc
 
-    if enable_exception_logging:
+    if enable_unhandled_exception_logging:
         set_custom_excepthook_with_logging(
             logger,
             pc,
             log_exc_info,
             critical_exceptions,
             unhandled_exception_debug,
-            update_exception_logging,
+            update_unhandled_exception_logging,
         )
 
     # Helper function to create or use a supplied formatter
@@ -189,7 +216,6 @@ def setup_logger(
                 logging.ERROR: 'error',
                 logging.CRITICAL: 'critical'
             },
-            internal_logging=internal_logging,
             use_styles=use_styles
         )
 
@@ -209,7 +235,7 @@ def setup_logger(
         """
 
         if handler_name == 'console':
-            return PrintsCharmingLogHandler(pc=pc, internal_logging=internal_logging)
+            return PrintsCharmingLogHandler(pc=pc)
         elif handler_name == 'file':
             return logging.FileHandler(config['path'])  # Use standard FileHandler
         elif handler_name == 'rotating_file':
@@ -291,3 +317,6 @@ def setup_logger(
 
 
 __all__ = ['PrintsCharmingFormatter', 'PrintsCharmingLogHandler', 'setup_logger']
+
+
+

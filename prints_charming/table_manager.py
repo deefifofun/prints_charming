@@ -31,8 +31,6 @@ class BoundCell:
 
 
 
-
-
 class TableManager:
     _shared_instances = {}
 
@@ -58,7 +56,7 @@ class TableManager:
         cls._shared_instances[key] = instance
 
 
-    def __init__(self, pc: Union[PrintsCharming, str, None] = None, style_themes: dict = None, conditional_styles: dict = None):
+    def __init__(self, pc: Union[PrintsCharming, str, None] = None, style_themes: dict = None, conditional_styles: dict = None, specific_headers: dict = None):
         if isinstance(pc, str):
             self.pc = PrintsCharming.get_shared_instance(pc)
             if not self.pc:
@@ -69,6 +67,7 @@ class TableManager:
 
         self.style_themes = style_themes
         self.conditional_styles = conditional_styles
+        self.specific_headers = specific_headers or {}
         self.tables = {}
         self.previous_values = {}
 
@@ -76,16 +75,23 @@ class TableManager:
         self.col_sep = " | "
         self.title_style = "header_text"
 
-        self.header_styles = {
-            'Color Name': self.col_sep,
-            'Foreground Text': self.col_sep,
-            'Background Block': self.col_sep,
-            'Style Name': self.col_sep,
-            'Styled Text': self.col_sep,
-            'Style Definition': self.col_sep,
-        }
-
         self.debug = self.pc.debug
+
+
+
+
+    def add_specific_headers(self, name: str, specific_headers: Dict[str, Callable[[Any, List[Any], int, int, int], str]]):
+        """
+        Adds or updates a specific_headers configuration with the given name.
+
+        Args:
+            name (str): The name to assign to the specific_headers configuration.
+            specific_headers (dict): A dictionary of header-specific formatting functions.
+        """
+        if not isinstance(specific_headers, dict):
+            raise ValueError("specific_headers must be a dictionary of column-specific formatting functions.")
+
+        self.specific_headers[name] = specific_headers
 
 
 
@@ -126,25 +132,14 @@ class TableManager:
             # Data row styles
             conditional_style_functions = format_params.get('conditional_style_functions')
             default_column_styles = format_params.get('default_column_styles')
+            specific_headers = format_params.get('specific_headers', {})
             cell_style = format_params.get('cell_style')
             column_name = header[col_idx]
 
             # Handle specific headers
-            if column_name == 'Color Name':
-                aligned_cell = self.pc.apply_color(cell_str, aligned_cell)
-            elif column_name == 'Foreground Text':
-                color_name = row[0]  # Assuming the first column is the color name
-                aligned_cell = self.pc.apply_color(color_name, aligned_cell)
-            elif column_name == 'Background Block':
-                color_name = row[0]  # Assuming the first column is the color name
-                aligned_cell = self.pc.generate_bg_bar_strip(color_name, length=max_length)
-            elif column_name == 'Style Name':
-                aligned_cell = self.pc.apply_style(cell_str, aligned_cell)
-            elif column_name == 'Styled Text':
-                style_name = row[0]
-                aligned_cell = self.pc.apply_style(style_name, aligned_cell)
-            elif column_name == 'Style Definition':
-                aligned_cell = self.pc.apply_style('default', aligned_cell)
+            if specific_headers and column_name in specific_headers:
+                specific_handler = specific_headers[column_name]
+                aligned_cell = specific_handler(cell_str, aligned_cell, row, row_idx, col_idx, max_length)
 
             # Apply conditional styles if provided
             elif conditional_style_functions and column_name in conditional_style_functions:
@@ -189,6 +184,7 @@ class TableManager:
                        header_column_styles: Optional[Dict[int, str]] = None,
                        col_alignments: Optional[List[str]] = None,
                        default_column_styles: Optional[Dict[int, str]] = None,
+                       specific_headers: Union[Dict[str, Callable[[Any, List[Any], int, int, int], str]], str, None] = None,
                        cell_style: Optional[Union[str, List[str]]] = None,
                        target_text_box: bool = False,
                        conditional_style_functions: Optional[Dict[str, Callable[[Any], Optional[str]]]] = None,
@@ -223,20 +219,14 @@ class TableManager:
         :return: A string representing the formatted table.
         """
 
-        self.debug(f"Generating table with name: {table_name}")
-        self.debug(f"Table Data: \n{table_data}")
 
         if use_styles:
             styled_col_sep = self.pc.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
         else:
             styled_col_sep = self.pc.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
 
-        self.debug(f"Column Separator: {styled_col_sep}\n")
-
         # Step 1: Automatic Column Sizing
-        self.debug(f"Step 1: Automatic Column Sizing")
         max_col_lengths = [0] * len(table_data[0])
-        self.debug(f"Max col lengths: {max_col_lengths}")
         for row in table_data:
             for i, cell in enumerate(row):
                 if isinstance(cell, BoundCell):
@@ -245,9 +235,12 @@ class TableManager:
                 max_col_lengths[i] = max(max_col_lengths[i], cell_length)
 
         # Step 2: Prepare Table Output
-        self.debug(f"Step 2: Prepare Table Output")
         table_output = []
         header = table_data[0]
+
+        # If `specific_headers` is a string, retrieve the corresponding dictionary from `self.specific_headers`
+        if isinstance(specific_headers, str):
+            specific_headers = self.specific_headers.get(specific_headers, {})
 
         # Collect formatting parameters to store later
         format_params = {
@@ -257,6 +250,7 @@ class TableManager:
             "header_style": header_style,
             "header_column_styles": header_column_styles,
             "default_column_styles": default_column_styles,
+            "specific_headers": specific_headers,
             "cell_style": cell_style,
             "conditional_style_functions": conditional_style_functions,
             "use_styles": use_styles,
@@ -378,14 +372,17 @@ class TableManager:
         #y = starting_line + row_idx + 1  # Adjust for zero-based index
         y = starting_line + row_idx
 
-        return f"\033[{y};{x}H"
+        position = f"\033[{y};{x}H"
 
+        self.debug(f"Calculated cursor position: {position} (row={row_idx}, col={col_idx})")
 
+        return position
 
 
     @staticmethod
     def visible_length(s):
         return len(ANSI_ESCAPE.sub('', s))
+
 
 
     def refresh_bound_table(self, table_name: str) -> None:
@@ -487,29 +484,6 @@ class TableManager:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def live_update(self, table_name: str, update_callback: Callable[[], List[List[Any]]], interval: float = 1.0):
         """
         Creates a live-updating table that refreshes at a specified interval.
@@ -528,8 +502,8 @@ class TableManager:
                 self.tables[table_name]["data"] = update_callback()
 
                 # Clear the previous output
-                os.system('clear')  # or use '\033[H\033[J' for ANSI escape to clear terminal
-                print(self.generate_table_depreciated(self.tables[table_name]["data"], table_name=table_name))
+                os.system('clear')
+                print(self.generate_table(self.tables[table_name]["data"], table_name=table_name))
 
                 # Wait before updating again
                 time.sleep(interval)
@@ -548,281 +522,5 @@ class TableManager:
 
 
 
-    def add_bound_table_depreciated(self, **kwargs) -> str:
-        """
-        Store a table with bound cells in self.tables, allowing real-time updates.
-        """
-        # Initial formatted table layout using generate_table
 
-        # Preprocess table_data to resolve all BoundCell instances to their values
-
-        # Extract table_data from kwargs
-        table_data = kwargs.pop('table_data', None)
-        original_table_data = table_data  # Keep the original data with BoundCell instances
-
-        # If table_data is present, resolve BoundCell instances
-        if table_data is not None:
-            resolved_data = self.resolve_bound_instances(table_data)
-            # Replace table_data with resolved_data in kwargs
-            kwargs['table_data'] = resolved_data
-
-
-        formatted_table = self.generate_table_depreciated(**kwargs)
-
-        """
-        formatted_table = self.generate_table(resolved_data,
-                                              table_name=table_name,
-                                              show_table_name=True,
-                                              header_style='magenta',
-                                              border_style='vgreen',
-                                              col_sep_style='vgreen',
-                                              target_text_box=True,
-                                              cell_style=['orange', 'purple'],
-                                              conditional_style_functions=conditional_style_functions,
-                                              ephemeral=True,
-                                              )
-        """
-
-        table_name = kwargs.get('table_name', None)
-
-
-        # Store the table data and initialize previous values for selective updating
-        self.tables[table_name] = {
-            "data": original_table_data,
-            "formatted_table": formatted_table,
-            "bound": True
-        }
-        self.previous_values[table_name] = [
-            ["" for _ in row] for row in resolved_data
-        ]
-
-        return formatted_table
-
-
-
-
-
-
-
-    def generate_table_depreciated(self,
-                       table_data: List[List[Any]],
-                       table_name: str = None,
-                       show_table_name: bool = False,
-                       table_style: str = "default",
-                       border_char: str = "-",
-                       col_sep: str = " | ",
-                       border_style: Optional[str] = None,
-                       col_sep_style: Optional[str] = None,
-                       header_style: Optional[str] = None,
-                       header_column_styles: Optional[Dict[int, str]] = None,
-                       col_alignments: Optional[List[str]] = None,
-                       default_column_styles: Optional[Dict[int, str]] = None,
-                       cell_style: Optional[str or list] = None,
-                       target_text_box: bool = False,
-                       conditional_style_functions: Optional[Dict[str, Callable[[Any], Optional[str]]]] = None,
-                       double_space: bool = False,
-                       use_styles=True,
-                       ephemeral: bool = False
-                       ) -> str:
-
-        """
-        Generates a table with optional styling and alignment as a string.
-
-        :param table_data: A list of lists representing the rows of the table.
-        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
-        :param cell_style: Style name for the table cells.
-        :param header_style: Style name for the header row.
-        :param header_column_styles: A dictionary mapping column indices to style names for the header row.
-        :param border_style: Style name for the table borders.
-        :param column_styles: A dictionary mapping column indices to style names.
-        :param conditional_styles: A dictionary defining conditional styles based on cell values.
-        :return: A string representing the formatted table.
-        """
-
-        self.debug(f"Generating table with name: {table_name}")
-        self.debug(f"Table Data: \n{table_data}")
-
-        table_lines = []
-        line_number = 0
-
-        if use_styles:
-            styled_col_sep = self.pc.apply_style(col_sep_style, col_sep) if col_sep_style else col_sep
-        else:
-            styled_col_sep = self.pc.apply_color(col_sep_style, col_sep) if col_sep_style else col_sep
-
-        self.debug(f"Column Separator: {styled_col_sep}\n")
-
-        # 1. Automatic Column Sizing
-        self.debug(f"Step 1: Automatic Column Sizing")
-        max_col_lengths = [0] * len(table_data[0])
-        self.debug(f"Max col lengths: {max_col_lengths}")
-        for row in table_data:
-            self.debug(f"Column Length: {len(row)}")
-            self.debug(f"row: {row}")
-            for i, cell in enumerate(row):
-                if isinstance(cell, BoundCell):
-                    print(f'isinstance BoundCell: {cell}')
-                    cell = cell.get_value()
-                    print(f'changed BoundCell with get_value(): {cell}')
-                self.debug(f"index: {i}\tcell: {cell}")
-                cell_length = len(str(cell))
-                self.debug(f"cell length: {cell_length}")
-                max_col_lengths[i] = max(max_col_lengths[i], cell_length)
-                self.debug(f"max_col_length: {max_col_lengths[i]}")
-
-        # 2. Column Alignment
-        self.debug(f"Step 2: Column Alignment")
-        table_output = []
-        header = table_data[0]
-        self.debug(f"header: {header}")
-
-        # Process each row
-        for row_idx, row in enumerate(table_data):
-            self.debug(f"row_idx: {row_idx}\trow: {row}")
-            aligned_row = []
-            for i, cell in enumerate(row):
-                if isinstance(cell, BoundCell):
-                    print(f'isinstance BoundCell: {cell}')
-                    cell = cell.get_value()
-                    print(f'isinstance BoundCell: {cell}')
-                cell_str = str(cell)
-                max_length = max_col_lengths[i]
-                self.debug(f"i: {i}\tcell_str: {cell_str}\tmax_length: {max_length}")
-
-                # Determine the alignment for this cell
-                alignment = 'left'  # Default
-                if col_alignments and i < len(col_alignments):
-                    alignment = col_alignments[i]
-                elif isinstance(cell, (int, float)):
-                    alignment = 'right'
-
-                self.debug(f'alignment: {alignment}')
-
-                # Apply the alignment
-                if alignment == 'left':
-                    aligned_cell = cell_str.ljust(max_length)
-                elif alignment == 'center':
-                    aligned_cell = cell_str.center(max_length)
-                elif alignment == 'right':
-                    aligned_cell = cell_str.rjust(max_length)
-                else:
-                    aligned_cell = cell_str.ljust(max_length)  # Fallback
-
-                self.debug(f'aligned_cell: {aligned_cell}')
-
-                # Apply the style
-                if row_idx == 0:
-                    self.debug(f"row_idx == 0")
-                    # Apply header styles
-                    if header_column_styles and i in header_column_styles:
-                        aligned_cell = self.pc.apply_style(header_column_styles[i], aligned_cell)
-                    elif header_style:
-                        aligned_cell = self.pc.apply_style(header_style, aligned_cell)
-
-                    self.debug(f'aligned_cell: {aligned_cell}')
-
-                else:
-                    if header[i] == 'Color Name':
-                        aligned_cell = self.pc.apply_color(cell_str, aligned_cell)
-                    elif header[i] == 'Foreground Text':
-                        color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.pc.apply_color(color_name, aligned_cell)
-                    elif header[i] == 'Background Block':
-                        color_name = row[0]  # Assuming the first column is the color name
-                        aligned_cell = self.pc.generate_bg_bar_strip(color_name, length=max_length)
-                    elif header[i] == 'Style Name':
-                        aligned_cell = self.pc.apply_style(cell_str, aligned_cell)
-                    elif header[i] == 'Styled Text':
-                        style_name = row[0]
-                        aligned_cell = self.pc.apply_style(style_name, aligned_cell)
-                    elif header[i] == 'Style Definition':
-                        aligned_cell = self.pc.apply_style('default', aligned_cell)
-
-                    # Apply conditional styles if provided
-                    elif conditional_style_functions and header[i] in conditional_style_functions:
-                        # Check if the function requires the entire row as an argument
-                        if conditional_style_functions[header[i]].__code__.co_argcount == 2:
-                            style = conditional_style_functions[header[i]](cell, row)
-                        else:
-                            if isinstance(cell, BoundCell):
-                                print(f'conditional_style_functions BoundCell instance: {cell}')
-                                cell = cell.get_value()
-                                print(f'changed cell value with cell.get_value(): {cell}')
-                            style = conditional_style_functions[header[i]](cell)
-                        if style:
-                            aligned_cell = self.pc.apply_style(style, aligned_cell)
-                        else:
-                            if default_column_styles and i in default_column_styles:
-                                # Apply column-specific styles if provided
-                                aligned_cell = self.pc.apply_style(default_column_styles[i], aligned_cell)
-                    elif default_column_styles and i in default_column_styles:
-                        # Apply column-specific styles if provided
-                        aligned_cell = self.pc.apply_style(default_column_styles[i], aligned_cell)
-                    elif cell_style:
-                        if isinstance(cell_style, list):
-                            # Apply alternating styles based on the row index
-                            style_to_apply = cell_style[0] if row_idx % 2 == 1 else cell_style[1]
-                            aligned_cell = self.pc.apply_style(style_to_apply, aligned_cell)
-                        else:
-                            aligned_cell = self.pc.apply_style(cell_style, aligned_cell)
-
-
-                # Add aligned and styled cell to the row
-                aligned_row.append(aligned_cell)
-
-            # Create a row string and add to table output
-            if target_text_box:
-                row_str = self.pc.apply_style(col_sep_style, col_sep.lstrip()) + styled_col_sep.join(aligned_row) + self.pc.apply_style(col_sep_style, col_sep.rstrip())
-            else:
-                row_str = styled_col_sep + styled_col_sep.join(aligned_row) + styled_col_sep
-            table_output.append(row_str)
-
-        # 3. Generate Borders and Rows
-        table_str = ""
-        border_line = ""  # Initialize border_line to ensure it always has a value
-        if border_style:
-            border_length = sum(max_col_lengths) + len(max_col_lengths) * len(col_sep) + len(col_sep) - 2
-            border_line = self.pc.apply_style(border_style, border_char * border_length)
-            #print(f' {border_line}')
-            if target_text_box:
-                table_str += f'{border_line}\n'
-            else:
-                table_str += f' {border_line}\n'
-
-        if show_table_name and table_name:
-            centered_table_name = self.pc.apply_style(self.title_style, table_name.center(border_length))
-            table_str += f'{centered_table_name}\n'
-            if border_style:
-                table_str += f'{border_line}\n'
-
-        for i, row in enumerate(table_output):
-            #print(row)
-            table_str += row + "\n"
-            if i != 0 and double_space:
-                table_str += "\n"
-            #if double_space:
-                #table_str += "\n"
-            if i == 0 and (header_style or header_column_styles) and border_style:
-                #print(f' {border_line}')
-                if target_text_box:
-                    table_str += f'{border_line}\n'
-                else:
-                    table_str += f' {border_line}\n'
-
-        if border_style:
-            #print(f' {border_line}')
-            if target_text_box:
-                table_str += f'{border_line}\n'
-            else:
-                table_str += f' {border_line}\n'
-
-        # Check if the table should be stored
-        if table_name and not ephemeral:
-            self.tables[table_name] = {
-                "data": table_data,
-                "generated_table": table_str  # or the final table output string
-                # additional metadata if needed
-            }
-
-        return table_str
 

@@ -57,7 +57,7 @@ def set_excepthook(
 
         # Check if the exception is a subclass of PrintsCharmingException
         if issubclass(exc_type, PrintsCharmingException):
-            exc_value.handle_exception()
+            exc_value.handle_exception(logger=logger, exc_type=exc_type, exc_value=exc_value, exc_info=exc_traceback)
         else:
             # Handle non-PrintsCharming exceptions
             general_exception = PrintsCharmingException(
@@ -69,7 +69,7 @@ def set_excepthook(
                 logger=logger,
                 exc_type=exc_type,
                 exc_value=exc_value,
-                exc_info=log_exc_info
+                exc_info=exc_traceback
             )
 
     # Store the original excepthook
@@ -116,4 +116,5 @@ def set_excepthook(
             sys.excepthook = custom_excepthook
     else:
         sys.excepthook = custom_excepthook
+
 

@@ -79,11 +79,11 @@ styled_strings2 = {
 
 class CustomError(PrintsCharmingException):
     """Custom error for specific use cases."""
-    def __init__(self, message: str, pc: 'PrintsCharming', additional_info: str):
-        super().__init__(message, pc)
+    def __init__(self, message: str, pc: 'PrintsCharming', additional_info: str, format_specific_exception: bool = True) -> None:
+        super().__init__(message, pc, format_specific_exception=format_specific_exception)
         self.additional_info = additional_info
 
-    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
+    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None, print_error=False):
         super().handle_exception()
         print(self.pc.apply_style('cyan', self.additional_info), file=sys.stderr)
 
@@ -99,6 +99,7 @@ class CustomError2(PrintsCharmingException):
         cls._pc_instance = pc
 
     def __init__(self, message: str = "Custom error occurred", additional_info: str = "Additional context info",
+                 format_specific_exception: bool = True,
                  pc_error: 'PrintsCharming' = None,
                  check_subclass_names: bool = False,
                  use_shared_pc: bool = False):
@@ -123,12 +124,12 @@ class CustomError2(PrintsCharmingException):
 
 
         # Call the superclass constructor with default and passed parameters
-        super().__init__(message=message, pc=self.pc, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
+        super().__init__(message=message, pc=self.pc, format_specific_exception=format_specific_exception, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
 
         # Store additional information for this custom error
         self.additional_info = additional_info
 
-    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
+    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None, print_error=False):
         """Handle the exception and print additional information."""
         # Call the base class method to handle the exception
         super().handle_exception()
@@ -149,6 +150,7 @@ class CustomError3(PrintsCharmingException):
         cls._pc_instance = pc
 
     def __init__(self, message: str = "CustomError3 occurred", additional_info: str = "Different context",
+                 format_specific_exception: bool = True,
                  pc_error: 'PrintsCharming' = None,
                  check_subclass_names: bool = False,
                  use_shared_pc: bool = False):
@@ -168,9 +170,9 @@ class CustomError3(PrintsCharmingException):
             self.pc = PrintsCharmingException.shared_pc_exception_instance  # Use shared instance
 
         self.additional_info = additional_info
-        super().__init__(message, pc=self.pc, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
+        super().__init__(message, pc=self.pc, format_specific_exception=format_specific_exception, check_subclass_names=check_subclass_names, use_shared_pc=use_shared_pc)
 
-    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None):
+    def handle_exception(self, logger=None, exc_type=None, exc_value=None, exc_info=None, print_error=False):
         """Handle the exception and print additional information."""
         super().handle_exception()
         print(self.pc.apply_style('green', self.additional_info), file=sys.stderr)
@@ -214,9 +216,11 @@ def time_total_execution(main_func):
 
 @time_step
 def example_menu():
+    # Remove '1' from word_map so that it isn't printed in yellow style
+    pc.remove_string('1')
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
-    menu = InteractiveMenu(menu_options, pc=quick_pc, selected_style='vcyan', confirmed_style='vgreen', alt_buffer=True)
+    menu = InteractiveMenu(menu_options, pc=pc, selected_style='vcyan', confirmed_style='vgreen', alt_buffer=True)
     menu.run()
 
 
@@ -569,6 +573,7 @@ def add_styled_substrings_to_instance(pc):
     pc.add_subword('ex', 'vred')
 
 
+
 @time_step
 def print1(pc):
     pc.print(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
@@ -684,6 +689,7 @@ def random_examples():
     add_styled_substrings_to_instance(pc)
 
     print1(pc)
+
     print2(pc)
 
     test1(pc)
@@ -1252,7 +1258,23 @@ def welcome():
 
     table_manager = TableManager(pc=pc)
 
-    colors_table_data = create_color_table_data(pc)
+    specific_headers_colors = {
+        'Color Name': lambda cell_str, aligned_cell, row, row_idx, col_idx, max_length: pc.apply_color(cell_str, aligned_cell),
+        'Foreground Text': lambda cell_str, aligned_cell, row, row_idx, col_idx, max_length: pc.apply_color(row[0], aligned_cell),
+        'Background Block': lambda cell_str, aligned_cell, row, row_idx, col_idx, max_length: pc.generate_bg_bar_strip(row[0], length=max_length),
+    }
+
+    @time_step
+    def create_color_table_data2(pc: PrintsCharming):
+        table_data = [list(specific_headers_colors)]
+        for color_name in pc.color_map:
+            fg_example = "Foreground Colored Text"
+            bg_example = pc.generate_bg_bar_strip(color_name, length=10)
+            table_data.append([color_name, fg_example, bg_example])
+        return table_data
+
+
+    colors_table_data = create_color_table_data2(pc)
     colors_table = table_manager.generate_table(
         table_data=colors_table_data,
         table_name="PrintsCharming Color Map",
@@ -1262,13 +1284,33 @@ def welcome():
         header_style="magenta",
         border_style="white",
         col_sep_style="white",
+        specific_headers=specific_headers_colors,
         target_text_box=True,
         double_space=True,
         ephemeral=True,
         append_newline=True,
     )
 
-    styles_table_data = create_style_table_data(pc)
+    specific_headers_styles = {
+        'Style Name': lambda cell_str, aligned_cell, row, row_idx, col_idx, max_length: pc.apply_style(cell_str, aligned_cell),
+        'Styled Text': lambda cell_str, aligned_cell, row, row_idx, col_idx, max_length: pc.apply_style(row[0], aligned_cell),
+        'Style Definition': lambda cell_str, aligned_cell, row, row_idx, col_idx, max_length: pc.apply_style('default', aligned_cell)
+    }
+
+    @time_step
+    def create_style_table_data2(pc: PrintsCharming):
+        table_data = [list(specific_headers_styles)]
+        for style_name, style_definition in pc.styles.items():
+            styled_text_example = "Styled Text Example"
+            # Filter the enabled attributes and format the definition
+            enabled_attribs = {k: v for k, v in vars(style_definition).items() if v not in (None, False)}
+            enabled_definition = f"PStyle({', '.join(f'{k}={repr(v)}' for k, v in enabled_attribs.items())})"
+            table_data.append([style_name, styled_text_example, enabled_definition])
+        return table_data
+
+
+
+    styles_table_data = create_style_table_data2(pc)
     styles_table = table_manager.generate_table(
         table_data=styles_table_data,
         table_name="PStyle Style Map",
@@ -1278,6 +1320,7 @@ def welcome():
         header_style="magenta",
         border_style="white",
         col_sep_style="white",
+        specific_headers=specific_headers_styles,
         target_text_box=True,
         double_space=True,
         ephemeral=True,
@@ -1286,11 +1329,21 @@ def welcome():
 
     (horiz_border_top,
      vert_border_left,
+     vert_border_inner,
+     vert_border_right,
+     horiz_border_bottom) = builder.build_styled_border_box2(style="dblue")
+
+
+
+    """
+    (horiz_border_top,
+     vert_border_left,
      vert_border_right,
      horiz_border_bottom) = builder.build_styled_border_box(horiz_border_top_style=style_conditions.function_styles.welcome('border2', 'top'),
                                                             vert_border_left_style=style_conditions.function_styles.welcome('border2', 'left'),
                                                             vert_border_right_style=style_conditions.function_styles.welcome('border2', 'right'),
                                                             horiz_border_bottom_style=style_conditions.function_styles.welcome('border2', 'bottom'))
+    """
 
     texts = []
     blank_line = 'invisible_text'
@@ -1853,7 +1906,7 @@ class NewClass:
 
 @time_step
 def play_around_with_logging():
-    logger = setup_logger(enable_exception_logging=True)
+    logger = setup_logger(enable_unhandled_exception_logging=True)
     pc = logger.pc
 
     print()
@@ -1878,7 +1931,7 @@ def play_around_with_logging():
     ###########################################################################################################
 
     # default_bg_color set to match jupyter notebook background in pycharm
-    logger2 = setup_logger(name='scratch', default_bg_color='jupyter', enable_exception_logging=True)
+    logger2 = setup_logger(name='scratch', default_bg_color='jupyter', enable_unhandled_exception_logging=True)
 
     init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.format_dict(logger2.pc.config)}"
     logger2.debug(init_message)
@@ -2173,8 +2226,6 @@ if __name__ == "__main__":
     mini_border = '!' * divide_term_width(6)
     styled_mini_border = pc.apply_color('orange', mini_border)
 
-    quick_pc = PrintsCharming()
-    quick_pc2 = PrintsCharming(styles=copy.deepcopy(DEFAULT_LOGGING_STYLES))
 
     # Change pc_instance
     #CustomError2.set_pc(pc)

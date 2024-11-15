@@ -230,6 +230,54 @@ class FrameBuilder:
         print()
 
 
+    def build_styled_border_box2(self, style=None, horiz_style=None, vert_style=None,
+                                vert_border_inner=True, vert_border_inner_style=None,
+                                horiz_border_top=True, horiz_border_top_style=None,
+                                horiz_border_bottom=True, horiz_border_bottom_style=None,
+                                vert_border_left=True, vert_border_left_style=None,
+                                vert_border_right=True, vert_border_right_style=None):
+
+        # Apply top border style
+        if horiz_border_top:
+            top_style = horiz_border_top_style or horiz_style or style
+            horiz_border_top = self.horiz_border if not top_style else self.pc.apply_style(top_style, self.horiz_border)
+        else:
+            horiz_border_top = None
+
+        # Apply bottom border style
+        if horiz_border_bottom:
+            bottom_style = horiz_border_bottom_style or horiz_style or style
+            horiz_border_bottom = self.horiz_border if not bottom_style else self.pc.apply_style(bottom_style, self.horiz_border)
+        else:
+            horiz_border_bottom = None
+
+        # Apply left border style
+        if vert_border_left:
+            left_style = vert_border_left_style or vert_style or style
+            vert_border_left = (self.vert_border + self.vert_padding if not left_style
+                                else self.pc.apply_style(left_style, self.vert_border) + self.vert_padding)
+        else:
+            vert_border_left = self.vert_padding
+
+        # Apply right border style
+        if vert_border_right:
+            right_style = vert_border_right_style or vert_style or style
+            vert_border_right = (self.vert_padding + self.vert_border if not right_style
+                                 else self.vert_padding + self.pc.apply_style(right_style, self.vert_border))
+        else:
+            vert_border_right = self.vert_padding
+
+        # Apply inner border style with padding on both sides
+        if vert_border_inner:
+            inner_style = vert_border_inner_style or vert_style or style
+            vert_border_inner = (self.vert_padding + self.vert_border + self.vert_padding if not inner_style
+                                 else self.vert_padding + self.pc.apply_style(inner_style, self.vert_border) + self.vert_padding)
+        else:
+            vert_border_inner = None
+
+        return horiz_border_top, vert_border_left, vert_border_inner, vert_border_right, horiz_border_bottom
+
+
     def build_styled_border_box(self, horiz_border_top=True, horiz_border_top_style=None,
                                 horiz_border_bottom=True, horiz_border_bottom_style=None,
                                 vert_border_left=True, vert_border_left_style=None,
