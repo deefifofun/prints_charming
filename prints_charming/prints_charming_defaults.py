@@ -71,7 +71,8 @@ DEFAULT_COLOR_MAP: Dict[str, str] = {
         "plat": "\033[38;5;252m",
         "white": "\033[38;5;15m",
         "vwhite": "\033[38;5;231m",
-        "jupyter": "\033[38;2;48;56;64m"
+        "jupyter": "\033[38;2;48;56;64m",
+        "charm": "\033[38;2;24;28;33m",
 }
 
 
@@ -313,6 +314,7 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "yellow"       : PStyle(color="yellow"),
         "vyellow"      : PStyle(color="vyellow"),
 
+
         "conceal": PStyle(conceal=True),
 
         "selected_style": PStyle(color='vcyan'),
@@ -373,6 +375,132 @@ DEFAULT_LEVEL_STYLES = {
 
 
 DEFAULT_UNICODE_MAP = {
+        # Animals
+        "baboon": "𓃷",
+        "barbel": "𓆜",
+        "bird_pecking_at_fish": "𓅻",
+        "bull": "𓃒",
+        "bull_charging": "𓃓",
+        "buzzard": "𓅂",
+        "calf": "𓃔",
+        "cat": "𓃠",
+        "catfish": "𓆢",
+        "cattle_egret": "𓅥",
+        "centipede": "𓆨",
+        "charging_ox_head": "𓄀",
+        "claw": "𓆆",
+        "cobra": "𓆓",
+        "cobra_with_feather": "𓆔",
+        "cormorant": "𓅧",
+        "cow_suckling_calf": "𓃖",
+        "crocodile": "𓆊",
+        "crocodile_with_curved_tail": "𓆌",
+        "dog": "𓃡",
+        "donkey": "𓃘",
+        "duckling": "𓅷",
+        "dung_beetle": "𓆣",
+        "egg": "𓆇",
+        "elephant": "𓃰",
+        "elephant_snout_fish": "𓆞",
+        "erect_cobra": "𓆗",
+        "erect_cobra_on_basket": "𓆘",
+        "falcon": "𓅃",
+        "falcon_in_boat": "𓅇",
+        "falcon_on_basket": "𓅅",
+        "falcon_on_collar_of_beads": "𓅉",
+        "falcon_on_standard": "𓅆",
+        "falcon_with_sun_on_head": "𓅊",
+        "falcon_in_Sokar_barque": "𓅋",
+        "fish_scale": "𓆠",
+        "flamingo": "𓅟",
+        "fly": "𓆦",
+        "forepart_of_hartebeest": "𓄄",
+        "forepart_of_lion": "𓄂",
+        "forepart_of_ram": "𓄆",
+        "frog": "𓆏",
+        "gazelle": "𓃴",
+        "gecko": "𓆈",
+        "glossy_ibis": "𓅠",
+        "goat_with_collar": "𓃶",
+        "goose_picking_up_grain": "𓅼",
+        "guinea_fowl": "𓅘",
+        "hare": "𓃹",
+        "hartebeest_head": "𓄃",
+        "head_of_crested_bird": "𓆀",
+        "head_of_pintail": "𓅿",
+        "head_of_ram": "𓄅",
+        "head_of_spoonbill": "𓆁",
+        "head_of_vulture": "𓆂",
+        "heron": "𓅣",
+        "heron_on_perch": "𓅤",
+        "hippo": "𓃯",
+        "hippo_head": "𓄁",
+        "hoopoe": "𓅙",
+        "horse": "𓃗",
+        "horned_viper": "𓆑",
+        "horned_viper_crawling_out_of_enclosure": "𓆒",
+        "human_headed_bird_with_bowl_with_smoke": "𓅽",
+        "ibex": "𓃵",
+        "image_of_crocodile": "𓆍",
+        "image_of_falcon": "𓅌",
+        "image_of_falcon_on_standard": "𓅍",
+        "image_of_falcon_with_two_plumes": "𓅏",
+        "jackal": "𓃥",
+        "jackal_looking_back": "𓃦",
+        "kid": "𓃙",
+        "kid_jumping": "𓃚",
+        "lapwing": "𓅚",
+        "lapwing_with_twisted_wings": "𓅛",
+        "leopard_head": "𓄇",
+        "lion": "𓃬",
+        "locust": "𓆧",
+        "long_horned_bull": "𓃽",
+        "lying_canine": "𓃢",
+        "lying_lion": "𓃭",
+        "lying_Set_animal": "𓃫",
+        "mature_bovine_lying_down": "𓃜",
+        "monkey": "𓃸",
+        "mullet": "𓆝",
+        "newborn_hartebeest": "𓃛",
+        "northern_bald_ibis": "𓅜",
+        "oryx": "𓃲",
+        "ostrich": "𓅦",
+        "owl": "𓅓",
+        "panther": "𓃮",
+        "Petrocephalus_bane": "𓆟",
+        "pintail": "𓅭",
+        "pintail_alighting": "𓅯",
+        "pintail_flying": "𓅮",
+        "plucked_bird": "𓅾",
+        "quail_chick": "𓅱",
+        "ram": "𓃝",
+        "sacred_cow": "𓃕",
+        "sacred_Ibis": "𓅞",
+        "sacred_Ibis_on_standard": "𓅝",
+        "saddle_billed_stork": "𓅡",
+        "Set_animal": "𓃩",
+        "snake": "𓆙",
+        "sparrow": "𓅪",
+        "sparrow_low": "𓅫",
+        "swallow": "𓅨",
+        "swallow_low": "𓅩",
+        "tadpole": "𓆐",
+        "three_ducklings_in_nest": "𓅸",
+        "three_ducklings_in_pool": "𓅹",
+        "three_saddle_billed_storks": "𓅢",
+        "tilapia": "𓆛",
+        "turtle": "𓆉",
+        "two_cobras": "𓆕",
+        "two_Egyptian_vultures": "𓅀",
+        "two_owls": "𓅔",
+        "two_plovers": "𓅺",
+        "two_quail_chicks": "𓅳",
+        "vulture": "𓅐",
+        "vulture_and_cobra_each_on_a_basket": "𓅒",
+        "white_fronted_goose": "𓅬",
+        "widgeon": "𓅰",
+        "wing": "𓆃",
+
         # Arrows
         "arrow_up": "⭡",
         "arrow_down": "⭣",
@@ -751,6 +879,87 @@ DEFAULT_CONTROL_MAP: Dict[str, str] = {
 
         # Meta Key (Alt or Esc)
         "meta": "\x1b",               # Meta key (typically Alt or Esc)
+}
+
+
+DEFAULT_BYTE_PARSING_MAP = {
+    # Mouse Event Parsing
+    "mouse_event_start": b"<",                 # Start of mouse event
+    "mouse_event_end_press": b"M",             # End of mouse press event
+    "mouse_event_end_release": b"m",           # End of mouse release event
+    "mouse_drag_start": b"\x1b[<32;",          # Dragging mouse event start
+    "mouse_drag_end": b"\x1b[<35;",            # Dragging mouse event end
+    "mouse_scroll_up": b"\x1b[<64;",           # Mouse scroll up
+    "mouse_scroll_down": b"\x1b[<65;",         # Mouse scroll down
+
+    # Escape and Meta Keys
+    "escape_key": b"\x1b",                     # Escape key
+    "meta": b"\x1b",                           # Meta key (Alt or Esc)
+
+    # Bracketed Paste Mode
+    "paste_start": b"\x1b[200~",               # Start of pasted text
+    "paste_end": b"\x1b[201~",                 # End of pasted text
+
+    # Keyboard Events
+    "alt_key_prefix": b"\x1b",                 # Alt key prefix (used for combinations)
+    "ctrl_space": b"\x00",                     # Ctrl + Space
+    "ctrl_enter": b"\n",                       # Ctrl + Enter (newline)
+    "ctrl_tab": b"\t",                         # Ctrl + Tab
+    "shift_tab": b"\x1b[Z",                    # Shift + Tab
+    "fn_key_prefix": b"\x1bO",                 # Function key prefix (varies by terminal)
+    "ctrl_escape": b"\x1b\x1b",                # Ctrl + Esc (double escape)
+    "ctrl_backspace": b"\x1b\x7f",             # Ctrl + Backspace
+
+    # CSI Sequences (Control Sequence Introducer)
+    "cursor_position_report_start": b"\x1b[6n", # Start of cursor position report
+    "window_resize_report": b"\x1b[8;",         # Resize report
+    "focus_in": b"\x1b[I",                      # Focus in event
+    "focus_out": b"\x1b[O",                     # Focus out event
+    "application_mode_start": b"\x1b[=",        # Application keypad mode input
+    "normal_mode_start": b"\x1b[>",             # Normal keypad mode input
+
+    # Terminal Reporting
+    "terminal_ready_report": b"\x1b[>0;0;0c",  # Terminal ready (DA report)
+    "device_status_report": b"\x1b[5n",        # Device status report (is terminal ready)
+    "cursor_save": b"\x1b[s",                  # Save cursor position (parse this as input acknowledgment)
+    "cursor_restore": b"\x1b[u",               # Restore cursor position (input acknowledgment)
+    "bell_detected": b"\x07",                  # Bell detected in input stream
+
+    # XTerm-Specific Events
+    "window_focus_in": b"\x1b[I",              # Window focus in
+    "window_focus_out": b"\x1b[O",             # Window focus out
+    "title_set": b"\x1b]2;",                   # Title set (partial, often seen during pasting)
+    "title_end": b"\x07",                      # End of title set event
+    "hyperlink_start": b"\x1b]8;;",            # Hyperlink detection start
+    "hyperlink_end": b"\x1b]8;;\a",            # Hyperlink detection end
+
+    # Private Mode Changes
+    "mouse_reporting_enabled": b"\x1b[?1000h",  # Mouse reporting enabled acknowledgment
+    "mouse_reporting_disabled": b"\x1b[?1000l",  # Mouse reporting disabled acknowledgment
+    "sgr_mouse_reporting_enabled": b"\x1b[?1006h",  # SGR mouse reporting enabled acknowledgment
+    "sgr_mouse_reporting_disabled": b"\x1b[?1006l",  # SGR mouse reporting disabled acknowledgment
+
+    # Application Keypad Parsing
+    "app_keypad_start": b"\x1b=",              # Application keypad start
+    "app_keypad_end": b"\x1b>",                # Application keypad end
+    "app_cursor_keys_enabled": b"\x1b[?1h",    # Application cursor keys enabled
+    "app_cursor_keys_disabled": b"\x1b[?1l",   # Application cursor keys disabled
+
+    # ANSI Special Characters
+    "null_char": b"\x00",                      # Null character
+    "start_of_header": b"\x01",                # Start of header
+    "start_of_text": b"\x02",                  # Start of text
+    "end_of_text": b"\x03",                    # End of text
+    "end_of_transmission": b"\x04",            # End of transmission
+    "cancel": b"\x18",                         # Cancel (Ctrl + X)
+    "escape_seq_start": b"\x1b[",              # Start of escape sequence (general)
+
+    # Miscellaneous Input Parsing
+    "unknown_event_start": b"\x1b[?",          # Start of unknown private mode toggle
+    "invalid_escape_sequence": b"\x1b[999",    # Invalid or incomplete escape sequence
+    "newline_detected": b"\n",                 # Newline detected
+    "carriage_return_detected": b"\r",         # Carriage return detected
+    "control_char_ignored": b"\x1f",           # Common ignored control character in parsing streams
 }
 
 

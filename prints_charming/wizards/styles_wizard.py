@@ -23,13 +23,6 @@ from prints_charming import (
 
 
 
-
-
-
-
-
-
-
 class StylesEditor:
     def __init__(self, menu_instance, styles_file='styles.json'):
         self.menu = menu_instance

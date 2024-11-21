@@ -298,7 +298,8 @@ class StyleConditionsManager:
             "age": self.age_style,
             "balance": self.balance_style,
             "occupation": self.occupation_style,
-            "welcome": self.welcome_style
+            "welcome": self.welcome_style,
+            "real": self.real_style,
         }
 
     def name_style(self, value: str) -> str:
@@ -326,6 +327,9 @@ class StyleConditionsManager:
 
     def occupation_style(self, value: str) -> str:
         return "orange"
+
+    def real_style(self, value: str) -> str:
+        return "red" if value == 'False' else "green"
 
     def welcome_style(self, position: str) -> str:
         return "purple" if position in ['top', 'right'] else "orange"
@@ -506,9 +510,10 @@ def kwargs_replace_and_style_placeholders_examples():
         "age": 20,
         "balance": 5,
         "occupation": "Software Developer",
+        "real:": 'True',
     }
 
-    my_text = "Hello, {name}. You are {age} years old, your occupation is {occupation}, and you have {balance} USD in your account."
+    my_text = "Hello, {name}. You are {age} years old, your occupation is {occupation}, and you have {balance} USD in your account and you are real: {real}."
     pc.print(my_text, **my_placeholders)  # print my_text directly thru the PrintCharming print method
 
     colored_text = pc.replace_and_style_placeholders(text=my_text, placeholders=my_placeholders)  # return the styled text from the method
@@ -519,6 +524,7 @@ def kwargs_replace_and_style_placeholders_examples():
                 Age: {age}
                 Balance: {balance}
                 Occupation: {occupation}
+                Real: {real}
 
                 Skills:
                 - Python
@@ -625,34 +631,13 @@ def print2(pc):
     pc.print2(' ' * term_width, color="default", bg_color="purple", bold=True, overline=True, underline=True, end='\n\n')
 
 
-@time_step
-def test1(pc):
-    # Basic printing with ColorPrinter using default style and color
-    pc.print("Hello, world!")
-
-
-@time_step
-def test2(pc):
-    # Basic printing with ColorPrinter using default style and color
-    pc.print2("Hello, world!")
-
-
-
-@time_step
-def test1_reversed(pc):
-    # Print with default style reversed foreground and background colors
-    pc.print("Hello, world!", reverse=True)
-
-
-
-@time_step
-def test2_reversed(pc):
-    # Print with default style reversed foreground and background colors
-    pc.print2("Hello, world!", reverse=True)
-
 
 @time_step
 def test_my_style_code(pc):
+    print(styled_mini_border)
+    pc.print(f'function: test_my_style_code:')
+    print(f'{styled_mini_border}\n')
+
     my_style_code = pc.create_style_code(PStyle(color='green', bg_color='white', underline=True))
 
     my_style_code2 = pc.create_style_code(dict(color='orange', bg_color='white'))
@@ -686,18 +671,17 @@ def random_examples():
 
     pc = PrintsCharming(styled_strings=styled_strings)
 
+    print(styled_mini_border)
+    pc.print(f'function: random_examples:')
+    print(f'{styled_mini_border}\n')
+
+
+
     add_styled_substrings_to_instance(pc)
 
     print1(pc)
 
     print2(pc)
-
-    test1(pc)
-    test2(pc)
-
-    test1_reversed(pc)
-    test2_reversed(pc)
-
 
     test_my_style_code(pc)
 
@@ -727,50 +711,39 @@ def random_examples():
 
     # Print specifying only the color of the text
     pc.print("Hello, world!", color="red" if some_var < 21 else "green")
-    pc.print2("Hello, world!", color="red" if some_var < 21 else "green")
-
 
     # Print specifying italic and underline styles with default color
     pc.print("Hello, world!", italic=True, underline=True)
-    pc.print2("Hello, world!", italic=True, underline=True)
 
     # Print using a predefined style 'magenta' defined above
     pc.print("Hello, world!", style="magenta")
-    pc.print2("Hello, world!", style="magenta")
 
     # Print using a predefined style 'task' defined above
     pc.print("# Specify predefined style 'task' for printing. The 'task' style is defined above.")
     pc.print("This is a task.", style="task")
-    pc.print2("This is a task.", style="task")
 
     # Print using a predefined style 'task' with color changed to green and underline
     pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
     pc.print("This is a task.\n\n", style="task", color="green", underline=True)
-    pc.print2("This is a task.\n\n", style="task", color="green", underline=True)
 
 
 @time_step
 def print_horizontal_bg_strip(pc):
     print(styled_mini_border)
-    print(f'function: print_horizontal_bg_strip:')
+    pc.print(f'function: print_horizontal_bg_strip:')
     print(f'{styled_mini_border}\n')
 
-    pc.print_bg_bar_strip('green', 50)
-    pc.print_bg_bar_strip('vyellow')
 
-    pc.print(f'These will purposely cause an error that is styled\n\n', color='vgreen')
+    print(pc.generate_bg_bar_strip('green', 50))
+    print(pc.generate_bg_bar_strip('vyellow'))
 
-    # Will raise and Except COLORNOTFOUNDERROR
-    pc.print_bg_bar_strip('tree_color')
 
-    # Will raise and Except INVALIDLENGTHERROR
-    pc.print_bg_bar_strip('green', -10)
 
 
 @time_step
 def print_variable_examples(pc):
     print(styled_mini_border)
-    print(f'function: print_variable_examples:')
+    pc.print(f'function: print_variable_examples:')
     print(f'{styled_mini_border}\n')
 
     pc.print_variables("Hello {username}, your balance is {balance} USD.", text_style="yellow",
@@ -785,7 +758,7 @@ def print_variable_examples(pc):
 @time_step
 def auto_styling_examples(pc, text):
     print(f'\n\n{styled_mini_border}')
-    print(f'function: auto_styling_examples:')
+    pc.print(f'function: auto_styling_examples:')
     print(f'{styled_mini_border}\n')
 
     pc.add_strings_from_dict(styled_strings)
@@ -793,33 +766,22 @@ def auto_styling_examples(pc, text):
     pc.print("Let's first print, Hello, world! styled as described above and right here.", style="yellow")
     pc.print(f"{text} Remember we assigned, 'Hello, world!' to the 'text' variable above. Let's pretend we are Connected to wss://advanced-trade-ws.coinbase.com", color="blue")
     pc.print("These words are going to be styled by their indexes, Hello, world!", style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 10): "purple", (11, 12): "pink"})
-    pc.print2("These words are going to be styled by their indexes, Hello, world!", style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 10): "purple", (11, 12): "pink"})
     pc.print("Hello, world! These words are going to be styled by their indexes, Hello, world!",
-             style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 11): "purple", (13, 14): "pink"}, color='red')
-    pc.print2("Hello, world! These words are going to be styled by their indexes, Hello, world!",
              style={1: "vgreen", (2, 4): "blue", (5, 7): "yellow", (8, 11): "purple", (13, 14): "pink"}, color='red')
     pc.print("Hello, world! Only these words are going to be styled by their indexes, Hello, world!",
              style={(3, 4): "orange", (5, 7): "blue", (8, 9): "yellow", (10, 13): "purple", (14, 15): "pink"})
-    pc.print2("Hello, world! Only these words are going to be styled by their indexes, Hello, world!",
-             style={(3, 4): "orange", (5, 7): "blue", (8, 9): "yellow", (10, 13): "purple", (14, 15): "pink"})
     pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple! these words are default. server")
-    pc.print2("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple! these words are default. server")
     pc.print("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple these words are magenta. server",
              style='magenta')
-    pc.print2("Let's try, New Message! Let's try, True and 1 and | and Failed! File modified: is this an Error Monitor My color is purple these words are magenta. server",
-             style='magenta')
     pc.print("Hello", "how are you?", sep="---", color='green')
-    pc.print2("Hello", "how are you?", sep="---", color='green')
     pc.print("This string is not connected to another", color='blue')
-    pc.print2("This string is not connected to another", color='blue')
     pc.print("This string is connected to another", "string\n", color='vyellow')
-    pc.print2("This string is connected to another", "string\n", color='vyellow')
 
 
 @time_step
 def style_words_by_index_examples(local_pc):
     print(styled_mini_border)
-    print(f'function: style_words_by_index_examples:')
+    pc.print(f'function: style_words_by_index_examples:')
     print(f'{styled_mini_border}\n')
     indexed_style = {
         1: "vgreen",
@@ -828,12 +790,27 @@ def style_words_by_index_examples(local_pc):
         7: "purple",
         (8, 10): "pink"
     }
-    local_pc.print("These,    words are going to be    styled by their indexes. ", style=indexed_style)
-    local_pc.print2("These,    words are going to be    styled by their indexes. \n", style=indexed_style)
+
+    text1 = "These,    words are going to be    styled by their indexes."
+
+    index_styled_text = local_pc.style_words_by_index(text1, indexed_style)
+    print(f'{index_styled_text}\n')  # 1
+    local_pc.print(f'Orange text here, {index_styled_text}, more orange text.', color='orange', skip_ansi_check=True)  # 2
+    local_pc.print2(f'Orange text here, {index_styled_text}, more orange text.', color='orange', skip_ansi_check=True)  # 3
+    print()
+
+    local_pc.print2(f'Orange text here', {index_styled_text}, f'more orange text', 'gold text here!', color=['orange', None, 'orange', 'gold'], skip_ansi_check=True, style_args_as_one=False)  # 4
+
+
+    local_pc.print("These,    words are going to be    styled by their indexes. ", style=indexed_style)  # 5
+    local_pc.print("These,    words are going to be    styled by their indexes. ", style=indexed_style, color="blue", skip_ansi_check=True)  # 6
 
 
     index_styled_text2 = local_pc.style_words_by_index("These,    words are going to be    styled by their indexes. ", indexed_style)
-    print(f'{index_styled_text2}\n\n')
+    print(f'{index_styled_text2}\n\n')  # 7
+
+    local_pc.print(f'{index_styled_text2}\n\n')  # 8
+    local_pc.print("These,    words are going to be    styled by their indexes. ", style=indexed_style)  # 9
 
     indexed_style2 = {
         (2, 4): "blue",
@@ -842,18 +819,21 @@ def style_words_by_index_examples(local_pc):
         (8, 9): "pink"
     }
 
-    local_pc.print("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')
-    local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')
+    local_pc.print("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')  # 10
+    local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')  # 11
 
-    #index_styled_text3 = local_pc.style_words_by_index("These,    words are going to be    styled by their indexes.  ", indexed_style2)
-    #local_pc.print(f'{index_styled_text3}\n\n', skip_ansi_check=True, color='green')
+    index_styled_text3 = local_pc.style_words_by_index("These,    words are going to be    styled by their indexes.  ", indexed_style2)
+    print(f'{index_styled_text3}\n\n')  # 12
+    local_pc.print(f'{index_styled_text3} not these though\n\nor these', skip_ansi_check=True, color='green')  # 13
 
 
 @time_step
-def segment_and_style_example_1(local_pc, text):
+def segment_and_style_example_1(local_pc):
     print(styled_mini_border)
-    print(f'function: segment_and_style_example_1:')
+    pc.print(f'function: segment_and_style_example_1:')
     print(f'{styled_mini_border}\n')
+
+    text = f'This is a sentence where the way we determine 1 how and 2 where the text gets styled depends on: where the word: that is the dictionary key falls within this text.'
 
     splits = dict(green='sentence', red='2', orange='gets', blue='word:', yellow='')
     #styled_sentence = local_pc.segment_and_style(text, splits)
@@ -862,37 +842,43 @@ def segment_and_style_example_1(local_pc, text):
     local_pc.print(f'{text}\n\n', style=splits)
     local_pc.print2(f'{text}\n\n', style=splits)
 
-    #styled_sentence2 = local_pc.segment_and_style_update(text, splits)
-    #print(f'{styled_sentence2}\n')
+    styled_sentence2 = local_pc.segment_and_style_update(text, splits)
+    print(f'{styled_sentence2}\n')
 
 
 @time_step
-def segment_and_style_example_2(local_pc, text):
+def segment_and_style_example_2(local_pc):
     print(styled_mini_border)
-    print(f'function: segment_and_style_example_2:')
+    pc.print(f'function: segment_and_style_example_2:')
     print(f'{styled_mini_border}\n')
 
-    #splits2 = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
-    #styled_sentence2 = local_pc.segment_and_style2(text, splits2)
-    #print(f'{styled_sentence2}\n\n')
+    text = f'This is a sentence where the way we determine 1 how and 2 where the text gets styled depends on: where the word: that is the dictionary key falls within this text.'
+
+    splits = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
+
+    local_pc.print(f'{text}\n\n', style=splits)
+    local_pc.print2(f'{text}\n\n', style=splits)
+
+    styled_sentence2 = local_pc.segment_and_style2(text, splits)
+    print(f'{styled_sentence2}\n\n')
 
 
 @time_step
 def segment_and_style_examples(local_pc):
     print(styled_mini_border)
-    print(f'function: segment_and_style_examples:')
+    pc.print(f'function: segment_and_style_examples:')
     print(f'{styled_mini_border}\n')
 
     text = f'This is a sentence where the way we determine 1 how and 2 where the text gets styled depends on: where the word: that is the dictionary key falls within this text.'
 
-    segment_and_style_example_1(local_pc, text)
-    segment_and_style_example_2(local_pc, text)
+    segment_and_style_example_1(local_pc)
+    segment_and_style_example_2(local_pc)
 
 
 @time_step
 def segment_with_splitter_example(local_pc):
     print(styled_mini_border)
-    print(f'function: segment_with_splitter_example:')
+    pc.print(f'function: segment_with_splitter_example:')
     print(f'{styled_mini_border}\n')
 
     splitter_text = f' | This is a sentence | where the way we determine 1 how and 2 | where the text gets | styled depends on: where the word: | that is the dictionary key falls within this text. |'
@@ -912,7 +898,7 @@ def segment_with_splitter_example(local_pc):
 @time_step
 def index_styling_examples(default_bg='jupyter'):
     print(styled_mini_border)
-    print(f'function: index_styling_examples:')
+    pc.print(f'function: index_styling_examples:')
     print(f'{styled_mini_border}\n')
 
     local_pc = PrintsCharming(default_bg_color=default_bg)
@@ -925,7 +911,7 @@ def index_styling_examples(default_bg='jupyter'):
 @time_step
 def variable_examples(pc):
     print(styled_mini_border)
-    print(f'function: variable_examples:')
+    pc.print(f'function: variable_examples:')
     print(f'{styled_mini_border}\n')
 
     pc.print("# Use the add_string method to add 'Hello, world!' to the phrases dictionary with 'vgreen' style.")

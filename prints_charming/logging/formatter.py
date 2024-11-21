@@ -59,7 +59,7 @@ class PrintsCharmingFormatter(logging.Formatter):
             internal_logging (bool): Whether internal logging is enabled.
         """
         super().__init__(datefmt=datefmt, style=style)
-        self.pc = pc or PrintsCharming(styles=copy.deepcopy(DEFAULT_LOGGING_STYLES))
+        self.pc = pc or PrintsCharming(styles=copy.deepcopy(DEFAULT_STYLES))
 
         if internal_logging:
             self.apply_style = self.pc._apply_style_internal
@@ -70,6 +70,15 @@ class PrintsCharmingFormatter(logging.Formatter):
         self.reset = self.pc.reset
         self.hostname = gethostname()
         self.timestamp_style = timestamp_style_name
+        if self.pc.default_bg_color:
+            self.space = self.apply_style('default', ' ', fill_bg_only=False)
+            self.padded_dash = self.apply_style('default', ' - ')
+            self.colon = self.apply_style('default', ':')
+        else:
+            self.space = ' '
+            self.padded_dash = ' - '
+            self.colon = ':'
+
         self.level_styles = level_styles or self.default_level_styles
         self.use_styles = use_styles
         self.args_style_name = args_style_name
@@ -181,9 +190,13 @@ class PrintsCharmingFormatter(logging.Formatter):
         Returns:
             str: Final formatted log message.
         """
-        styled_timestamp = self.apply_style(self.get_timestamp_style(record), timestamp) + f"{int(record.msecs):04.0f}"
+        #styled_timestamp = self.apply_style(self.get_timestamp_style(record), timestamp) + f"{int(record.msecs):04.0f}"
+        styled_timestamp_part = self.apply_style(self.get_timestamp_style(record), timestamp)
+        styled_msecs = self.apply_style('default', f"{int(record.msecs):04.0f}")
+        styled_timestamp = styled_timestamp_part + styled_msecs
         styled_log_level_prefix = log_level_label
-        return f"{styled_timestamp} {styled_log_level_prefix} {record.msg}"
+
+        return f"{styled_timestamp}{self.space}{styled_log_level_prefix}{self.space}{record.msg}"
 
 
     def get_timestamp_style(self, record: logging.LogRecord) -> str:
@@ -243,8 +256,8 @@ class PrintsCharmingFormatter(logging.Formatter):
             record.args = ()  # Clear args to prevent further formatting
         record.msg = f"{log_level_style_code}{record.msg}{self.reset}"
         record.msg = (
-            f"{record.hostname} - {record.filename} {record.name} "
-            f"{record.funcName}:{record.lineno} - {record.msg}"
+            f"{record.hostname}{self.padded_dash}{record.filename}{self.space}{record.name}{self.space}"
+            f"{record.funcName}{self.colon}{record.lineno}{self.padded_dash}{record.msg}"
         )
 
 

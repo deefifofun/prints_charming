@@ -8,7 +8,8 @@ from .prints_charming_defaults import (
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
     DEFAULT_LEVEL_STYLES,
-    DEFAULT_CONTROL_MAP
+    DEFAULT_CONTROL_MAP,
+    DEFAULT_BYTE_PARSING_MAP,
 )
 
 from .utils import (

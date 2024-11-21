@@ -284,8 +284,9 @@ class SnakeGame:
 
 if __name__ == "__main__":
     pc = PrintsCharming(styles=snake_styles)
+    snake_head = pc.unicode_map.get('medium_block', ' ')
     pattern = ['snake_seg1', 'snake_seg2', 'snake_seg3', 'snake_seg4', 'snake_seg5', 'snake_seg6', 'snake_seg7']
-    game = SnakeGame(prints_charming_instance=pc, snake_head=pc.unicode_map.get('medium_block', ' '), body_pattern=pattern, reverse_pattern=True)
+    game = SnakeGame(prints_charming_instance=pc, snake_head=snake_head, body_pattern=pattern, reverse_pattern=True)
     try:
         asyncio.run(game.run())
     except KeyboardInterrupt:

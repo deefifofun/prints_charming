@@ -1,9 +1,21 @@
+import inspect
+import logging
 from prints_charming import (
     PStyle,
     PrintsCharming,
 )
 
 from prints_charming.logging import setup_logger
+
+
+
+def get_pretty_caller_function_name():
+    # Get the current frame, then the caller's frame
+    stack = inspect.stack()
+    if len(stack) > 2:  # Ensure there is a caller
+        caller_frame = stack[1]
+        return f"=== {caller_frame.function} ===\n"
+    return None
 
 
 
@@ -101,7 +113,11 @@ def prestyle_parts_of_log_messages(logger):
 
 
 
-def default_log_messages(logger):
+def default_log_messages(logger, print_func_name=True):
+    if print_func_name:
+        logger.pc.add_string('===', 'vcyan')
+        logger.pc.print(get_pretty_caller_function_name(), color='orange', italic=True)
+
     logger.debug("This is a plain 'debug' message.")
     logger.info("This is a plain 'info' message.")
     logger.warning("This is a plain 'warning' message.")
@@ -109,12 +125,11 @@ def default_log_messages(logger):
     logger.critical("This is a plain 'critical' message.\n\n")
 
 
-
-
-
 def create_logger_with_specific_pc_instance():
     # Create specific PrintsCharming instance.
-    pc = PrintsCharming(default_bg_color='jupyter')
+    # use default_bg_color of the environment your printing to if not in a terminal session.
+    # For instance pycharm jupyter notebook
+    pc = PrintsCharming(default_bg_color='dgray')
 
     # Pass PrintsCharming instance 'pc' and give the logger a name
     logger = setup_logger(pc=pc, name='my_logger')

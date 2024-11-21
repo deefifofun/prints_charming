@@ -2,6 +2,7 @@
 
 import sys
 import os
+import shutil
 import textwrap
 import re
 from datetime import datetime
@@ -93,12 +94,30 @@ class Formatter:
         self.styles = {}
         self.buffer = []  # Store formatted strings for later writing
         self.terminal_width = self.get_terminal_width()
+        #self.terminal_width = shutil.get_terminal_size().columns
 
 
     @staticmethod
     def get_terminal_width():
-        terminal_size = os.get_terminal_size()
-        return terminal_size.columns
+        try:
+            # First, try using os.get_terminal_size()
+            return os.get_terminal_size().columns
+        except OSError:
+            try:
+                # Fallback to shutil.get_terminal_size()
+                return shutil.get_terminal_size().columns
+            except OSError:
+                # Ultimate fallback: Estimate width manually
+                width = 0
+                print("x" * 80, end="", flush=True)
+                while True:
+                    try:
+                        sys.stdout.write("\r")
+                        width += 1
+                    except Exception:
+                        break
+                sys.stdout.write("\n")
+                return width - 1  # Subtract 1 for overflow
 
     # Setter methods from DynamicFormatter
     def set_width(self, width):

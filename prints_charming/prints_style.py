@@ -50,3 +50,38 @@ class PStyle:
                 attribs[key] = type(value).__name__
 
         return attribs
+
+
+    def toggle_reverse(self) -> 'PStyle':
+        """
+        Creates a new PStyle instance with all attributes the same as the current instance,
+        except the `reverse` attribute is toggled.
+
+        Returns:
+            PStyle: A new instance with the toggled `reverse` attribute.
+        """
+        # Create a dictionary of the current attributes
+        current_attributes = {field.name: getattr(self, field.name) for field in fields(self)}
+        # Toggle the `reverse` attribute
+        current_attributes['reverse'] = not self.reverse
+        # Return a new instance with the modified attributes
+        return PStyle(**current_attributes)
+
+
+    @classmethod
+    def toggle_reverse_batched(cls, styles: dict[str, 'PStyle'], suffix: str = 'reversed') -> dict[str, 'PStyle']:
+        """
+        Creates a dictionary of new PStyle instances with all attributes the same
+        as the provided styles, except the `reverse` attribute is toggled.
+
+        Args:
+            styles (dict[str, PStyle]): A dictionary where keys are style names and
+                values are PStyle instances.
+            suffix (str): The string to append to each original key in the returned dictionary.
+
+        Returns:
+            dict[str, PStyle]: A dictionary with updated keys (name_suffix) and
+            toggled PStyle instances as values.
+        """
+        return {f"{name}_{suffix}": style.toggle_reverse() for name, style in styles.items()}
+

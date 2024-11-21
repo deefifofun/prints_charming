@@ -196,7 +196,7 @@ class InteractiveMenu:
 
     def run(self):
         if self.alt_buffer:
-            self.write('alt_buffer', 'cursor_home')
+            self.write('alt_buffer', 'cursor_home', 'hide_cursor')
 
         if self.current_menu is None:
             print("No menu is currently active.")
@@ -232,7 +232,7 @@ class InteractiveMenu:
                 break
 
         if self.alt_buffer:
-            self.write('normal_buffer')
+            self.write('normal_buffer', 'show_cursor')
 
         self.pc.print(f'confirmed_option: {confirmed_option}', style={1: self.confirmed_style, (2, 3): self.selected_style})
 

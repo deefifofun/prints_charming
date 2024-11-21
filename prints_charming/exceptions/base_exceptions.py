@@ -149,7 +149,7 @@ class PrintsCharmingException(Exception):
 
             if line.startswith("Traceback"):
                 styled_line = self.apply_style('header', line)
-                styled_lines.extend([' ', styled_line, ' '])
+                styled_lines.extend([styled_line, ' '])
 
             elif line.strip().startswith("File"):
                 match = self.file_line_regex.search(line)
@@ -248,6 +248,7 @@ class PrintsCharmingException(Exception):
                          exc_value: Optional[BaseException] = None,
                          exc_info: Optional[Any] = None,
                          print_error: bool = False,
+                         full_traceback: bool = True,
                          ) -> None:
         """
         Handle the exception by printing or logging the styled traceback.
@@ -258,21 +259,19 @@ class PrintsCharmingException(Exception):
             exc_value (Optional[BaseException]): Exception value.
             exc_info (Optional[Any]): Exception info.
             print_error (Optional[bool]): Print unstyled error message first.
+            full_traceback (bool): Current active exception if True else specific.
         """
         if print_error:
             self.print_error()
 
 
         if self.format_specific_exception:
-            # Current active exception traceback (more detailed)
-            full_traceback = traceback.format_exc()
-
-            # Specific styled traceback from this instance
-            instance_traceback = ''.join(traceback.format_exception(None, self, self.__traceback__))
-
-            # Combine both tracebacks with a separator for clarity
-            #tb = f"{full_traceback}\n{instance_traceback}"
-            tb = full_traceback
+            if full_traceback:
+                # Current active exception traceback (more detailed)
+                tb = traceback.format_exc()
+            else:
+                # Specific styled traceback from this instance
+                tb = ''.join(traceback.format_exception(None, self, self.__traceback__))
         else:
             tb = ''.join(traceback.format_exception(exc_type, exc_value, exc_info))
             #tb = traceback.format_exc()

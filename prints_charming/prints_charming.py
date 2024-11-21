@@ -3,8 +3,10 @@
 import time
 import os
 import sys
+import termios
+import tty
+import select
 import copy
-import traceback
 import re
 import logging
 import inspect
@@ -27,7 +29,8 @@ from .prints_charming_defaults import (
     DEFAULT_UNICODE_MAP,
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
-    DEFAULT_CONTROL_MAP
+    DEFAULT_CONTROL_MAP,
+    DEFAULT_BYTE_PARSING_MAP,
 )
 
 from .prints_style import PStyle
@@ -100,8 +103,22 @@ class PrintsCharming:
     _shared_instance = None
     _shared_instances = {}
 
+    shared_color_map: Optional[Dict[str, str]] = None
+    shared_bg_color_map: Optional[Dict[str, str]] = None
+    shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
+    shared_unicode_map: Optional[Dict[str, str]] = DEFAULT_UNICODE_MAP
+    shared_styles: Optional[Dict[str, PStyle]] = None
+    shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
+    shared_byte_map: Optional[Dict[str, bytes]] = DEFAULT_BYTE_PARSING_MAP
+
+    # Assigned with create_reverse_input_mapping classmethod called in relevant modules
+    shared_reverse_input_map: Optional[Dict[bytes, str]] = None
+
+
+    log_level_style_names: List[str] = ['debug', 'info', 'warning', 'error', 'critical']
+
     @classmethod
-    def get_shared_instance(cls, key):
+    def get_shared_instance(cls, key: str) -> Optional["PrintsCharming"]:
         """
         Retrieve a shared instance of PrintsCharming by key.
 
@@ -126,7 +143,7 @@ class PrintsCharming:
         return cls._shared_instances.get(key)
 
     @classmethod
-    def set_shared_instance(cls, key, instance):
+    def set_shared_instance(cls, key: str, instance: "PrintsCharming") -> None:
         """
         Set a shared instance of PrintsCharming under a specific key.
 
@@ -149,31 +166,6 @@ class PrintsCharming:
         cls._shared_instances[key] = instance
 
 
-    log_level_style_names = ['debug', 'info', 'warning', 'error', 'critical']
-
-    @classmethod
-    def set_log_level_style_names(cls, levels) -> None:
-        """
-        Sets the log levels for the class.
-
-        :param levels: A list of log level strings.
-        """
-        if (
-            not isinstance(levels, list)
-            or not all(isinstance(lvl, str) for lvl in levels)
-        ):
-            raise ValueError("log_levels must be a list of strings.")
-        cls.log_levels = levels
-
-
-    shared_color_map: Optional[Dict[str, str]] = None
-    shared_bg_color_map: Optional[Dict[str, str]] = None
-    shared_effect_map: Optional[Dict[str, str]] = DEFAULT_EFFECT_MAP
-    shared_unicode_map: Optional[Dict[str, str]] = DEFAULT_UNICODE_MAP
-    shared_styles: Optional[Dict[str, PStyle]] = None
-    shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
-
-
     @classmethod
     def set_shared_maps(cls,
                         shared_color_map: Optional[Dict[str, str]] = None,
@@ -181,7 +173,8 @@ class PrintsCharming:
                         shared_effect_map: Optional[Dict[str, str]] = None,
                         shared_unicode_map: Optional[Dict[str, str]] = None,
                         shared_styles: Optional[Dict[str, PStyle]] = None,
-                        shared_ctl_map: Optional[Dict[str, str]] = None
+                        shared_ctl_map: Optional[Dict[str, str]] = None,
+                        shared_byte_map: Optional[Dict[str, bytes]] = None,
                         ) -> None:
         """
         Set shared maps across all instances of the PrintsCharming class.
@@ -243,6 +236,7 @@ class PrintsCharming:
                               styles across all instances.
 
         :param shared_ctl_map: (Optional) A dictionary of shared control codes.
+        :param shared_byte_map: (Optional) A dictionary of bytes for input parsing.
         """
 
         cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
@@ -264,15 +258,196 @@ class PrintsCharming:
         if shared_ctl_map:
             cls.shared_ctl_map = shared_ctl_map
 
+        if shared_byte_map:
+            cls.shared_byte_map = shared_byte_map
 
 
     @classmethod
-    def clear_line(cls, use_carriage_return: bool = True):
+    def create_reverse_input_mapping(
+        cls,
+        ctl_map_input_keys: Optional[set] = None,
+        byte_map_input_keys: Optional[set] = None,
+        update: bool = False,
+    ) -> None:
+
+        if not cls.shared_reverse_input_map or update:
+            # Set of input keys from cls.shared_ctl_map
+            if not ctl_map_input_keys:
+                ctl_map_input_keys = {
+                    # Function Keys
+                    "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+                    # Navigation Keys
+                    "arrow_up", "arrow_down", "arrow_right", "arrow_left",
+                    "home", "end", "insert", "delete", "page_up", "page_down",
+                    # Miscellaneous Input
+                    "escape", "tab", "backspace", "enter",
+                    # Modifier Keys
+                    "ctrl_a", "ctrl_b", "ctrl_c", "ctrl_d", "ctrl_e", "ctrl_f", "ctrl_g",
+                    "ctrl_h", "ctrl_i", "ctrl_j", "ctrl_k", "ctrl_l", "ctrl_m", "ctrl_n",
+                    "ctrl_o", "ctrl_p", "ctrl_q", "ctrl_r", "ctrl_s", "ctrl_t", "ctrl_u",
+                    "ctrl_v", "ctrl_w", "ctrl_x", "ctrl_y", "ctrl_z",
+                    "ctrl_backslash", "ctrl_square_bracket", "ctrl_caret", "ctrl_underscore",
+                    "shift_arrow_up", "shift_arrow_down", "shift_arrow_right", "shift_arrow_left",
+                    "alt_arrow_up", "alt_arrow_down", "alt_arrow_right", "alt_arrow_left",
+                }
+
+            # Specific keys to include from cls.shared_byte_map
+            if not byte_map_input_keys:
+                byte_map_input_keys = {
+                    "ctrl_space", "ctrl_enter", "ctrl_tab", "shift_tab",
+                    "ctrl_escape", "ctrl_backspace", "paste_start", "paste_end",
+                    "newline_detected", "carriage_return_detected",
+                }
+
+            # Reverse mapping dictionary
+            reverse_mapping: Dict[bytes, str] = {}
+
+            # Add input keys from cls.shared_ctl_map
+            for key, value in cls.shared_ctl_map.items():
+                if key in ctl_map_input_keys:
+                    # Normalize to bytes if necessary
+                    reverse_mapping[value.encode() if isinstance(value, str) else value] = key
+
+            # Add input keys from cls.shared_byte_map
+            for key, value in cls.shared_byte_map.items():
+                if key in byte_map_input_keys:
+                    reverse_mapping[value] = key
+
+            cls.shared_reverse_input_map = reverse_mapping
+
+
+    @staticmethod
+    def read_input() -> Optional[bytes]:
+        """Read input from stdin in a non-blocking way."""
+        fd = sys.stdin.fileno()
+        rlist, _, _ = select.select([sys.stdin], [], [], 0)
+        if sys.stdin in rlist:
+            return sys.stdin.buffer.read(1)
+        else:
+            return None
+
+    @classmethod
+    def parse_input(cls) -> Tuple[Optional[str], Optional[Any]]:
+        """Parse input and determine if it's a mouse event, keystroke, or escape sequence."""
+        c = cls.read_input()
+        if c is None:
+            return None, None
+
+        if c == cls.shared_byte_map['escape_key']:  # Start of an escape sequence
+            c += sys.stdin.buffer.read(1)
+            if c[-1:] == b'[':
+                c += sys.stdin.buffer.read(1)
+                if c[-1:] == cls.shared_byte_map['mouse_event_start']:
+                    # Mouse event
+                    seq = c + cls.read_mouse_event_sequence()
+                    mouse_event = cls.parse_mouse_event(seq)
+                    return 'mouse', mouse_event
+                else:
+                    # Other escape sequence
+                    seq = c + cls.read_remaining_escape_sequence()
+                    keystroke = cls.parse_escape_sequence(seq)
+                    return 'keystroke', keystroke
+            else:
+                # Single ESC keypress or other sequence
+                return 'keystroke', 'ESCAPE'
+        else:
+            # Regular keystroke
+            try:
+                ch = c.decode('utf-8', errors='ignore')
+                return 'keystroke', ch
+            except UnicodeDecodeError:
+                return None, None
+
+    @classmethod
+    def read_mouse_event_sequence(cls) -> bytes:
+        """Read the remaining bytes of a mouse event sequence."""
+        seq = b''
+        while True:
+            ch = sys.stdin.buffer.read(1)  # Blocking read
+            seq += ch
+            if ch in (
+                    cls.shared_byte_map['mouse_event_end_press'],
+                    cls.shared_byte_map['mouse_event_end_release']
+            ):
+                break
+        return seq
+
+    @classmethod
+    def read_remaining_escape_sequence(cls) -> bytes:
+        """Read the remaining bytes of an escape sequence."""
+        seq = b''
+        while True:
+            ch = sys.stdin.buffer.read(1)  # Blocking read
+            seq += ch
+            if ch.isalpha() or ch == b'~':
+                break
+        return seq
+
+
+    @staticmethod
+    def parse_mouse_event(seq: bytes) -> Optional[Tuple[int, int, int, bytes]]:
+        """Parse a mouse event from the given sequence."""
+        # Expected format: '\x1b[<b;x;yM' or '\x1b[<b;x;ym'
+        try:
+            params = seq[3:-1].split(b';')
+            if len(params) == 3:
+                b_code = int(params[0])
+                x = int(params[1])
+                y = int(params[2])
+                event_type = seq[-1:]  # b'M' for press, b'm' for release
+                return b_code, x, y, event_type
+            else:
+                return None
+        except ValueError:
+            return None
+
+    # Reverse Lookup Function
+    @classmethod
+    def parse_escape_sequence(cls, seq: bytes, default: str = "ESCAPE") -> str:
+        """Parse other escape sequences"""
+        if not cls.shared_reverse_input_map:
+            cls.create_reverse_input_mapping()
+        return cls.shared_reverse_input_map.get(seq, default)
+
+
+    @classmethod
+    def set_log_level_style_names(cls, levels: List[str]) -> None:
+        """
+        Sets the log levels for the class.
+
+        :param levels: A list of log level strings.
+        """
+        if (
+            not isinstance(levels, list)
+            or not all(isinstance(lvl, str) for lvl in levels)
+        ):
+            raise ValueError("log_levels must be a list of strings.")
+        cls.log_levels = levels
+
+
+    @classmethod
+    def clear_line(cls, use_carriage_return: bool = True) -> None:
         if use_carriage_return:
             print("\r" + cls.shared_ctl_map["clear_line"], end='')
         else:
             print(cls.shared_ctl_map["clear_line"], end='')
 
+
+    @classmethod
+    def write(cls, *control_keys_or_text: Union[str, bytes], **kwargs: Any) -> None:
+        """
+        Writes control sequences or text passed as arguments to sys.stdout.
+        If the control sequence has formatting placeholders, it uses the kwargs for formatting.
+        """
+        for item in control_keys_or_text:
+            if isinstance(item, str):
+                # Check if the item is a control key in the ctl_map
+                control_sequence = cls.shared_ctl_map.get(item, item)  # If not found, treat it as plain text
+                # If there are kwargs like row, col, format the control sequence
+                if kwargs and '{' in control_sequence and '}' in control_sequence:
+                    control_sequence = control_sequence.format(**kwargs)
+                sys.stdout.write(control_sequence)
+        sys.stdout.flush()
 
 
     def __init__(self,
@@ -283,6 +458,7 @@ class PrintsCharming:
                  effect_map: Optional[Dict[str, str]] = None,
                  unicode_map: Optional[Dict[str, str]] = None,
                  styles: Optional[Dict[str, PStyle]] = None,
+                 enable_input_parsing: bool = False,
                  styled_strings: Optional[Dict[str, List[str]]] = None,
                  style_conditions: Optional[Any] = None,
                  formatter: Optional['Formatter'] = None,
@@ -312,6 +488,9 @@ class PrintsCharming:
         :param styles: supply your own styles dictionary. Default is a copy of
                        the DEFAULT_STYLES dictionary unless cls.shared_styles
                        is defined.
+
+        :param enable_input_parsing: if True define cls.shared_reverse_input_map
+                       by calling self.__class__.create_reverse_input_mapping()
 
         :param styled_strings: calls the add_strings_from_dict method with your
                                provided styled_strings dictionary. See README
@@ -352,7 +531,12 @@ class PrintsCharming:
 
         self.unicode_map = unicode_map or PrintsCharming.shared_unicode_map
 
-        self.ctl_map = self.shared_ctl_map
+        self.ctl_map = PrintsCharming.shared_ctl_map
+
+        self.byte_map = PrintsCharming.shared_byte_map
+
+        if enable_input_parsing:
+            self.__class__.create_reverse_input_mapping()
 
         self.styles = (
             copy.deepcopy(styles)
@@ -375,7 +559,6 @@ class PrintsCharming:
             for name, style in self.styles.items()
             if self.styles[name].color in self.color_map
         }
-
 
         self._internal_logging_styles = (
             PrintsCharming._shared_internal_logging_styles
@@ -440,7 +623,13 @@ class PrintsCharming:
 
 
 
-    def escape_ansi_codes(self, ansi_string):
+    def escape_ansi_codes(self, ansi_string: str) -> str:
+        """
+        Escapes ANSI codes in a given string.
+
+        :param ansi_string: The string containing ANSI codes.
+        :return: The string with escaped ANSI codes.
+        """
         self.debug(
             "Escaping ANSI codes in string: {}",
             ansi_string
@@ -454,8 +643,14 @@ class PrintsCharming:
         return escaped_ansi_string
 
 
-    def create_style_code(self, style: Union[PStyle, Dict[str, Any]]):
-        style_codes = []
+    def create_style_code(self, style: Union[PStyle, Dict[str, Any]]) -> str:
+        """
+        Creates the ANSI style code for the given style.
+
+        :param style: A `PStyle` instance or a dictionary defining the style.
+        :return: The ANSI escape sequence for the style.
+        """
+        style_codes: List[str] = []
 
         if isinstance(style, PStyle):
             # Add foreground color
@@ -488,10 +683,13 @@ class PrintsCharming:
         return "".join(style_codes)
 
 
-    def add_style(self, name: str, style: PStyle):
+    def add_style(self, name: str, style: PStyle) -> None:
         """
         Add a new style, applying self.default_bg_color only if no bg_color is specified
         and self.default_bg_color is defined.
+
+        :param name: The name of the style.
+        :param style: A `PStyle` instance defining the style.
         """
 
         # Apply default background color if none is specified and self.default_bg_color is set
@@ -509,6 +707,8 @@ class PrintsCharming:
         """
         Add multiple styles, applying self.default_bg_color only if no bg_color is specified
         and self.default_bg_color is defined.
+
+        :param styles: A dictionary where keys are style names and values are `PStyle` instances.
         """
         for style_name, style in styles.items():
             # Apply default background color if none is specified and self.default_bg_color is set
@@ -519,10 +719,13 @@ class PrintsCharming:
                 self.add_style(style_name, style)
 
 
-    def edit_style(self, name: str, new_style: Union[PStyle, Dict[str, Any]]):
+    def edit_style(self, name: str, new_style: Union[PStyle, Dict[str, Any]]) -> None:
         """
         Edit an existing style by updating its attributes and regenerating its ANSI code,
         applying the default background color if not specified.
+
+        :param name: The name of the style to edit.
+        :param new_style: A `PStyle` instance or a dictionary with new attributes.
         """
         if name not in self.styles:
             raise ValueError(f"Style '{name}' does not exist.")
@@ -545,10 +748,12 @@ class PrintsCharming:
         self.style_codes[name] = self.create_style_code(self.styles[name])
 
 
-    def edit_styles(self, new_styles: Dict[str, Union[PStyle, Dict[str, Any]]]):
+    def edit_styles(self, new_styles: Dict[str, Union[PStyle, Dict[str, Any]]]) -> None:
         """
         Edit multiple styles by updating each style's attributes and regenerating their ANSI codes,
         applying the default background color if not specified.
+
+        :param new_styles: A dictionary of style names to `PStyle` instances or dictionaries.
         """
         for name, new_style in new_styles.items():
             if name not in self.styles:
@@ -558,9 +763,12 @@ class PrintsCharming:
             self.edit_style(name, new_style)
 
 
-    def rename_style(self, current_name: str, new_name: str):
+    def rename_style(self, current_name: str, new_name: str) -> None:
         """
         Rename an existing style in both self.styles and self.style_codes.
+
+        :param current_name: The current name of the style.
+        :param new_name: The new name for the style.
         """
         if current_name not in self.styles:
             raise ValueError(f"Style '{current_name}' does not exist.")
@@ -573,17 +781,21 @@ class PrintsCharming:
             self.style_codes[new_name] = self.style_codes.pop(current_name)
 
 
-    def rename_styles(self, name_map: dict[str, str]):
+    def rename_styles(self, name_map: dict[str, str]) -> None:
         """
         Rename multiple styles using a mapping from current names to new names.
+
+        :param name_map: A dictionary mapping current style names to new names.
         """
         for current_name, new_name in name_map.items():
             self.rename_style(current_name, new_name)
 
 
-    def remove_style(self, name: str):
+    def remove_style(self, name: str) -> None:
         """
         Remove a style by its name from both self.styles and self.style_codes.
+
+        :param name: The name of the style to remove.
         """
         if name in self.styles:
             del self.styles[name]
@@ -593,23 +805,49 @@ class PrintsCharming:
             raise ValueError(f"Style '{name}' does not exist.")
 
 
-    def remove_styles(self, names: list[str]):
+    def remove_styles(self, names: list[str]) -> None:
         """
         Remove multiple styles by their names from both self.styles and self.style_codes.
+
+        :param names: A list of style names to remove.
         """
         for name in names:
             self.remove_style(name)
 
 
-    def get_style_code(self, style_name):
+    def get_style_code(self, style_name: str) -> str:
+        """
+        Retrieves the ANSI style code for the given style name.
+
+        :param style_name: The name of the style.
+        :return: The ANSI style code for the style, or the default style code if the style is not found.
+        """
         return self.style_codes.get(style_name, self.style_codes['default'])
 
 
-    def apply_style_code(self, code, text, reset=True):
+    def apply_style_code(self, code: str, text: Any, reset: bool = True) -> str:
+        """
+        Applies a given ANSI style code to the provided text.
+
+        :param code: The ANSI style code to apply.
+        :param text: The text to style.
+        :param reset: Whether to reset styles after the text.
+        :return: The styled text with the applied ANSI code.
+        """
         return f'{code}{text}{self.reset if reset else ''}'
 
 
-    def apply_style(self, style_name, text, fill_space=True, reset=True):
+    def apply_style(self, style_name: str, text: Any, fill_space: bool = True, fill_bg_only: bool = True, reset: bool = True) -> str:
+        """
+        Applies a style to the given text.
+
+        :param style_name: The name of the style to apply.
+        :param text: The text to style.
+        :param fill_space: Whether to fill whitespace with the background color.
+        :param fill_bg_only: Only fill bg_color attrib.
+        :param reset: Whether to reset styles after the text.
+        :return: The styled text.
+        """
         self.debug(
             "Applying style_name: {} to text: {}",
             self._apply_style_internal('info', style_name),
@@ -622,12 +860,22 @@ class PrintsCharming:
 
         text = str(text)
         if text.isspace() and fill_space:
-            style_code = self.bg_color_map.get(
-                style_name,
-                self.bg_color_map.get(
-                    self.styles.get(style_name, 'default_bg').bg_color
+            if fill_bg_only:
+                style_code = self.bg_color_map.get(
+                    style_name,
+                    self.bg_color_map.get(
+                        self.styles.get(style_name, 'default_bg').bg_color
+                    )
                 )
-            )
+            else:
+                style_code = self.style_codes.get(
+                    style_name,
+                    self.bg_color_map.get(
+                        style_name,
+                        self.bg_color_map.get('default')
+                    )
+                )
+
 
         else:
             style_code = self.style_codes.get(
@@ -647,9 +895,15 @@ class PrintsCharming:
         return styled_text
 
 
+    def apply_indexed_styles(self, strs_list: List[str], styles_list: Union[str, List[str]], return_list: bool = False) -> Union[str, List[str]]:
+        """
+        Applies styles to a list of strings, optionally returning them as a list.
 
-
-    def apply_indexed_styles(self, strs_list, styles_list, return_list=False):
+        :param strs_list: A list of strings to style.
+        :param styles_list: A single style or a list of styles to apply.
+        :param return_list: Whether to return a list of styled strings.
+        :return: The styled strings as a single concatenated string or a list.
+        """
         strings_list_len = len(strs_list)
 
         # If a single style string is passed, repeat it for the entire list
@@ -674,15 +928,25 @@ class PrintsCharming:
         return ' '.join(styled_strs) if not return_list else styled_strs
 
 
+    def get_color_code(self, color_name: str) -> str:
+        """
+        Retrieves the ANSI color code for the given color name.
 
-
-
-    def get_color_code(self, color_name):
+        :param color_name: The name of the color.
+        :return: The ANSI color code for the color, or the default color code if the color is not found.
+        """
         return self.color_map.get(color_name, self.color_map['default'])
 
 
-    def apply_color(self, color_name, text, fill_space=True):
+    def apply_color(self, color_name: str, text: Any, fill_space: bool = True) -> str:
+        """
+        Applies a color to the given text.
 
+        :param color_name: The name of the color.
+        :param text: The text to apply the color to.
+        :param fill_space: Whether to fill whitespace with the background color.
+        :return: The text styled with the specified color.
+        """
         text = str(text)
         if text.isspace() and fill_space:
             color_code = self.bg_color_map.get(
@@ -697,11 +961,24 @@ class PrintsCharming:
         return colored_text
 
 
-    def get_bg_color_code(self, color_name):
+    def get_bg_color_code(self, color_name: str) -> str:
+        """
+        Retrieves the ANSI background color code for the given color name.
+
+        :param color_name: The name of the background color.
+        :return: The ANSI background color code, or None if the color is not found.
+        """
         return self.bg_color_map.get(color_name)
 
 
-    def apply_bg_color(self, color_name, text):
+    def apply_bg_color(self, color_name: str, text: Any) -> str:
+        """
+        Applies a background color to the given text.
+
+        :param color_name: The name of the background color.
+        :param text: The text to apply the background color to.
+        :return: The text styled with the specified background color.
+        """
         bg_color_code = self.get_bg_color_code(color_name)
         bg_color_block = f"{bg_color_code}{text}{self.reset}"
 
@@ -712,53 +989,39 @@ class PrintsCharming:
         """
         Generates a block of background color as a string.
 
-        :param color_name: The name of the color as per self.color_map.
+        :param color_name: The name of the color as per self.bg_color_map.
         :param length: The length of the color block in terms of spaces.
-        :raises ColorNotFoundError: If the background color is not found in
-                                    the background color map.
-        :raises InvalidLengthError: If the length is not valid.
+
+        :return: A string representing the background color block.
         """
-        self.debug(
-            "Printing background color: {} with length: {}",
-            color_name,
-            length
-        )
+        self.debug("Generating background color strip: {} with length: {}", color_name, length)
 
-        if length <= 0:
-            message = f"Invalid length '{length}'. Length must be positive."
-            styled_message = self.apply_style('vred', message)
-            raise InvalidLengthError(styled_message,
-                                     self,
-                                     format_specific_exception=True)
-
+        # Retrieve background color code
         bg_color_code = self.bg_color_map.get(color_name)
-        if not bg_color_code:
-            message = f"Key '{color_name}' not in 'self.bg_color_map'."
-            styled_message = self.apply_style('vred', message)
-            raise ColorNotFoundError(styled_message,
-                                     self,
-                                     format_specific_exception=True)
 
-        # style the color block
-        bg_bar_strip = f"{bg_color_code}{' ' * length}{self.reset}"
-
-        return bg_bar_strip
+        # Generate and return the styled color block
+        return f"{bg_color_code}{' ' * length}{self.reset}"
 
 
-    def print_bg_bar_strip(self, color_name: str, length: int = 10) -> None:
-        """Prints a block of background color."""
-        try:
-            bg_bar_strip = self.generate_bg_bar_strip(color_name, length)
-            print(bg_bar_strip)
-        except (ColorNotFoundError, InvalidLengthError) as e:
-            e.handle_exception()
 
+    def get_effect_code(self, effect_name: str) -> str:
+        """
+        Retrieves the ANSI effect code for the given effect name.
 
-    def get_effect_code(self, effect_name):
+        :param effect_name: The name of the effect.
+        :return: The ANSI effect code, or an empty string if the effect is not found.
+        """
         return self.effect_map.get(effect_name, '')
 
 
-    def apply_effect(self, effect_name, text):
+    def apply_effect(self, effect_name: str, text: Any) -> str:
+        """
+        Applies an effect to the given text.
+
+        :param effect_name: The name of the effect.
+        :param text: The text to apply the effect to.
+        :return: The text styled with the specified effect.
+        """
         effect_code = self.get_effect_code(effect_name)
         return f'{effect_code}{text}{self.reset}'
 
@@ -793,6 +1056,7 @@ class PrintsCharming:
                 self.enable_styled_subwords = True
         else:
             print(f"Style {style_name} not found in styles dictionary.")
+
 
     def add_string(self,
                    string: str,
@@ -896,6 +1160,10 @@ class PrintsCharming:
         if it is a word (does not contain any ' ' characters) then it is added
         to self.word_map unless word_trie param is set to True which in that
         case the word will be added to self.word_trie.
+
+        :param strings: A list of strings to be styled.
+        :param style_name: The name of the style to apply.
+        :param word_trie: If True, insert words into the word trie; otherwise, use word_map.
         """
         if style_name in self.styles:
             style_code = self.style_codes[style_name]
@@ -914,6 +1182,9 @@ class PrintsCharming:
         (does not contain any ' ' characters) then it is added to
         self.word_map unless word_trie param is set to True which in that case
         the word will be added to self.word_trie.
+
+        :param strings_dict: A dictionary where keys are style names and values are lists of strings.
+        :param word_trie: If True, insert words into the word trie; otherwise, use word_map.
         """
         for style_name, strings in strings_dict.items():
             if style_name in self.styles:
@@ -998,7 +1269,7 @@ class PrintsCharming:
         return False  # String was not found as a complete word/phrase
 
     @staticmethod
-    def _cleanup_trie(stack):
+    def _cleanup_trie(stack: List[Tuple[Any, str]]) -> None:
         """
         Recursively clean up the trie by removing nodes that are no longer part
         of any valid words/phrases.
@@ -1021,6 +1292,12 @@ class PrintsCharming:
 
 
     def _remove_word(self, word: str) -> bool:
+        """
+        Removes a word from the word map or conceal map.
+
+        :param word: The word to remove.
+        :return: True if the word was removed, False otherwise.
+        """
         if word in self.word_map:
             del self.word_map[word]
             return True
@@ -1031,7 +1308,15 @@ class PrintsCharming:
 
 
 
-    def conceal_text(self, text_to_conceal, replace=False, style_name=None):
+    def conceal_text(self, text_to_conceal: Any, replace: bool = False, style_name: Optional[str] = None) -> str:
+        """
+        Conceals a given text, optionally replacing it with a placeholder.
+
+        :param text_to_conceal: The text to conceal.
+        :param replace: Whether to replace the text with a placeholder.
+        :param style_name: The style to apply for concealment.
+        :return: The concealed text.
+        """
         if replace:
             style_code = self.get_style_code(style_name)
             if not style_code:
@@ -1046,7 +1331,7 @@ class PrintsCharming:
         return concealed_text
 
 
-    def format_dict(self, d, indent=4) -> str:
+    def format_dict(self, d: Dict[Any, Any], indent: int = 4) -> str:
         """
         Formats a dictionary as a styled string.
 
@@ -1055,7 +1340,7 @@ class PrintsCharming:
         :return: A string representing the formatted dictionary.
         """
 
-        def pprint_dict(d, level=0):
+        def pprint_dict(d: Dict[Any, Any], level: int = 0) -> str:
             result = ""
             for key, value in d.items():
                 result += (
@@ -1471,6 +1756,13 @@ class PrintsCharming:
     def _style_words_by_index(self,
                               text: str, style: Dict[Union[int, Tuple[int, int]], str]
                               ) -> str:
+        """
+        Styles words in the text based on their index or a range of indices.
+
+        :param text: The input text to style.
+        :param style: A dictionary mapping indices or index ranges to style names.
+        :return: The styled text.
+        """
 
         words = text.split()
 
@@ -1490,9 +1782,16 @@ class PrintsCharming:
 
     # Public facing method that accounts for whitespace and styles it and words.
     def style_words_by_index(self, text: str, style: Dict[Union[int, Tuple[int, int]], str]) -> str:
+        """
+        Styles words and whitespace in the text based on their index or a range of indices.
+
+        :param text: The input text to style.
+        :param style: A dictionary mapping indices or index ranges to style names.
+        :return: The styled text.
+        """
         words_and_spaces = re.findall(r'\S+|\s+', text)
         styled_words_and_spaces = [None] * len(words_and_spaces)
-        word_indices = {}
+        word_indices: Dict[int, Optional[str]] = {}
         word_index = 0
 
         # First pass: style words and record their indices
@@ -1523,6 +1822,7 @@ class PrintsCharming:
                 # Temporarily store spaces as is; we'll handle them in the next pass
                 styled_words_and_spaces[i] = token
 
+
         # Second pass: style spaces based on adjacent words
         for i, token in enumerate(words_and_spaces):
             if token.isspace():
@@ -1541,24 +1841,53 @@ class PrintsCharming:
                     # Leave space unstyled
                     pass
 
+
         return ''.join(styled_words_and_spaces)
 
 
     @staticmethod
     def contains_ansi_codes(s: str) -> bool:
+        """
+        Checks if a string contains ANSI codes.
+
+        :param s: The input string.
+        :return: True if the string contains ANSI codes, False otherwise.
+        """
         return '\033' in s
 
+
     @classmethod
-    def remove_ansi_codes(cls, text):
+    def remove_ansi_codes(cls, text: Any) -> str:
+        """
+        Removes ANSI codes from the text.
+
+        :param text: The input text.
+        :return: The text without ANSI codes.
+        """
         return cls.ansi_escape_pattern.sub('', text)
 
+
     @staticmethod
-    def write_file(text, filename, end, mode='a'):
+    def write_file(text: str, filename: str, end: str, mode: str = 'a') -> None:
+        """
+        Writes text to a file.
+
+        :param text: The text to write.
+        :param filename: The name of the file.
+        :param end: The ending to append after the text.
+        :param mode: The file opening mode.
+        """
         with open(filename, mode) as file:
             file.write(text + end)
 
     @staticmethod
-    def check_dict_structure(d):
+    def check_dict_structure(d: Dict[Any, Any]) -> str:
+        """
+        Checks the structure of a dictionary.
+
+        :param d: The dictionary to check.
+        :return: A string representing the detected structure ('indexed_style', 'splits', or 'Unknown structure').
+        """
         has_tuple_keys = any(isinstance(pkey, tuple) for pkey in d.keys())
         has_int_keys = any(isinstance(pkey, int) for pkey in d.keys())
         has_str_keys = all(isinstance(pkey, str) for pkey in d.keys())
@@ -1574,14 +1903,26 @@ class PrintsCharming:
 
 
     def format_with_sep(self,
-                        *args,
-                        converted_args=None,
-                        sep=' ',
-                        prog_sep='',
-                        prog_step=1,
-                        start='',
-                        prog_direction='forward'
+                        *args: Any,
+                        converted_args: Optional[List[str]] = None,
+                        sep: Union[str, Tuple[str, ...]] = ' ',
+                        prog_sep: str = '',
+                        prog_step: int = 1,
+                        start: str = '',
+                        prog_direction: str = 'forward'
                         ) -> str:
+        """
+        Formats text with separators and progression options.
+
+        :param args: The arguments to format.
+        :param converted_args: Pre-converted arguments if available.
+        :param sep: Separator between arguments.
+        :param prog_sep: Progressive separator to apply between arguments.
+        :param prog_step: Step for the progressive separator.
+        :param start: String to prepend to the final output.
+        :param prog_direction: Direction of progression ('forward' or 'reverse').
+        :return: The formatted text.
+        """
 
         if not converted_args:
             # Convert args to strings if required
@@ -1627,7 +1968,13 @@ class PrintsCharming:
 
 
     @staticmethod
-    def get_words_and_spaces(text):
+    def get_words_and_spaces(text: str) -> List[str]:
+        """
+        Splits text into a list of words and spaces.
+
+        :param text: The input text.
+        :return: A list of words and spaces in order of appearance.
+        """
         words = text.split()
         words_and_spaces = []
         index = 0
@@ -1718,7 +2065,7 @@ class PrintsCharming:
         if isinstance(style, dict):
             dict_type = self.check_dict_structure(style)
             if dict_type == "indexed_style":
-                text = self._style_words_by_index(text, style)
+                text = self.style_words_by_index(text, style)
             elif dict_type == 'splits':
                 text = self.segment_and_style(text, style)
             elif dict_type == 'splits_with_lists':
@@ -2127,7 +2474,15 @@ class PrintsCharming:
 
 
 
-    def compare_dicts(self, dict1, dict2, keys):
+    def compare_dicts(self, dict1: Dict[str, Any], dict2: Dict[str, Any], keys: List[str]) -> Dict[str, bool]:
+        """
+        Compares two dictionaries for specified keys.
+
+        :param dict1: The first dictionary.
+        :param dict2: The second dictionary.
+        :param keys: A list of keys to compare.
+        :return: A dictionary mapping each key to a boolean indicating equality.
+        """
         dict2 = self.apply_reverse_effect(dict2)
 
         results = {}
@@ -2139,7 +2494,13 @@ class PrintsCharming:
         return results
 
     @staticmethod
-    def apply_reverse_effect(style_dict):
+    def apply_reverse_effect(style_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Reverses color and background color in a style dictionary if 'reversed' is set.
+
+        :param style_dict: The style dictionary.
+        :return: The modified style dictionary.
+        """
         if style_dict.get('reversed'):
             style_dict['color'], style_dict['bg_color'] = (
                 style_dict.get('bg_color'), style_dict.get('color')
@@ -2147,7 +2508,14 @@ class PrintsCharming:
         return style_dict
 
 
-    def print_variables(self, text: str, text_style: str = None, **kwargs) -> None:
+    def print_variables(self, text: str, text_style: Optional[str] = None, **kwargs: Tuple[Any, str]) -> None:
+        """
+        Prints variables with styles applied to placeholders.
+
+        :param text: The text template.
+        :param text_style: Optional text style to apply.
+        :param kwargs: Mapping of variable names to (value, style).
+        """
         # Apply styles to each variable in kwargs
         for key, value in kwargs.items():
             variable, var_style = value
@@ -2160,17 +2528,30 @@ class PrintsCharming:
         self.print(text, style=text_style, skip_ansi_check=True)
 
 
-    def replace_and_style_placeholders(self,
-                                       text: str,
-                                       placeholders: Dict[str, Any],
-                                       enable_label_style: bool = True,
-                                       top_level_label: str = 'top_level_label',
-                                       sub_level_label: str = 'sub_level_label',
-                                       label_delimiter: str = ':',
-                                       style_function: Callable[[str, Dict[str, Any]], str] = None,
-                                       **style_kwargs) -> str:
+    def replace_and_style_placeholders(
+        self,
+        text: str,
+        placeholders: Dict[str, Any],
+        enable_label_style: bool = True,
+        top_level_label: str = 'top_level_label',
+        sub_level_label: str = 'sub_level_label',
+        label_delimiter: str = ':',
+        style_function: Optional[Callable[[str, Dict[str, Any]], str]] = None,
+        **style_kwargs: Any
+    ) -> str:
+        """
+        Replaces placeholders with values and applies styles.
 
-        """Replace placeholders with actual values and apply colors."""
+        :param text: The text containing placeholders.
+        :param placeholders: A dictionary of placeholder keys and their values.
+        :param enable_label_style: Whether to style labels.
+        :param top_level_label: The style name for top-level labels.
+        :param sub_level_label: The style name for sub-level labels.
+        :param label_delimiter: The delimiter for labels.
+        :param style_function: A function to apply additional styles.
+        :param style_kwargs: Additional keyword arguments for the style function.
+        :return: The styled text.
+        """
         self.debug(
             "Replace and style text: {} with placeholders: {}",
             text,
@@ -2246,7 +2627,15 @@ class PrintsCharming:
         return styled_text
 
 
-    def print_progress_bar(self, total_steps: int = 4, bar_symbol: str = ' ', bar_length: int = 40, color: str = 'vgreen'):
+    def print_progress_bar(self, total_steps: int = 4, bar_symbol: str = ' ', bar_length: int = 40, color: str = 'vgreen') -> None:
+        """
+        Prints a progress bar.
+
+        :param total_steps: Total number of steps in the progress bar.
+        :param bar_symbol: The symbol to represent progress.
+        :param bar_length: The total length of the progress bar.
+        :param color: The color of the progress bar.
+        """
         for i in range(total_steps):
             progress = (i + 1) / total_steps
             block = int(bar_length * progress)
@@ -2260,9 +2649,12 @@ class PrintsCharming:
             time.sleep(0.25)  # Simulate work
 
     # This is for internal logging within this class!!!
-    def setup_internal_logging(self, log_level: str, log_format: str = '%(message)s'):
+    def setup_internal_logging(self, log_level: str, log_format: str = '%(message)s') -> None:
         """
-        Setup logger, configure it with appropriate log level and format.
+        Sets up internal logging.
+
+        :param log_level: Logging level (e.g., 'DEBUG', 'INFO').
+        :param log_format: Logging format.
         """
         # Configure the shared logger's level
         self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
@@ -2275,9 +2667,15 @@ class PrintsCharming:
 
 
 
-    def _apply_style_internal(self, style_name, text, reset=True):
-        # This method does not log debug messages to avoid recursion
+    def _apply_style_internal(self, style_name: str, text: Any, reset: bool = True) -> str:
+        """
+        Applies a style internally without logging debug messages.
 
+        :param style_name: The name of the style to apply.
+        :param text: The text to style.
+        :param reset: Whether to reset styles after the text.
+        :return: The styled text.
+        """
         text = str(text)
         if isinstance(text, str) and text.isspace():
             style_code = self.bg_color_map.get(
@@ -2296,7 +2694,15 @@ class PrintsCharming:
 
 
 
-    def log(self, level: str, message: str, *args, **kwargs) -> None:
+    def log(self, level: str, message: str, *args: Any, **kwargs: Any) -> None:
+        """
+        Logs a message with styling.
+
+        :param level: The log level (e.g., 'DEBUG', 'INFO').
+        :param message: The message to log.
+        :param args: Positional arguments for message formatting.
+        :param kwargs: Keyword arguments for message formatting.
+        """
         if not self.config['internal_logging']:
             return
 
@@ -2336,7 +2742,7 @@ class PrintsCharming:
         self.logger.log(level, log_message)
 
 
-    def debug(self, message: str, *args, **kwargs) -> None:
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
         # Get the current stack frame
         current_frame = inspect.currentframe()
         # Get the caller frame
@@ -2351,16 +2757,16 @@ class PrintsCharming:
 
         self.log('DEBUG', message, *args, **kwargs)
 
-    def info(self, message: str, *args, **kwargs) -> None:
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
         self.log('INFO', message, *args, **kwargs)
 
-    def warning(self, message: str, *args, **kwargs) -> None:
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
         self.log('WARNING', message, *args, **kwargs)
 
-    def error(self, message: str, *args, **kwargs) -> None:
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
         self.log('ERROR', message, *args, **kwargs)
 
-    def critical(self, message: str, *args, **kwargs) -> None:
+    def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
         self.log('CRITICAL', message, *args, **kwargs)
 
 
@@ -2827,7 +3233,7 @@ class PrintsCharming:
             if isinstance(style, dict):
                 dict_type = self.check_dict_structure(style)
                 if dict_type == "indexed_style":
-                    text = self._style_words_by_index(text, style)
+                    text = self.style_words_by_index(text, style)
                 elif dict_type == 'splits':
                     text = self.segment_and_style(text, style)
                 elif dict_type == 'splits_with_lists':
@@ -2976,6 +3382,7 @@ class PrintsCharming:
             conceals = ensure_list(conceal, num_args)
             blinks = ensure_list(blink, num_args)
 
+
             # Handle kwargs replacements
             if self.config["kwargs"] and kwargs:
                 converted_args = [self.replace_and_style_placeholders(arg, kwargs) for arg in converted_args]
@@ -3000,7 +3407,7 @@ class PrintsCharming:
                 if isinstance(styles[i], dict):
                     dict_type = self.check_dict_structure(styles[i])
                     if dict_type == "indexed_style":
-                        arg = self._style_words_by_index(arg, styles[i])
+                        arg = self.style_words_by_index(arg, styles[i])
                     elif dict_type == 'splits':
                         arg = self.segment_and_style(arg, styles[i])
                     elif dict_type == 'splits_with_lists':
@@ -3359,20 +3766,7 @@ class PrintsCharming:
         return
 
 
-    def write(self, *control_keys_or_text, **kwargs):
-        """
-        Writes control sequences or text passed as arguments to sys.stdout.
-        If the control sequence has formatting placeholders, it uses the kwargs for formatting.
-        """
-        for item in control_keys_or_text:
-            if isinstance(item, str):
-                # Check if the item is a control key in the ctl_map
-                control_sequence = self.ctl_map.get(item, item)  # If not found, treat it as plain text
-                # If there are kwargs like row, col, format the control sequence
-                if kwargs and '{' in control_sequence and '}' in control_sequence:
-                    control_sequence = control_sequence.format(**kwargs)
-                sys.stdout.write(control_sequence)
-        sys.stdout.flush()
+
 
 
 
