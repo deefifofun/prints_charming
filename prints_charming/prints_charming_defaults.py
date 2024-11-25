@@ -1,7 +1,7 @@
 # prints_charming_defaults.py
 
 import logging
-from typing import Dict
+from typing import Any, Dict, List, Optional, Tuple, Union
 from .prints_style import PStyle
 from .utils import (
     compute_bg_color_map,
@@ -11,13 +11,14 @@ from .utils import (
 
 
 
-DEFAULT_CONFIG: Dict[str, bool] = {
+DEFAULT_CONFIG: Dict[str, Union[bool, int, str]] = {
         "color_text"          : True,
         "args_to_strings"     : True,
         "style_names"         : True,
         "style_words_by_index": True,
         "kwargs"              : True,
         "conceal"             : True,
+        "tab_width"           : 8,
         "internal_logging"    : False,
         "log_level"           : 'DEBUG',  # Default to DEBUG level
 }
@@ -316,9 +317,15 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
 
 
         "conceal": PStyle(conceal=True),
+        "conceal_replaced": PStyle(color='plum'),
 
         "selected_style": PStyle(color='vcyan'),
         "unselected_style": PStyle(),
+
+        "test_color_red_bg_dgray" : PStyle(color="red", bg_color="dgray"),
+        "test_color_red_bg_dgray_reverse" : PStyle(color='red', bg_color="dgray", reverse=True),
+        "purple_dgray_bg": PStyle(color="purple", bg_color="dgray"),
+        "purple_dgray_bg_reverse" : PStyle(color='purple', bg_color="dgray", reverse=True),
 }
 
 
@@ -515,8 +522,11 @@ DEFAULT_UNICODE_MAP = {
         "medium_block": "▄",
         "half_block": "▄",
 
-        "upper_half_block": "▀",
-        "three_eighths_block": "▃",
+        "light_shade": "░",
+        "medium_shade": "▒",
+        "dark_shade": "▓",
+
+
 
         "square": "■",
         "hollow_square": "⬜",
@@ -526,30 +536,157 @@ DEFAULT_UNICODE_MAP = {
         "small_square": "▪",
         "small_hollow_square": "▫",
 
+        "square_corners": "⛶",
+        "square_inner_rounded_corners": "⛚",
+        "square_shadowed": "❏",
+        "squares_tiny": "⚏",
+        "square_diagonal_lines": "⛆",
+
+        "square_no_bottom": "⨅",
+        "square_no_top": "⨆",
+
+        "box_empty": "☐",
+        "box_filled_with_x": "☒",
+        "box_filled_with_checkmark": "☑",
+
+        "upper_half_block": "▀",
+        "lower_half_block": "▄",
+
+        "lower_three_eighths_block": "▃",
+
+        "blocks_large": "␩",
+        "blocks_medium": "␨",
+        "blocks_small": "␧",
+
+        "dashes_two": "⚋",
+
+        "upper_one_eighth_block": "▔",
+        "lower_one_eighth_block": "▁",
+
+        "box_drawings_light_horizontal": "─",
+        "box_drawings_heavy_horizontal": "━",
+
+        "light_left_half_arc": "╸",
+        "light_up_arc": "╹",
+
         "parallelogram": "▰",
         "hollow_rectangle": "▭",
-        "one_eighth_block": "▁",
 
         "quarter_block": "▂",
         "quad_block": "▖",
         "rectangle": "▮",
         "hollow_vert_rectangle": "▯",
 
+        "vertical_line":  "│",
+        "light_vertical": "│",
+        "heavy_vertical": "┃",
+
+        "upper_light_vertical_line": "⏐",
+
+        "thick_forward_slash": "/",
+        "slanted_forward_slash": "／",
+        "slanted_back_slash": "＼",
+        "thick_back_slash": "\"",
 
         "left_one_eighth_block": "▏",
+        "right_one_eighths_block": "▕",
         "left_quarter_block": "▎",
         "left_three_eighths_block": "▍",
         "left_half_block": "▌",
         "left_five_eighths_block": "▋",
         "left_three_quarters_block": "▊",
         "left_seven_eighths_block": "▉",
+
         "three_quadrant_block": "▞",
+        "quadrant_lower_left": "▖",
+        "quadrant_lower_right": "▗",
+        "quadrant_upper_left": "▘",
+        "quadrant_upper_right": "▝",
 
-        "right_one_eighths_block": "▕",
+        "lower_horizontal_bracket": "⏠",
+        "upper_horizontal_bracket": "⏡",
 
-        "light_shade": "░",
-        "medium_shade": "▒",
-        "dark_shade": "▓",
+        "upper_left_corner_rounded": "⎛",
+        "lower_left_corner_rounded": "⎝",
+        "upper_right_corner_rounded": "⎞",
+        "lower_right_corner_rounded": "⎠",
+
+        "vertical_right_left_thing": "⎰",
+        "vertical_left_right_thing": "⎱",
+
+        "lines_right": "⚞",
+        "lines_left": "⚟",
+
+
+        # Lines and Corners
+        "bottom_left_corner": "└",
+        "bottom_right_corner": "┘",
+        "bottom_t": "┴",
+        "cross": "┼",
+        "double_bottom_left_corner": "╚",
+        "double_bottom_right_corner": "╝",
+        "double_horizontal_line": "═",
+        "double_top_left_corner": "╔",
+        "double_top_right_corner": "╗",
+        "double_vertical_line": "║",
+        "horizontal_heavy_double_dash": "╍",
+        "horizontal_light_double_dash": "╌",
+        "horizontal_light_triple_dash": "┄",
+        "horizontal_line": "─",
+        "left_t": "├",
+        "right_t": "┤",
+        "top_left_corner": "┌",
+        "top_right_corner": "┐",
+        "top_t": "┬",
+        "vertical_heavy_double_dash": "╏",
+        "vertical_light_double_dash": "╎",
+        "vertical_light_triple_dash": "┆",
+
+
+        # Shapes
+        "bullet": "•",
+        "bullet_operator": "∙",
+        "circle": "●",
+        "circle_cross_hairs": "⨁",
+        "circle_diag_cross_hairs": "⨂",
+        "circle_medium": "⚫",
+        "circles_chained": "⚯",
+        "circles_small": "⛬",
+        "circle_filled_with_dot": "☉",
+        "circle_shadowed": "❍",
+        "circular_vertical": "⩇",
+        "diamond": "◆",
+        "hollow_circle": "◯",
+        "hollow_diamond": "◇",
+        "hollow_star": "☆",
+        "star": "★",
+        "triangle_down": "▼",
+        "triangle_left": "◀",
+        "triangle_right": "▶",
+        "triangle_up": "▲",
+        "triangular_bullet": "‣",
+
+
+        "crown": "♕",
+        "crown2": "♔",
+
+        "sixty_nine": "♋",
+
+        "dice_one": "Ķ",
+        "dice_two": "ķ",
+        "dice_three": "ĸ",
+        "dice_four": "Ĺ",
+        "dice_five": "ĺ",
+        "dice_six": "Ļ",
+
+        "triangles_less_than": "⫷",
+        "triangles_greater_than": "⫸",
+
+        "hour_glass_horizontal": "⨝",
+
+        "left_line": "⟝",
+        "right_line": "⟞",
+
 
         # Currency and Finance
         "alarm_clock": "⏰",
@@ -625,30 +762,7 @@ DEFAULT_UNICODE_MAP = {
         "withdrawal": "🏦⬆️",
         "yen": "¥",
 
-        # Lines and Corners
-        "bottom_left_corner": "└",
-        "bottom_right_corner": "┘",
-        "bottom_t": "┴",
-        "cross": "┼",
-        "double_bottom_left_corner": "╚",
-        "double_bottom_right_corner": "╝",
-        "double_horizontal_line": "═",
-        "double_top_left_corner": "╔",
-        "double_top_right_corner": "╗",
-        "double_vertical_line": "║",
-        "horizontal_heavy_double_dash": "╍",
-        "horizontal_light_double_dash": "╌",
-        "horizontal_light_triple_dash": "┄",
-        "horizontal_line": "─",
-        "left_t": "├",
-        "right_t": "┤",
-        "top_left_corner": "┌",
-        "top_right_corner": "┐",
-        "top_t": "┬",
-        "vertical_heavy_double_dash": "╏",
-        "vertical_light_double_dash": "╎",
-        "vertical_light_triple_dash": "┆",
-        "vertical_line": "│",
+
 
         # Miscellaneous Icons
         "airplane": "✈️",
@@ -688,19 +802,8 @@ DEFAULT_UNICODE_MAP = {
         "trash": "🗑",
         "watch": "⌚",
 
-        # Shapes
-        "bullet": "•",
-        "circle": "●",
-        "diamond": "◆",
-        "hollow_circle": "◯",
-        "hollow_diamond": "◇",
-        "hollow_star": "☆",
-        "star": "★",
-        "triangle_down": "▼",
-        "triangle_left": "◀",
-        "triangle_right": "▶",
-        "triangle_up": "▲",
-        "triangular_bullet": "‣",
+
+
 
         # Symbols
         "check_box": "☑️",

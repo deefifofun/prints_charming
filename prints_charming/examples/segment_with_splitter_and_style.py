@@ -1,11 +1,162 @@
 from prints_charming import PrintsCharming, PStyle
 
+"""
+I got off track and started experimenting with making buttons and showcasing 
+more advanced nested functionality within the print2 method, but have made 
+some major updates to the PrintsCharming class that i want to push to github 
+so this is going with it. Note the print2 method will soon be replacing the 
+print method once i merge all current functionality from print into print2.
+"""
+
+
+def experimenting_with_buttons(pc, name):
+    pc.print2(f"=== Experimenting With Buttons and Boxed Text Demo ===", f"{name} ===\n", start='\n', end='', color=['orange', 'purple'], italic=True, bold=[False, True], style_args_as_one=False)
+
+    horiz_rule = "==="
+    length_horiz_rule = len(horiz_rule)
+
+    box_left = "▎"
+    box_right = "▕"
+    box1_title = "Simple Divider Demo"
+    box1_length = len(box_left + box1_title + box_right)
+    top_line_args = [' ' * length_horiz_rule, '▁' * box1_length]
+    middle_line_args = [f"{horiz_rule} {box_left}", box1_title, f"{box_right} {horiz_rule} ", f"{name} ==="]
+    bottom_line_args = [' ' * length_horiz_rule, '▔' * box1_length]
+    pc.print2(*top_line_args, start='\n', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+    pc.print2(*middle_line_args, sep='', color=['purple', 'orange', 'purple', 'purple'], bg_color=['dgray', 'dgray', 'dgray', 'orange'], bold=[False, False, False, True], style_args_as_one=False)
+    pc.print2(*bottom_line_args, color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
+
+
+    top_line_args = [' ' * length_horiz_rule + ' ', '▁' * box1_length]
+    bottom_line_args = [' ' * length_horiz_rule + ' ', '▔' * box1_length]
+
+    top_line_args[-1] += '\n'
+    middle_line_args[-1] += '\n'
+
+
+    pc.print2(*top_line_args,
+              *middle_line_args,
+              *bottom_line_args,
+              start='\n',
+              sep='',
+              color=['default', 'purple', 'purple', 'orange', 'purple', 'purple', 'default', 'purple'],
+              bg_color=[None, None, 'dgray', 'dgray', 'dgray', 'orange', None, None],
+              bold=[True, True, False, False, False, False, False, False],
+              style_args_as_one=False,
+              )
+
+    horiz_rule = "=== "
+    length_horiz_rule = len(horiz_rule)
+
+    box_left = "▎"
+    box_right = "▕"
+    box1_title = "Simple Divider Demo"
+    box1_length = len(box_left + box1_title + box_right)
+
+    top_line_args_base = [' ' * length_horiz_rule, '▁' * box1_length]
+    middle_line_args_base = [f"{horiz_rule}{box_left}", f"{box1_title}", f"{box_right} {horiz_rule}", f"{name} ==="]
+    bottom_line_args_base = [' ' * length_horiz_rule, '▔' * box1_length]
+
+
+
+    pc.print2(*top_line_args_base, sep='', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+    pc.print2(*middle_line_args_base, sep='', color=['purple', 'orange', 'purple', 'purple'], bg_color=['dgray', 'dgray', 'dgray', 'orange'], bold=[False, False, False, True], style_args_as_one=False)
+    pc.print2(*bottom_line_args_base, sep='', color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
+
+    # Create copies of the base arguments
+    top_line_args = top_line_args_base.copy()
+    middle_line_args = middle_line_args_base.copy()
+    bottom_line_args = bottom_line_args_base.copy()
+
+    # Modify the copies for the combined print2 statement
+    top_line_args[-1] += '\n'
+    middle_line_args[-1] += '\n'
+    bottom_line_args[-1] += '\n'
+
+    # Now use the modified arguments in the combined print2 statement
+    pc.print2(*top_line_args,
+              *middle_line_args,
+              *bottom_line_args,
+              sep='',
+              color=['default', 'purple', 'purple', 'orange', 'purple', 'purple', 'default', 'purple'],
+              bg_color=[None, None, 'dgray', 'dgray', 'dgray', 'orange', None, None],
+              bold=[True, True, False, False, False, False, False, False],
+              style_args_as_one=False)
+
+    #box_left = "▎"
+    box_left = "▏"
+    box_right = "▕"
+    box1_title = "Simple Divider Demo"
+    box1_length = len(box_left + box1_title + box_right)
+
+    top_line = '▁' * box1_length
+    middle_line = [f"{box_left}", f"{box1_title}", f"{box_right}"]
+    bottom_line = '▔' * box1_length
+
+    pc.print2(top_line, color='vcyan', bold=True)
+    pc.print2(*middle_line, sep='', color=['vcyan', 'orange', 'vcyan'], bg_color='dgray', style_args_as_one=False)
+    pc.print2(bottom_line, color='vcyan', bold=True)
+
+    print()
+
+    top_line += '\n'
+    middle_line[-1] += '\n'
+    bottom_line += '\n'
+    pc.print2(top_line, *middle_line, bottom_line, sep='', color=['purple', 'purple', 'orange', 'purple', 'purple'], bg_color=[None, 'dgray', 'dgray', 'dgray', None], bold=[True, False, False, False, False], style_args_as_one=False)
+
+
+def divider_selected(pc, name):
+    pc.print2('   ', '▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁', start='\n', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+
+    pc.print2(f"=== ▎Simple Divider Demo▕ ===", f"{name} ===", color=['orange', 'purple'], bg_color=['dgray', 'orange'], overline=False, bold=[False, True], style_args_as_one=False)
+
+    pc.print2('   ', '▔' * 21, color=['default', 'purple'], overline=[False, False], style_args_as_one=False)
+
+
+def divider_unselected(pc, name):
+    pc.print2('   ', '                     ', start='\n', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+
+    pc.print2(f"=== ▎Simple Divider Demo▕ ===", f"{name} ===", color=['orange', 'purple'], bg_color=['dgray', 'orange'], overline=False, bold=[False, True], style_args_as_one=False)
+
+    pc.print2('   ', '                     ', color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
+
+
+def divider_unselected2(pc, name):
+
+    pc.print2('   ', '                     ', start='\n', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+
+    pc.print2("=== ▎", "Simple Divider Demo", "▕ === ", f"{name} ===", sep='', color=['purple', 'orange', 'purple', 'purple'], bg_color=['dgray', 'dgray', 'dgray', 'orange'], bold=[False, False, False, True], style_args_as_one=False)
+
+    pc.print2('   ', '                     ', color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
+
+
+
+    pc.print2('   ', '▁' * 21, start='\n', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+
+    pc.print2("=== ▎", "Simple Divider Demo", "▕ === ", f"{name} ===", sep='', color=['purple', 'orange', 'purple', 'purple'], bg_color=['dgray', 'dgray', 'dgray', 'orange'],
+              bold=[False, False, False, True], style_args_as_one=False)
+
+    pc.print2('   ', '▔' * 21, color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
+
+
+
+    pc.print2(' ' * 3, '▁' * 21, start='\n', color=['default', 'purple'], bold=True, underline=[False, True], style_args_as_one=False)
+
+    pc.print2("=== ▎", "Simple Divider Demo", "▕ === ", f"{name} ===", sep='', color=['purple', 'orange', 'purple', 'purple'], bg_color=['dgray', 'dgray', 'dgray', 'orange'],
+              bold=[False, False, False, True], style_args_as_one=False)
+
+    pc.print2('   ', '▔' * 21, end='\n\n', color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
+
 
 
 def simple_divider_demo(pc, name):
-    pc.print2(f"\n=== Simple Divider Demo ===", f"{name} ===\n", color=['orange', 'purple'], italic=True, bold=[False, True], style_args_as_one=False)
-    text = "Apple|Banana|Orange"
+    experimenting_with_buttons(pc, name)
+    divider_selected(pc, name)
+    divider_unselected(pc, name)
+    divider_unselected2(pc, name)
 
+
+    text = "Apple|Banana|Orange"
 
 
     output = pc.segment_with_splitter_and_style(
@@ -65,6 +216,7 @@ def gradient_demo(pc, name):
     )
     print(output)
 
+    """
     original_styles = {
         name: pc.styles[name] for name in styles if name in pc.styles
     }
@@ -89,7 +241,7 @@ def gradient_demo(pc, name):
 
     print(output2)
     #print(f'\n{pc.escape_ansi_codes(output3)}')
-
+    """
 
 
 def style_words_by_index(pc, name):
@@ -109,7 +261,7 @@ def style_words_by_index(pc, name):
     index_styled_text = pc.style_words_by_index(text1, indexed_style)
     print(f'{index_styled_text}\n')  # 1
 
-    pc.print(text1, style=indexed_style)  # 2
+    pc.print(text1, style=indexed_style, end='\n\n')  # 2
 
     pc.print2(f"Orange text here,", text1, "more orange text.", style=[None, indexed_style, None, None], color=['orange', None, 'orange'], skip_ansi_check=True, style_args_as_one=False)
 
@@ -165,5 +317,9 @@ def main(pc, name):
 if __name__ == "__main__":
     pc_instances = [PrintsCharming(), PrintsCharming(default_bg_color='jupyter')]
     for i, instance in enumerate(pc_instances, start=1):
-        instance.add_string("===", 'vcyan')
+        if i == 2:
+            break
+        instance.trie_manager.add_string("===", 'vcyan')
         main(instance, f'pc{i}')
+
+

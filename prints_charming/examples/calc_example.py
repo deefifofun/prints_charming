@@ -46,10 +46,8 @@ class CalculatorUI:
             # Handle arrow keys if needed
             pass
         elif key == 'ESCAPE':
-            # Handle escape key if needed
             pass
         else:
-            # Handle other keys if necessary
             pass
 
     def get_mouse_event(self):

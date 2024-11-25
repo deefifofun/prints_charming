@@ -51,9 +51,23 @@ styled_strings = {
     "magenta": ["within 10 seconds.", "how", "React", "this is a test"],
     "cyan": ["|", "#", "are", "your", "Project Management System"],
     "orange": ["New Message!", "Prints", "Software Developer", "Prince Charming"],
-    "purple": ["My color is purple", "Reading"],
+    "purple": ["My color is purple", "Reading", "a normal different purple styled phrase and additionally"],
+    "purple_dgray_bg": ["purple phrase with same bg_color"],
+    "purple_dgray_bg_reverse": ["a normal different purple styled phrase with same bg_color but reverse"],
+    "test_color_red_bg_dgray": ["new", "a normal styled phrase", "'test_color_red_bg_dgray' (style)"],
+    "test_color_red_bg_dgray_reverse": ["new_reverse", "a reverse styled phrase"],
+    "conceal": ["conceal1", "conceal2 is a phrase"],
     # Uncomment the next line to hide API keys or sensitive information
     # "conceal": [os.environ[key] for key in os.environ if "API" in key],
+}
+
+styled_subwords = {
+    "yellow": ["please",],
+    "vyellow": ["substring",],
+    "blue": ["color",],
+    "orange": ["apple",],
+    "white": ["pine",],
+    "vred": ["ex",],
 }
 
 
@@ -178,6 +192,7 @@ class CustomError3(PrintsCharmingException):
         print(self.pc.apply_style('green', self.additional_info), file=sys.stderr)
 
 
+"""
 # Timing decorator
 def time_step(func):
     @wraps(func)
@@ -211,13 +226,41 @@ def time_total_execution(main_func):
             print(f'Total script execution time: {pc.apply_style('vgreen', total_time)} seconds!!!')
 
     return wrapper
+"""
 
+
+# Timing decorator
+def time_step(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        step_start = perf_counter()
+        result = func(*args, **kwargs)
+        step_end = perf_counter()
+        elapsed_time = step_end - step_start
+        elapsed_time = f'{elapsed_time:.4f}'
+        print(f'{pc.apply_style('cyan', func.__name__)} took {pc.apply_style('vgreen', elapsed_time)} seconds to complete\n')
+        return result
+
+    return wrapper
+
+
+def time_total_execution(main_func):
+    def wrapper():
+        start_time = perf_counter()
+        main_func()
+        end_time = perf_counter()
+        total_time = end_time - start_time
+        total_time = f'{total_time:.4f}'
+        # Print total execution time with your styling
+        print(f'Total script execution time: {pc.apply_style('vgreen', total_time)} seconds!!!')
+
+    return wrapper
 
 
 @time_step
 def example_menu():
     # Remove '1' from word_map so that it isn't printed in yellow style
-    pc.remove_string('1')
+    pc.trie_manager.remove_string('1')
     # Cycle thru the options with 'n' or 'p' <enter> and then <enter> again on the selection
     menu_options = ["main_menu", "vert", "Option 1", "Option 2", "Option 3"]
     menu = InteractiveMenu(menu_options, pc=pc, selected_style='vcyan', confirmed_style='vgreen', alt_buffer=True)
@@ -568,7 +611,7 @@ def kwargs_replace_and_style_placeholders_examples():
     print(f'result of custom function with replace_and_style_placeholders method:')
     print(custom_replace_and_style_placeholders)
 
-
+"""
 @time_step
 def add_styled_substrings_to_instance(pc):
     pc.add_subword('please', 'yellow')
@@ -577,11 +620,81 @@ def add_styled_substrings_to_instance(pc):
     pc.add_subword('apple', 'orange')
     pc.add_subword('pine', 'white')
     pc.add_subword('ex', 'vred')
-
+"""
 
 
 @time_step
 def print1(pc):
+    concealed_text = pc.conceal_text('conceal this secret text')
+    concealed_and_replaced_text = pc.conceal_text('conceal and replace this secret text', replace=True)
+    print(f"Going to conceal the text after the colon: {concealed_text}")
+    print(f"Going to conceal and replace the text after the colon: {concealed_and_replaced_text}")
+    pc.print(f"Some of this text is going to be concealed with word_map and phrase_trie, specifically, conceal1 and conceal2 is a phrase are both concealed and the rest is styled blue", style="blue")
+
+    pc.print(f'This is new text to test a normal styled phrase', start='')
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray')
+
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray', fill_to_end=True)
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray', fill_to_end=True)
+
+
+    pc.print(f'\tThis is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray',
+             prepend_fill=True)
+    pc.print(f'\tThis is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray',
+             prepend_fill=True, fill_to_end=True)
+
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray',
+             fill_to_end=True)
+
+    pc.print(' ', bg_color='dgray', fill_to_end=True)
+
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray',
+             container_width=50, word_wrap=True)
+    pc.print(f'\tThis is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color)', start='', color='green', bg_color='dgray',
+             prepend_fill=True, fill_to_end=True)
+
+    #pc.config['internal_logging'] = True
+    #pc.setup_internal_logging(pc.config.get("log_level", "DEBUG"))
+
+    #print(f"\nwrap testing:\n")
+    pc.print(f'\n\tThis\n\n\tis new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped = False', start='', color='green', bg_color='dgray', prepend_fill=True, fill_to_end=True)
+    pc.print(f'\n\tThis\n\n\tis new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and print_to_end_of_container = True', start='\n', color='green', bg_color='dgray', container_width=60, fill_to_end=True)
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped at width=60', start='\n', color='green', bg_color='dgray', container_width=60, word_wrap=True)
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped at width=60 and print_to_end_of_container = True', start='\n', color='green', bg_color='dgray', container_width=60, fill_to_end=True, word_wrap=True)
+    print(f'\n\n')
+
+
+    #pc.config['internal_logging'] = False
+
+    bar_strip = pc.generate_bg_bar_strip('blue', length=60)
+    print(bar_strip)
+    pc.print(f'This is new text to\ttest a normal styled phrase and additionally green (color) with dgray (bg_color) and not word_wrapped at width=60', start='\n', color='green', bg_color='dgray')
+    pc.print(f'This is new text to \ttest a normal styled phrase and additionally green (color) with dgray (bg_color) and not word_wrapped at width=60', start='\n', color='green', bg_color='dgray')
+    pc.print2(f'This is new text to \ttest a normal styled phrase and additionally green (color) with dgray (bg_color) and not word_wrapped at width=60', start='\n', color='green', bg_color='dgray')
+    pc.print(f'This is new text to \ttest a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped at width=60', start='\n', color='green', bg_color='dgray', container_width=60, fill_to_end=True)
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped at width=60', start='\n', color='green', bg_color='dgray', container_width=60, word_wrap=True)
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped at width=60', start='\n', color='green', bg_color='dgray', container_width=60, fill_to_end=True, word_wrap=True)
+    pc.print(f'This is new text to test a normal styled phrase and additionally green (color) with dgray (bg_color) and word_wrapped at width=60', start='\n', end='\n', color='green', bg_color='dgray', container_width=60, print_to_end_of_container=True, word_wrap=True)
+    print(f'\n\n')
+
+    print(bar_strip)
+
+
+
+    pc.print(f"This is new text to \ttest a normal styled phrase and additionally 'test_color_red_bg_dgray' (style)", start='\n', style='test_color_red_bg_dgray')
+    pc.print(f"This is new text to test a normal styled phrase and additionally 'test_color_red_bg_dgray' (style) plus 'vyellow' (color)", start='\n', style='test_color_red_bg_dgray', color='vyellow')
+    pc.print(f"This is new text to test a normal different purple styled phrase and additionally 'test_color_red_bg_dgray' (style) plus 'vyellow' (color)", start='\n', style='test_color_red_bg_dgray', color='vyellow')
+    pc.print(f"This is new text to test purple phrase with same bg_color and additionally 'test_color_red_bg_dgray' (style) plus 'vyellow' (color)", start='\n', style='test_color_red_bg_dgray', color='vyellow')
+    pc.print(f"This is new text to test a normal different purple styled phrase with same bg_color but reverse and additionally 'test_color_red_bg_dgray' (style) plus 'vyellow' (color)", start='\n', style='test_color_red_bg_dgray', color='vyellow')
+
+    pc.print(f'This is new text to test a normal styled phrase', start='\n', style='test_color_red_bg_dgray', underline=True)
+    pc.print(f'This is new text to test a normal styled phrase', start='\n', style='test_color_red_bg_dgray', color='green')
+    pc.print(f"This is new_reverse text to test a reverse styled phrase", start='\n\n')
+    pc.print(f"This is new_reverse text to test a reverse styled phrase plus other styled blue text", start='\n', style='blue')
+    pc.print(f"This is new_reverse text to test a reverse styled phrase plus other colored blue text", start='\n', color='blue')
+    pc.print(f"This is new_reverse text to test a reverse styled phrase plus other colored blue text", start='\n', color='blue')
+    pc.print(f"This is new_reverse text to test a reverse styled phrase plus other colored blue text", start='\n', color='blue')
+
     pc.print(f"\nThis is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=5)
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=1)
     pc.print(f"This is an example text with the Some please tsubstring tsubstrings phrase hello world. This includes snapple.\n\n", subword_style_option=2)
@@ -654,7 +767,7 @@ def test_my_style_code(pc):
 
     pc.print(mytext3_styled, skip_ansi_check=True)
 
-    pc.print2(mytext3_styled, skip_ansi_check=True)
+    #pc.print2(mytext3_styled, skip_ansi_check=True)
 
     print(f'{mytext3_styled}\n\n')
 
@@ -669,7 +782,7 @@ def random_examples():
     # words/phrases/substrings/variables/numbers/other/styles/etc/highly dynamic and like i said configurable...legit documentation
     # to come. In the meantime you can keep as is or mess around with the PrintsCharming print method parameters.
 
-    pc = PrintsCharming(styled_strings=styled_strings)
+    pc = PrintsCharming(styled_strings=styled_strings, styled_subwords=styled_subwords)
 
     print(styled_mini_border)
     pc.print(f'function: random_examples:')
@@ -677,34 +790,32 @@ def random_examples():
 
 
 
-    add_styled_substrings_to_instance(pc)
+    #add_styled_substrings_to_instance(pc)
 
     print1(pc)
 
-    print2(pc)
+    #print2(pc)
 
     test_my_style_code(pc)
 
 
 
 
-    pc.add_string('This phrase styled in green', 'green')
-    pc.add_string("I'm completely yellow!", 'vyellow')
-    pc.add_string('wordl', 'red')
-    pc.add_string('Blue', 'blue')
-    pc.add_string("orange phrase          white bg", 'orangewhite')
+    pc.trie_manager.add_string('This phrase styled in green', 'green')
+    pc.trie_manager.add_string("I'm completely yellow!", 'vyellow')
+    pc.trie_manager.add_string('wordl', 'red')
+    pc.trie_manager.add_string('Blue', 'blue')
+    pc.trie_manager.add_string("orange phrase          white bg", 'orangewhite')
 
     pc.print(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
              '   orange phrase          white bg', color='green', bg_color='white', underline=True, overline=True, skip_ansi_check=True)
 
-    pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
-             '   orange phrase          white bg', color='green', bg_color='white', underline=True, overline=True, skip_ansi_check=True)
+    #pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that", '   orange phrase          white bg', color='green', bg_color='white', underline=True, overline=True, skip_ansi_check=True)
 
     pc.print(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
              '   orange phrase          white bg', color='green', underline=True, overline=True, skip_ansi_check=True)
 
-    pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that",
-             '   orange phrase          white bg', color='green', underline=True, overline=True, skip_ansi_check=True)
+    #pc.print2(f"A single wordl styled red. This phrase styled in green Hello                     World.", f"I'm Blue mostly default styling I'm completely yellow! except that", '   orange phrase          white bg', color='green', underline=True, overline=True, skip_ansi_check=True)
 
 
     some_var = 21
@@ -725,7 +836,13 @@ def random_examples():
     # Print using a predefined style 'task' with color changed to green and underline
     pc.print("# Specify predefined style 'task' for printing but change color to green and underline to True.")
     pc.print("This is a task.\n\n", style="task", color="green", underline=True)
+    pc.print("This is a task.\n\n", style="task", color="green", bg_color='jupyter', underline=True)
 
+    pc.print("\n\n", style="task", color="green", bg_color='jupyter', underline=True)
+
+    pc.print("This is a task.", end='\n\n', style="task", color="green", underline=True, bg_color='jupyter')
+    pc.print("This is a task.", start='\n\n', style="task", color="green", underline=True, bg_color='jupyter')
+    pc.print("This is a task.", start='\n\n', end='\n\n', style="task", color="green", underline=True, bg_color='jupyter')
 
 @time_step
 def print_horizontal_bg_strip(pc):
@@ -761,7 +878,7 @@ def auto_styling_examples(pc, text):
     pc.print(f'function: auto_styling_examples:')
     print(f'{styled_mini_border}\n')
 
-    pc.add_strings_from_dict(styled_strings)
+    pc.trie_manager.add_strings_from_dict(styled_strings)
     pc.print("Let's first print, Hello, world! styled as described above.")
     pc.print("Let's first print, Hello, world! styled as described above and right here.", style="yellow")
     pc.print(f"{text} Remember we assigned, 'Hello, world!' to the 'text' variable above. Let's pretend we are Connected to wss://advanced-trade-ws.coinbase.com", color="blue")
@@ -796,10 +913,10 @@ def style_words_by_index_examples(local_pc):
     index_styled_text = local_pc.style_words_by_index(text1, indexed_style)
     print(f'{index_styled_text}\n')  # 1
     local_pc.print(f'Orange text here, {index_styled_text}, more orange text.', color='orange', skip_ansi_check=True)  # 2
-    local_pc.print2(f'Orange text here, {index_styled_text}, more orange text.', color='orange', skip_ansi_check=True)  # 3
+    #local_pc.print2(f'Orange text here, {index_styled_text}, more orange text.', color='orange', skip_ansi_check=True)  # 3
     print()
 
-    local_pc.print2(f'Orange text here', {index_styled_text}, f'more orange text', 'gold text here!', color=['orange', None, 'orange', 'gold'], skip_ansi_check=True, style_args_as_one=False)  # 4
+    #local_pc.print2(f'Orange text here', {index_styled_text}, f'more orange text', 'gold text here!', color=['orange', None, 'orange', 'gold'], skip_ansi_check=True, style_args_as_one=False)  # 4
 
 
     local_pc.print("These,    words are going to be    styled by their indexes. ", style=indexed_style)  # 5
@@ -820,7 +937,7 @@ def style_words_by_index_examples(local_pc):
     }
 
     local_pc.print("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')  # 10
-    local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')  # 11
+    #local_pc.print2("These, words are going to be styled by their indexes.", style=indexed_style2, color='orange')  # 11
 
     index_styled_text3 = local_pc.style_words_by_index("These,    words are going to be    styled by their indexes.  ", indexed_style2)
     print(f'{index_styled_text3}\n\n')  # 12
@@ -840,7 +957,7 @@ def segment_and_style_example_1(local_pc):
     #print(f'{styled_sentence}\n\n')
 
     local_pc.print(f'{text}\n\n', style=splits)
-    local_pc.print2(f'{text}\n\n', style=splits)
+    #local_pc.print2(f'{text}\n\n', style=splits)
 
     styled_sentence2 = local_pc.segment_and_style_update(text, splits)
     print(f'{styled_sentence2}\n')
@@ -857,7 +974,7 @@ def segment_and_style_example_2(local_pc):
     splits = dict(green='sentence', red=['2', 'word:'], blue='gets', yellow='')
 
     local_pc.print(f'{text}\n\n', style=splits)
-    local_pc.print2(f'{text}\n\n', style=splits)
+    #local_pc.print2(f'{text}\n\n', style=splits)
 
     styled_sentence2 = local_pc.segment_and_style2(text, splits)
     print(f'{styled_sentence2}\n\n')
@@ -915,17 +1032,17 @@ def variable_examples(pc):
     print(f'{styled_mini_border}\n')
 
     pc.print("# Use the add_string method to add 'Hello, world!' to the phrases dictionary with 'vgreen' style.")
-    pc.add_string("Hello, world!", style_name="vgreen")
+    pc.trie_manager.add_string("Hello, world!", style_name="vgreen")
     pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
     pc.print("Hello, world!")
     pc.print("# Use the remove_string method to remove 'Hello, world!' from the styled phrases dictionary.")
-    pc.remove_string("Hello, world!")
+    pc.trie_manager.remove_string("Hello, world!")
     pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
     pc.print("Hello, world!")
     pc.print("# Define a variable.")
     text = "Hello, world!"
     pc.print(f"# Use the add_string method to add {text} to the phrases dictionary with 'yellow' style.")
-    pc.add_string(text, style_name="yellow")
+    pc.trie_manager.add_string(text, style_name="yellow")
     pc.print("# Show that 'Hello, world!' is style defined in the phrases dictionary.")
     pc.print(text)
     pc.print("# Show that 'Hello, world!' retains its style while other words are unstyled.")
@@ -935,7 +1052,7 @@ def variable_examples(pc):
     pc.print("# Show how the order of the words doesn't matter.")
     pc.print(f"{text} Let me say that again, {text} {text} I said it again!", style="orange")
     pc.print("# Use the remove_string method to remove 'Hello, world!' from the styled phrases dictionary.")
-    pc.remove_string("Hello, world!")
+    pc.trie_manager.remove_string("Hello, world!")
     pc.print("# Show that 'Hello, world!' has been removed from the styled phrases dictionary.")
     pc.print("Hello, world!\n")
 
@@ -966,7 +1083,7 @@ def simple_use_case(pc):
     pc.print("This is a task.", style="task", color="green", underline=True, end=ds)
     pc.print("Show text with bg_color:")
     pc.print("This has a bg_color", style="bg_color_green", end=ds)
-    pc.print2("This has a bg_color", style="bg_color_green", end=ds)
+    #pc.print2("This has a bg_color", style="bg_color_green", end=ds)
     pc.print("# Show that 'Hello, world!' isn't color or style defined.")
     pc.print("Hello, world!", end=ts)
 
@@ -1018,6 +1135,13 @@ def more_stuff():
     print('\n')
 
     columns = ["Column 1 text\nLine 2. This should def be line2", "Column 2 text\nAnother line", structured_text, "Column 4", " "]
+    col_widths = ['', 25, 68, 20, 20]
+    col_styles = ['red', 'green', 'blue', 'yellow', 'magenta']
+    col_alignments = ['left', 'center', 'left', 'center', 'center']
+    builder.print_multi_column_box2(columns, col_widths, col_styles, col_alignments, col_sep='|')
+    print('\n')
+
+    columns = ["Column 1 text. This should def wrap around to line2 correct?", "Column 2 text\nAnother line\nAnother line but this one is going to wrap around to lines 3, 4, 5, 6, 7, 8, and 9 or maybe more or less depending on your terminal cols width most definitely!", structured_text, "Column 4\n\n\n\n\n\n\n\n\n\n\n\n\nThis is going to jump down a couple lines!", " "]
     col_widths = ['', 25, 68, 20, 20]
     col_styles = ['red', 'green', 'blue', 'yellow', 'magenta']
     col_alignments = ['left', 'center', 'left', 'center', 'center']
@@ -1719,6 +1843,7 @@ def print_markdown(pc):
 
 
 def example_dynamic_formatter():
+    """
     # Example usage
     formatter = DynamicFormatter()
 
@@ -1817,11 +1942,11 @@ def example_dynamic_formatter():
     pc2.print(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
     print(f'\n\n\n')
 
-    pc2.print2(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
+    #pc2.print2(*print_statements, start="Start:\n", end="\nEnd.\n", style='vgreen')
     print(f'\n\n\n')
 
     styles = ['green', 'red', 'yellow', 'yellow', 'red']
-    pc2.print2(*print_statements, start="\nStart:\n\t", end="\nEnd.\n", sep='\n\n\t\t', style=styles, style_args_as_one=False)
+    #pc2.print2(*print_statements, start="\nStart:\n\t", end="\nEnd.\n", sep='\n\n\t\t', style=styles, style_args_as_one=False)
 
     print_statements2 = [
         f'\tThis is some green text with other colors too like, New Message, Reading\n\n',
@@ -1832,17 +1957,19 @@ def example_dynamic_formatter():
     ]
 
     styles = ['green', 'red', 'yellow', 'yellow', 'red']
-    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', style=styles, style_args_as_one=False)
+    #pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', style=styles, style_args_as_one=False)
 
-    pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', color=styles, style_args_as_one=False)
+    #pc2.print2(*print_statements2, start="\nStart:\n", end="\nEnd.\n", sep='', color=styles, style_args_as_one=False)
 
-    styled_args_list = pc2.print2(*print_statements2, start="", end="", sep='', style=styles, style_args_as_one=False, return_styled_args_list=True)
+    #styled_args_list = pc2.print2(*print_statements2, start="", end="", sep='', style=styles, style_args_as_one=False, return_styled_args_list=True)
 
     # Uniform single spacing after each item
-    formatter.write(styled_args_list, start="<<", end=">>", spacing=1)
+    #formatter.write(styled_args_list, start="<<", end=">>", spacing=1)
 
     # Cyclical pattern for spacing (1 newline after first, 2 after second, 3 after third)
     formatter.write(["Item 1", "Item 2", "Item 3"], start="Start:\n", end="\nEnd.", spacing=[1, 2, 3])
+    """
+    pass
 
 
 
@@ -2148,14 +2275,14 @@ def main():
     #################################################
     # Logging
     #################################################
-    logger1, logger2 = play_around_with_logging()
+    #logger1, logger2 = play_around_with_logging()
 
     #################################################
     # Exceptions
     # I may have introduced some breaking changes with customn exception logging i need to correct and will soon if need be
     # but haven't had time to test.
     #################################################
-    exception_examples(logger1, logger2)
+    #exception_examples(logger1, logger2)
 
     #################################################
     # Random Examples
@@ -2169,7 +2296,7 @@ def main():
     #pc = PrintsCharming(config={'internal_logging': True}) if internal_logging else PrintsCharming()
     builder = FrameBuilder(pc=pc, horiz_char='|', vert_width=5, vert_padding=1, vert_char='|')
 
-    pc.add_string('function', 'blue')
+    pc.trie_manager.add_string('function', 'blue')
 
     print_colors_and_styles()
 
@@ -2216,11 +2343,13 @@ if __name__ == "__main__":
     # Change pc_instance
     #CustomError2.set_pc(pc)
 
+    """
     try:
         main()
     except CustomError2 as e:
         print(f"Caught CustomError2: {e}")
         print(f"Additional info: {e.additional_info}")
         e.handle_exception()
-
+    """
+    main()
 
