@@ -140,8 +140,7 @@ create_logger_with_specific_pc_instance()
                        by calling self.__class__.create_reverse_input_mapping()
 
         :param enable_trie_manager: if True initializes an instance of
-                                    TrieManager passing self to the pc_instance
-                                    param.
+                                    TrieManager.
 
         :param styled_strings: calls the add_strings_from_dict method with your
                                provided styled_strings dictionary.
