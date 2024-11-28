@@ -665,7 +665,8 @@ def print1(pc):
 
 
     #pc.config['internal_logging'] = False
-
+    bg_bar_strip = f"{pc.bg_color_map.get('green')}{' ' * 60}{pc.reset}"
+    print(bg_bar_strip)
     bar_strip = pc.generate_bg_bar_strip('blue', length=60)
     print(bar_strip)
     pc.print(f'This is new text to\ttest a normal styled phrase and additionally green (color) with dgray (bg_color) and not word_wrapped at width=60', start='\n', color='green', bg_color='dgray')
@@ -2275,14 +2276,14 @@ def main():
     #################################################
     # Logging
     #################################################
-    #logger1, logger2 = play_around_with_logging()
+    logger1, logger2 = play_around_with_logging()
 
     #################################################
     # Exceptions
     # I may have introduced some breaking changes with customn exception logging i need to correct and will soon if need be
     # but haven't had time to test.
     #################################################
-    #exception_examples(logger1, logger2)
+    exception_examples(logger1, logger2)
 
     #################################################
     # Random Examples

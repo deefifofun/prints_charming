@@ -9,7 +9,6 @@ import tty
 import select
 import copy
 import re
-import textwrap
 import logging
 import inspect
 from datetime import datetime
@@ -32,7 +31,7 @@ from .prints_charming_defaults import (
     DEFAULT_STYLES,
     DEFAULT_LOGGING_STYLES,
     DEFAULT_CONTROL_MAP,
-    DEFAULT_BYTE_PARSING_MAP,
+    DEFAULT_BYTE_MAP,
 )
 
 from .prints_style import PStyle
@@ -93,10 +92,319 @@ class PrintsCharming:
 
     RESET = "\033[0m"
     _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+    LEADING_WS_PATTERN = re.compile(r'^([\n\t]+)')
 
-    ansi_escape_pattern = re.compile(r'\033\[[0-9;]*[mK]')
-    sgr_pattern = re.compile(r'\033\[[0-9;]*[mK]')
-    ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    # Dictionary to hold the patterns
+    ansi_escape_patterns = {}
+
+
+    ANSI_ALL_PATTERN = re.compile(
+        r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*\x07)'
+    )
+    """
+    Matches any ANSI escape sequences.
+
+    Starts with:
+    - ESC character (\x1b)
+
+    Contains:
+    - Single-character sequences: any character from '@' to '_', including 
+      backslash '\\' and hyphen '-'.
+    - CSI sequences: '[' followed by optional parameter bytes ([0-?]*), 
+      optional intermediate bytes ([ -/]*), and a final byte in the range [@-~].
+    - OSC sequences: ']' followed by any characters not including BEL (\x07), 
+      ending with BEL.
+
+    Ends with:
+    - Single-character sequences: character from '@' to '_'.
+    - CSI sequences: final byte in the range '@' to '~'.
+    - OSC sequences: BEL character (\x07).
+
+    **Example matches beyond previous levels:**
+    - '\x1b]0;Title\x07' (Set window title)
+    - '\x1b[P' (Device Control String)
+
+    Use cases:
+    - Removing all types of ANSI escape sequences from text.
+    - Parsing and interpreting any ANSI escape code.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['all'] = ANSI_ALL_PATTERN
+
+
+    ANSI_ALL_NON_OSC_PATTERN = re.compile(
+        r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+    )
+    """
+    Matches any ANSI escape sequences excluding OSC (Operating System Command) 
+    sequences.
+
+    Starts with:
+    - ESC character (\x1b).
+
+    Contains:
+    - Single-character sequences: a single character from '@' to '_', including 
+      backslash '\\' and hyphen '-'.
+    - CSI (Control Sequence Introducer) sequences: '[' followed by optional 
+      parameter bytes ([0-?]*), optional intermediate bytes ([ -/]*), and a 
+      final byte in the range '@' to '~'.
+
+    Does not match:
+    - OSC sequences (which start with ']' and end with BEL (\x07)).
+
+    **Example matches beyond previous levels:**
+    - '\x1b[D' (Move cursor left, single-character).
+    - '\x1b[1;31m' (Set text attributes, CSI).
+    - '\x1b[2J' (Clear screen, CSI).
+
+    Use cases:
+    - Parsing or interpreting most ANSI escape sequences except OSC.
+    - Simplifying text processing when OSC sequences are irrelevant.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['all_non_osc'] = ANSI_ALL_NON_OSC_PATTERN
+
+
+    ANSI_CSI_PATTERN = re.compile(
+        r'\x1b\[[0-?]*[ -/]*[@-~]'
+    )
+    """
+    Matches ANSI CSI (Control Sequence Introducer) sequences.
+
+    Starts with:
+    - ESC character (\x1b) followed by '['
+
+    Contains:
+    - Optional parameter bytes: digits, semicolons, or '?'.
+    - Optional intermediate bytes: characters from ' ' (space) to '/'.
+    - Final byte: any character from '@' to '~'.
+
+    Ends with:
+    - Final byte in the range '@' to '~'.
+    
+    Does Not Match:
+    - Single-character ANSI sequences (e.g., \x1b[D).
+    - OSC sequences (e.g., \x1b]0;Title\x07).
+
+    **Example matches beyond previous levels:**
+    - '\x1b[1;31;40m' (Set text attributes)
+    - '\x1b[0c' (Device Attributes request)
+    - '\x1b[2J' (Clear Screen)
+
+    Use cases:
+    - Parsing standard CSI sequences like cursor movement, styling, and screen 
+      clearing, including non-alphabetic final bytes.
+    - Implementing terminal control functions.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['csi'] = ANSI_CSI_PATTERN
+
+
+    ANSI_CORE_PATTERN = re.compile(
+        r'\x1b\[[0-9;]*[a-zA-Z]'
+    )
+    """
+    Matches core ANSI escape sequences commonly used for text styling, cursor 
+    movement, and screen manipulation.
+
+    Starts with:
+    - ESC character (\x1b) followed by '['
+
+    Contains:
+    - Optional numeric parameters separated by semicolons.
+
+    Ends with:
+    - An alphabetic character (a-z or A-Z).
+    
+    Does Not Match:
+    - CSI sequences with non-alphabetic final bytes (e.g., @, [, or ~).
+    - Single-character ANSI sequences (e.g., \x1b[D).
+    - OSC sequences (e.g., \x1b]0;Title\x07).
+
+    **Example matches beyond previous levels:**
+    - '\x1b[12;24r' (Set scrolling region)
+    - '\x1b[5n' (Device status report)
+
+    Use cases:
+    - Handling CSI sequences with alphabetic final bytes.
+    - Filtering out sequences that use non-standard characters.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['core'] = ANSI_CORE_PATTERN
+
+
+    ANSI_SGR_OR_ERASE = re.compile(
+        r'\x1b\[[0-9;]*[mK]'
+    )
+    """
+    Matches ANSI CSI sequences ending with 'm' or 'K'.
+
+    Starts with:
+    - ESC character (\x1b) followed by '['
+
+    Contains:
+    - Optional numeric parameters separated by semicolons.
+
+    Ends with:
+    - Either 'm' or 'K'.
+
+    Example matches beyond previous levels:
+    - '\x1b[K' (Erase to end of line)
+    - '\x1b[1;2K' (Erase line with parameters)
+
+    Use cases:
+    - Specifically targeting text formatting and line modification sequences.
+    - Simplifying parsing when only 'm' or 'K' sequences are relevant.
+    - Handling both SGR styling and line clearing commands in terminal outputs.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['sgr_mk'] = ANSI_SGR_OR_ERASE
+
+
+    ANSI_SGR_LOOSE_PATTERN = re.compile(
+        r'\x1b\[[0-9;]*m'
+    )
+    """
+    Matches ANSI SGR sequences with optional numeric parameters.
+
+    Starts with:
+    - ESC character (\x1b) followed by '['
+
+    Contains:
+    - Optional numeric parameters separated by semicolons.
+
+    Ends with:
+    - 'm' character.
+
+    Example matches beyond previous levels:
+    - '\x1b[m' (Shorthand Reset all attributes or no params)
+
+    Use cases:
+    - Parsing or removing text styling codes.
+    - Applying text attributes in terminal applications.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['sgr_loose'] = ANSI_SGR_LOOSE_PATTERN
+
+
+    ANSI_SGR_STRICT_PATTERN = re.compile(
+        r'\x1b\[([0-9]+)(;[0-9]+)*m'
+    )
+    """
+    Matches ANSI SGR sequences with at least one numeric parameter.
+
+    Starts with:
+    - ESC character (\x1b) followed by '['
+
+    Contains:
+    - One or more numeric parameters separated by semicolons.
+
+    Ends with:
+    - 'm' character.
+
+    Example matches beyond previous levels:
+    - '\x1b[31m' (red text)
+    - '\x1b[1;4m' (bold and underlined text).
+    - '\x1b[38;5;231m' (256-color foreground).
+    - '\x1b[38;2;24;28;33m' (TrueColor foreground).
+
+    Use cases:
+    - Parsing or stripping SGR codes for color or style in text output.
+    - Useful in strict parsing scenarios where at least one parameter is 
+      required. 
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['sgr_strict'] = ANSI_SGR_STRICT_PATTERN
+
+
+    ANSI_SINGLE_CHAR_PATTERN = re.compile(
+        r'\x1b[@-Z\\-_]'
+    )
+    """
+    Matches ANSI single-character escape sequences that do not use parameters
+    or CSI sequences.
+
+    Starts with:
+    - ESC character (\x1b)
+
+    Contains:
+    - A single character from '@' to '_', including backslash '\\' and hyphen '-'.
+
+    Ends with:
+    - The single character after ESC.
+
+    **Example matches beyond previous levels:**
+    - '\x1b=' (Set alternate keypad mode)
+    - '\x1b>' (Set numeric keypad mode)
+    - '\x1b[D' (cursor left).
+    - '\x1b[M' (scroll up).
+
+    Use cases:
+    - Processing simple, single-character control sequences.
+    - Specifically for simple ANSI escape sequences used for terminal control, 
+      like keyboard inputs or mode toggles.
+    """
+    # Add to ansi_escape_patterns dictionary
+    ansi_escape_patterns['single_char'] = ANSI_SINGLE_CHAR_PATTERN
+
+
+    # default ansi escape pattern
+    ansi_escape_pattern = ansi_escape_patterns['sgr_mk']
+
+
+    @classmethod
+    def update_default_ansi_escape_pattern(cls, pattern_key: str) -> None:
+        """
+        Update the default ANSI escape pattern used by the class.
+
+        :param pattern_key: The key of the pattern to set as the default.
+        :raises ValueError: If the provided pattern_key does not exist in ansi_escape_patterns.
+        """
+        # Retrieve the pattern
+        pattern = cls.ansi_escape_patterns.get(pattern_key)
+
+        # Validate the pattern key
+        if pattern is None:
+            raise ValueError(
+                f"Invalid pattern_key '{pattern_key}'. "
+                f"Available keys are: {list(cls.ansi_escape_patterns.keys())}."
+            )
+
+        # Update the default pattern
+        cls.ansi_escape_pattern = pattern
+
+
+    @classmethod
+    def remove_ansi_codes(cls, text: Any, pattern_key: str = None) -> str:
+        """
+        Removes ANSI codes from the text.
+
+        :param text: The input text (should be a string).
+        :param pattern_key: (Optional) Key in ansi_escape_patterns dict.
+                            If None, uses the default pattern (`cls.ansi_escape_pattern`).
+        :return: The text without ANSI codes.
+        :raises ValueError: If an invalid `pattern_key` is provided.
+        """
+        if not isinstance(text, str):
+            raise TypeError(f"Expected 'text' to be a string, got {type(text).__name__}.")
+
+        # Use the default pattern if no pattern_key is provided
+        if not pattern_key:
+            return cls.ansi_escape_pattern.sub('', text)
+
+        # Retrieve the pattern for the provided key
+        pattern = cls.ansi_escape_patterns.get(pattern_key)
+        if not pattern:
+            raise ValueError(
+                f"Invalid pattern_key '{pattern_key}'. "
+                f"Available keys are: {list(cls.ansi_escape_patterns.keys())}."
+            )
+
+        # Use the retrieved pattern to remove ANSI codes
+        return pattern.sub('', text)
+
+
+
     words_and_spaces_pattern = re.compile(r'\S+|\s+')
 
     # For package wide internal and subclass logging purposes.
@@ -113,7 +421,8 @@ class PrintsCharming:
     shared_unicode_map: Optional[Dict[str, str]] = DEFAULT_UNICODE_MAP
     shared_styles: Optional[Dict[str, PStyle]] = None
     shared_ctl_map: Optional[Dict[str, str]] = DEFAULT_CONTROL_MAP
-    shared_byte_map: Optional[Dict[str, bytes]] = DEFAULT_BYTE_PARSING_MAP
+    shared_byte_map: Optional[Dict[str, bytes]] = DEFAULT_BYTE_MAP
+
 
     # Assigned with create_reverse_input_mapping classmethod called in relevant modules
     shared_reverse_input_map: Optional[Dict[bytes, str]] = None
@@ -173,10 +482,9 @@ class PrintsCharming:
     @classmethod
     def set_shared_maps(cls,
                         shared_color_map: Optional[Dict[str, str]] = None,
-                        shared_bg_color_map: Optional[Dict[str, str]] = None,
                         shared_effect_map: Optional[Dict[str, str]] = None,
                         shared_unicode_map: Optional[Dict[str, str]] = None,
-                        shared_styles: Optional[Dict[str, PStyle]] = None,
+                        shared_style_map: Optional[Dict[str, PStyle]] = None,
                         shared_ctl_map: Optional[Dict[str, str]] = None,
                         shared_byte_map: Optional[Dict[str, bytes]] = None,
                         ) -> None:
@@ -222,22 +530,15 @@ class PrintsCharming:
                                  instances. If not provided,
                                  `DEFAULT_COLOR_MAP.copy()` will be used.
 
-        :param shared_bg_color_map: (Optional) A dictionary of shared
-                                    background color mappings. to be accessible
-                                    globally across all instances. If None
-                                    (as it should be unless your really know
-                                    what your doing), it will be computed from
-                                    shared_color_map.
-
         :param shared_effect_map: (Optional) A dictionary of effect mappings.
                                   **This should not be changed unless you are
                                   certain of what you're doing.**
 
         :param shared_unicode_map: (Optional) A dictionary of unicode mappings.
 
-        :param shared_styles: (Optional) A dictionary of shared styles. This
-                              allows for the consistent application of text
-                              styles across all instances.
+        :param shared_style_map: (Optional) A dictionary of shared styles. This
+                                 allows for the consistent application of styles
+                                 across all instances.
 
         :param shared_ctl_map: (Optional) A dictionary of shared control codes.
         :param shared_byte_map: (Optional) A dictionary of bytes for input parsing.
@@ -245,7 +546,7 @@ class PrintsCharming:
 
         cls.shared_color_map = shared_color_map or DEFAULT_COLOR_MAP.copy()
         cls.shared_color_map.setdefault('default', PrintsCharming.RESET)
-        cls.shared_bg_color_map = shared_bg_color_map or {
+        cls.shared_bg_color_map = {
             color: compute_bg_color_map(code)
             for color, code in cls.shared_color_map.items()
         }
@@ -256,8 +557,8 @@ class PrintsCharming:
         if shared_unicode_map:
             cls.shared_unicode_map = shared_unicode_map
 
-        if shared_styles:
-            cls.shared_styles = shared_styles
+        if shared_style_map:
+            cls.shared_styles = shared_style_map
 
         if shared_ctl_map:
             cls.shared_ctl_map = shared_ctl_map
@@ -268,56 +569,30 @@ class PrintsCharming:
 
     @classmethod
     def create_reverse_input_mapping(
-        cls,
-        ctl_map_input_keys: Optional[set] = None,
-        byte_map_input_keys: Optional[set] = None,
-        update: bool = False,
+            cls,
+            ctl_map_input_keys: Optional[set] = None,
+            byte_map_input_keys: Optional[set] = None,
+            update: bool = False,
     ) -> None:
+        """
+        Create a reverse input mapping for escape sequences.
 
-        if not cls.shared_reverse_input_map or update:
-            # Set of input keys from cls.shared_ctl_map
-            if not ctl_map_input_keys:
-                ctl_map_input_keys = {
-                    # Function Keys
-                    "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
-                    # Navigation Keys
-                    "arrow_up", "arrow_down", "arrow_right", "arrow_left",
-                    "home", "end", "insert", "delete", "page_up", "page_down",
-                    # Miscellaneous Input
-                    "escape", "tab", "backspace", "enter",
-                    # Modifier Keys
-                    "ctrl_a", "ctrl_b", "ctrl_c", "ctrl_d", "ctrl_e", "ctrl_f", "ctrl_g",
-                    "ctrl_h", "ctrl_i", "ctrl_j", "ctrl_k", "ctrl_l", "ctrl_m", "ctrl_n",
-                    "ctrl_o", "ctrl_p", "ctrl_q", "ctrl_r", "ctrl_s", "ctrl_t", "ctrl_u",
-                    "ctrl_v", "ctrl_w", "ctrl_x", "ctrl_y", "ctrl_z",
-                    "ctrl_backslash", "ctrl_square_bracket", "ctrl_caret", "ctrl_underscore",
-                    "shift_arrow_up", "shift_arrow_down", "shift_arrow_right", "shift_arrow_left",
-                    "alt_arrow_up", "alt_arrow_down", "alt_arrow_right", "alt_arrow_left",
-                }
+        Args:
+            ctl_map_input_keys (Optional[set]): Keys from shared_ctl_map to include.
+            byte_map_input_keys (Optional[set]): Keys from shared_byte_map to include.
+            update (bool): If True, updates the existing mapping; otherwise, rebuilds it.
+        """
+        if cls.shared_reverse_input_map is None or update:
+            ctl_map_input_keys = ctl_map_input_keys or set(cls.shared_ctl_map.keys())
+            byte_map_input_keys = byte_map_input_keys or set(cls.shared_byte_map.keys())
 
-            # Specific keys to include from cls.shared_byte_map
-            if not byte_map_input_keys:
-                byte_map_input_keys = {
-                    "ctrl_space", "ctrl_enter", "ctrl_tab", "shift_tab",
-                    "ctrl_escape", "ctrl_backspace", "paste_start", "paste_end",
-                    "newline_detected", "carriage_return_detected",
-                }
-
-            # Reverse mapping dictionary
-            reverse_mapping: Dict[bytes, str] = {}
-
-            # Add input keys from cls.shared_ctl_map
-            for key, value in cls.shared_ctl_map.items():
-                if key in ctl_map_input_keys:
-                    # Normalize to bytes if necessary
-                    reverse_mapping[value.encode() if isinstance(value, str) else value] = key
-
-            # Add input keys from cls.shared_byte_map
-            for key, value in cls.shared_byte_map.items():
-                if key in byte_map_input_keys:
-                    reverse_mapping[value] = key
-
-            cls.shared_reverse_input_map = reverse_mapping
+            # Combine control and byte maps, filter out placeholder sequences
+            cls.shared_reverse_input_map = {
+                (v.encode() if isinstance(v, str) else v): k
+                for k, v in {**cls.shared_ctl_map, **cls.shared_byte_map}.items()
+                if (k in ctl_map_input_keys or k in byte_map_input_keys)
+                and not (isinstance(v, str) and "{" in v and "}" in v)  # Exclude placeholders
+            }
 
 
     @staticmethod
@@ -455,21 +730,38 @@ class PrintsCharming:
 
 
     @classmethod
-    def remove_ansi_codes(cls, text: Any) -> str:
+    def render_output(cls, *control_keys_or_text: Union[str, bytes, tuple], **global_kwargs: Any) -> None:
         """
-        Removes ANSI codes from the text.
+        Writes control sequences or text to sys.stdout.
+        Positional arguments can include tuples for scoped control sequences.
+        """
+        output = []
+        for item in control_keys_or_text:
+            if isinstance(item, tuple):
+                # Unpack the tuple: (control_key, local_kwargs)
+                key, local_kwargs = item
+                control_sequence = cls.shared_ctl_map.get(key, key)
+                if local_kwargs:
+                    control_sequence = control_sequence.format(**local_kwargs)
+                output.append(control_sequence)
+            elif isinstance(item, str):
+                control_sequence = cls.shared_ctl_map.get(item, item)
+                if global_kwargs and '{' in control_sequence and '}' in control_sequence:
+                    control_sequence = control_sequence.format(**global_kwargs)
+                output.append(control_sequence)
+            elif isinstance(item, bytes):
+                output.append(item.decode("utf-8"))
+        sys.stdout.write("".join(output))
+        sys.stdout.flush()
 
-        :param text: The input text.
-        :return: The text without ANSI codes.
-        """
-        return cls.ansi_escape_pattern.sub('', text)
+
+
 
 
 
     def __init__(self,
                  config: Optional[Dict[str, Union[bool, int, str]]] = None,
                  color_map: Optional[Dict[str, str]] = None,
-                 bg_color_map: Optional[Dict[str, str]] = None,
                  default_bg_color: Optional[str] = None,
                  effect_map: Optional[Dict[str, str]] = None,
                  unicode_map: Optional[Dict[str, str]] = None,
@@ -491,11 +783,10 @@ class PrintsCharming:
         :param color_map: supply your own color_map dictionary.
                           'color_name': 'ansi_code'
 
-        :param bg_color_map: supply your own bg_color_map dictionary. Default
-                             is computed from color_map dictionary.
-
         :param default_bg_color: change the default background color to a color
-                                 other than your terminal's background color.
+                                 other than your terminal's background color by
+                                 supplying the name of a color defined in the
+                                 color map.
 
         :param effect_map: supply your own effect_map dictionary. Default is
                            PrintsCharming.shared_effect_map
@@ -503,9 +794,9 @@ class PrintsCharming:
         :param unicode_map: supply your own unicode_map dictionary. Default is
                             PrintsCharming.shared_unicode_map
 
-        :param styles: supply your own styles dictionary. Default is a copy of
-                       the DEFAULT_STYLES dictionary unless cls.shared_styles
-                       is defined.
+        :param styles: supply your own style_map dictionary. Default is a copy
+                       of the DEFAULT_STYLES dictionary unless
+                       cls.shared_style_map is defined.
 
         :param enable_input_parsing: if True define cls.shared_reverse_input_map
                        by calling self.__class__.create_reverse_input_mapping()
@@ -544,14 +835,10 @@ class PrintsCharming:
         )
         self.color_map.setdefault('default', PrintsCharming.RESET)
 
-        self.bg_color_map = (
-            bg_color_map
-            or PrintsCharming.shared_bg_color_map
-            or {
+        self.bg_color_map = {
                 color: compute_bg_color_map(code)
                 for color, code in self.color_map.items()
-            }
-        )
+        }
 
         self.effect_map = effect_map or PrintsCharming.shared_effect_map
 
@@ -1609,15 +1896,16 @@ class PrintsCharming:
 
 
     @staticmethod
-    def replace_leading_newlines_tabs(s: str, fill_with: str, tab_width: int) -> str:
-        #ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+    def replace_leading_newlines_tabs(s: str, fill_with: str, tab_width: int, pattern_key: str = None) -> str:
+        pattern_dict = PrintsCharming.ansi_escape_patterns
+        pattern = pattern_dict.get(pattern_key, pattern_dict['core'])
 
         # Extract leading ANSI codes
         leading_ansi_codes = ''
         index = 0
         while index < len(s):
             if s[index] == '\x1b':
-                m = PrintsCharming.ansi_escape_pattern.match(s, index)
+                m = pattern.match(s, index)
                 if m:
                     ansi_seq = m.group()
                     leading_ansi_codes += ansi_seq
@@ -1629,7 +1917,7 @@ class PrintsCharming:
         s = s[index:]
 
         # Match leading newlines and tabs
-        leading_ws_match = re.match(r'^([\n\t]+)', s)
+        leading_ws_match = PrintsCharming.LEADING_WS_PATTERN.match(s)
         if leading_ws_match:
             leading_ws = leading_ws_match.group(1)
             n_newlines = leading_ws.count('\n')
@@ -1645,12 +1933,12 @@ class PrintsCharming:
 
 
     @staticmethod
-    def wrap_styled_text(styled_text: str, width: int, tab_width: int = 8) -> List[str]:
+    def wrap_styled_text(styled_text: str, width: int, tab_width: int = 8, pattern_key: str = None) -> List[str]:
         """
         Wraps the styled text (which includes ANSI codes) to the specified width.
         """
-
-        ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+        pattern_dict = PrintsCharming.ansi_escape_patterns
+        pattern = pattern_dict.get(pattern_key, pattern_dict['core'])
 
         i = 0
         line = ''
@@ -1660,7 +1948,7 @@ class PrintsCharming:
         while i < len(styled_text):
             if styled_text[i] == '\x1b':
                 # Handle ANSI escape sequences
-                m = ansi_escape.match(styled_text, i)
+                m = pattern.match(styled_text, i)
                 if m:
                     ansi_seq = m.group()
                     line += ansi_seq
@@ -1707,7 +1995,6 @@ class PrintsCharming:
         - Resets the length after each `\n`.
         - Expands `\t` to the next tab stop.
         """
-        #text = PrintsCharming.ansi_escape_pattern.sub('', text)
         if not tab_width:
             tab_width = self.config.get('tab_width', 8)
 
@@ -1730,7 +2017,7 @@ class PrintsCharming:
         :param s: The input string.
         :return: True if the string contains ANSI codes, False otherwise.
         """
-        return '\033' in s
+        return '\x1b' in s
 
 
     @staticmethod
@@ -2037,9 +2324,9 @@ class PrintsCharming:
 
 
         # Convert the text to a list of words and spaces
-        #words_and_spaces = self.get_words_and_spaces(text)
+        # words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
         words_and_spaces = self.get_words_and_spaces(start + text)
-        #words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
+
         self.debug(f'words_and_spaces:\n{words_and_spaces}')
 
         # Initialize list to hold the final styled words and spaces
@@ -2360,7 +2647,15 @@ class PrintsCharming:
                     # Replace leading newlines and tabs in 'line' with fill_with * (tab_width * n_tabs)
                     line = self.replace_leading_newlines_tabs(line, fill_with, tab_width)
 
+                # Calculate the number of trailing newlines
+                trailing_newlines = len(line) - len(line.rstrip('\n'))
+
+                # Check if the line is empty (contains only a newline character)
+                stripped_line = line.rstrip('\n')
+                has_newline = line.endswith('\n')
+
                 if fill_to_end:
+                    """
                     # Calculate the visible length of the line
                     visible_line = PrintsCharming.remove_ansi_codes(line)
                     current_length = self.get_visible_length(visible_line.expandtabs(tab_width), tab_width=tab_width)
@@ -2377,11 +2672,42 @@ class PrintsCharming:
                         padded_line += self.reset
 
                     final_lines.append(padded_line)
+                    """
+                    # Calculate the visible length of the line
+                    visible_line = PrintsCharming.remove_ansi_codes(stripped_line)
+                    current_length = self.get_visible_length(visible_line.expandtabs(tab_width), tab_width=tab_width)
+                    chars_needed = max(0, container_width - current_length)
+
+                    # If the line ends with the ANSI reset code, remove it temporarily
+                    has_reset = stripped_line.endswith(self.reset)
+                    if has_reset:
+                        stripped_line = stripped_line[:-len(self.reset)]
+
+                    # Add padding characters and then the reset code if it was present
+                    padded_line = stripped_line + fill_with * chars_needed
+                    if has_reset:
+                        padded_line += self.reset
+
+                    # Re-append the newline character if it was present
+                    if trailing_newlines > 0:
+                        padded_line += '\n' * trailing_newlines
+
+                    final_lines.append(padded_line)
                 else:
                     final_lines.append(line)
 
             # Combine the lines into the final styled output
-            final_all_styled_text = '\n'.join(final_lines)
+            if any(line.endswith('\n') for line in final_lines):
+                # Lines already contain newline characters; avoid adding extra newlines
+                final_all_styled_text = ''.join(final_lines)
+            else:
+                # Lines do not contain newlines; join them with '\n'
+                final_all_styled_text = '\n'.join(final_lines)
+
+            """
+            # Combine the lines into the final styled output
+            final_all_styled_text = ''.join(final_lines)
+            """
 
         else:
             final_all_styled_text = styled_text
@@ -3484,9 +3810,7 @@ class PrintsCharming:
 
     def apply_custom_python_highlighting(self, code_block):
         reset_code = PrintsCharming.RESET
-
-        # Pattern to match ANSI escape sequences (like 38;5;248m) and exclude them from further styling
-        ansi_escape_sequence_pattern = r'\033\[[0-9;]*m'
+        ansi_sgr_loose_pattern = PrintsCharming.ANSI_SGR_LOOSE_PATTERN
 
         # Simple regex patterns for Python elements
         builtin_pattern = r'\b(print|input|len|range|map|filter|open|help)\b'
@@ -3506,7 +3830,7 @@ class PrintsCharming:
         self_param_pattern = r'\bself\b'  # For detecting 'self' parameter
 
         # Exclude ANSI escape sequences from number styling
-        code_block = re.sub(ansi_escape_sequence_pattern, lambda match: match.group(0), code_block)
+        code_block = ansi_sgr_loose_pattern.sub(lambda match: match.group(0), code_block)
 
         # Apply styles to comments, strings, builtins, keywords
         code_block = re.sub(comment_pattern, f'{self.style_codes.get('python_comment', '')}\\g<0>{reset_code}', code_block, flags=re.MULTILINE)
@@ -3525,7 +3849,8 @@ class PrintsCharming:
 
         # Function to style parameters
         def param_replacer(param_match):
-            param_name = re.sub(ansi_escape_sequence_pattern, '', param_match.group(1))  # Exclude ANSI sequences
+            param_name = ansi_sgr_loose_pattern.sub('', param_match.group(1))  # Exclude ANSI sequences
+
             equal_sign = param_match.group(2).strip()
             default_value = param_match.group(3)
 
@@ -3538,10 +3863,10 @@ class PrintsCharming:
 
         # Match function signatures and apply styles to different parts
         def function_replacer(match):
-            function_name = re.sub(ansi_escape_sequence_pattern, '', match.group(1))  # Function name
-            parenthesis_open = re.sub(ansi_escape_sequence_pattern, '', match.group(2))
-            params = re.sub(ansi_escape_sequence_pattern, '', match.group(3))  # Parameters
-            parenthesis_close = re.sub(ansi_escape_sequence_pattern, '', match.group(4))
+            function_name = ansi_sgr_loose_pattern.sub('', match.group(1))  # Function name
+            parenthesis_open = ansi_sgr_loose_pattern.sub('', match.group(2))
+            params = ansi_sgr_loose_pattern.sub('', match.group(3))  # Parameters
+            parenthesis_close = ansi_sgr_loose_pattern.sub('', match.group(4))
             colon = match.group(5) if len(match.groups()) == 5 else ''
 
             # Apply styles and reset codes
@@ -3567,13 +3892,13 @@ class PrintsCharming:
         # Match and style function calls (function calls don't have trailing colons)
         def function_call_replacer(match):
             #function_name = f'{function_name_style_code}{match.group(1)}{reset_code}'  # Function name in calls
-            function_name = re.sub(ansi_escape_sequence_pattern, '', match.group(1))  # Function name
+            function_name = ansi_sgr_loose_pattern.sub('', match.group(1))  # Function name
             #parenthesis_open = f'{parenthesis_style_code}{match.group(2)}{reset_code}'
-            parenthesis_open = re.sub(ansi_escape_sequence_pattern, '', match.group(2))
+            parenthesis_open = ansi_sgr_loose_pattern.sub('', match.group(2))
             #params = match.group(3)
-            params = re.sub(ansi_escape_sequence_pattern, '', match.group(3))  # Exclude ANSI sequences
+            params = ansi_sgr_loose_pattern.sub('', match.group(3))  # Exclude ANSI sequences
             #parenthesis_close = f'{parenthesis_style_code}{match.group(4)}{reset_code}'
-            parenthesis_close = re.sub(ansi_escape_sequence_pattern, '', match.group(4))
+            parenthesis_close = ansi_sgr_loose_pattern.sub('', match.group(4))
 
             # Apply styles to 'cls' parameter within function calls
             styled_params = re.sub(cls_param_pattern, f'{self.style_codes.get('python_self_param', '')}cls{reset_code}', params)

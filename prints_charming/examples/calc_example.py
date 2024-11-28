@@ -14,6 +14,7 @@ class CalculatorUI:
     def __init__(self):
         self.pc = PrintsCharming(enable_input_parsing=True)
         self.write = self.pc.write
+        self.byte_map = self.pc.__class__.shared_byte_map
         self.fb = FrameBuilder(pc=self.pc, horiz_char='-', vert_width=1, vert_padding=0, vert_char='|', horiz_width=45)
         self.tm = TableManager(pc=self.pc)
         self.expression = ""
@@ -58,7 +59,7 @@ class CalculatorUI:
             # Set cbreak mode to allow signals like Ctrl-C
             tty.setcbreak(fd, termios.TCSANOW)
             c = sys.stdin.buffer.read(1)
-            if c == byte_map['escape_key']:  # Start of an escape sequence
+            if c == b'\x1b':  # Start of an escape sequence
                 c += sys.stdin.buffer.read(1)
                 if c[-1:] == b'[':
                     c += sys.stdin.buffer.read(1)
@@ -205,13 +206,14 @@ class CalculatorUI:
 
     def handle_escape_sequence(self, seq):
         # You can process the escape sequence here
-        if seq == b'\x1b[A':
+        byte_map = self.byte_map
+        if seq == byte_map['cursor_up']:
             self.handle_keystroke('UP_ARROW')
-        elif seq == b'\x1b[B':
+        elif seq == byte_map['cursor_down']:
             self.handle_keystroke('DOWN_ARROW')
-        elif seq == b'\x1b[C':
+        elif seq == byte_map['cursor_right']:
             self.handle_keystroke('RIGHT_ARROW')
-        elif seq == b'\x1b[D':
+        elif seq == byte_map['cursor_left']:
             self.handle_keystroke('LEFT_ARROW')
         else:
             # Handle other escape sequences if needed

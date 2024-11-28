@@ -191,7 +191,7 @@ class TrieManager:
 
             # Get the style attributes
             attribs = vars(self.pc.styles.get(style_name)).copy()
-            if attribs.get('reversed') and handle_reverse:
+            if attribs.get('reverse') and handle_reverse:
                 attribs['color'], attribs['bg_color'] = (
                     attribs.get('bg_color'), attribs.get('color')
                 )

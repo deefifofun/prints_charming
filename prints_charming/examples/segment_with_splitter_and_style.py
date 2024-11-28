@@ -63,6 +63,8 @@ def experimenting_with_buttons(pc, name):
     pc.print2(*middle_line_args_base, sep='', color=['purple', 'orange', 'purple', 'purple'], bg_color=['dgray', 'dgray', 'dgray', 'orange'], bold=[False, False, False, True], style_args_as_one=False)
     pc.print2(*bottom_line_args_base, sep='', color=['default', 'purple'], overline=[False, True], style_args_as_one=False)
 
+
+
     # Create copies of the base arguments
     top_line_args = top_line_args_base.copy()
     middle_line_args = middle_line_args_base.copy()

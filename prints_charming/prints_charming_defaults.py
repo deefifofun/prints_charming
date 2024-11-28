@@ -380,7 +380,6 @@ DEFAULT_LEVEL_STYLES = {
 
 
 
-
 DEFAULT_UNICODE_MAP = {
         # Animals
         "baboon": "𓃷",
@@ -836,69 +835,69 @@ DEFAULT_UNICODE_MAP = {
 DEFAULT_CONTROL_MAP: Dict[str, str] = {
 
         # 256 Color Mode (Foreground)
-        "fg_color_256": "\033[38;5;{n}m",  # Set 256 color mode foreground (0-255)
+        "fg_color_256": "\x1b[38;5;{n}m",  # Set 256 color mode foreground (0-255)
 
         # 256 Color Mode (Background)
-        "bg_color_256": "\033[48;5;{n}m",  # Set 256 color mode background (0-255)
+        "bg_color_256": "\x1b[48;5;{n}m",  # Set 256 color mode background (0-255)
 
         # True Color Mode (Foreground)
-        "fg_truecolor": "\033[38;2;{r};{g};{b}m",  # Set true color mode foreground (RGB)
+        "fg_truecolor": "\x1b[38;2;{r};{g};{b}m",  # Set true color mode foreground (RGB)
 
         # True Color Mode (Background)
-        "bg_truecolor": "\033[48;2;{r};{g};{b}m",  # Set true color mode background (RGB)
+        "bg_truecolor": "\x1b[48;2;{r};{g};{b}m",  # Set true color mode background (RGB)
 
         # Buffer Control
-        "alt_buffer": "\033[?1049h",
-        "normal_buffer": "\033[?1049l",
-        "alt_buffer_no_save": "\033[?47h",  # Switch to alternate buffer without saving the cursor
-        "normal_buffer_no_save": "\033[?47l",  # Switch back to normal buffer without restoring the cursor
+        "alt_buffer": "\x1b[?1049h",
+        "normal_buffer": "\x1b[?1049l",
+        "alt_buffer_no_save": "\x1b[?47h",  # Switch to alternate buffer without saving the cursor
+        "normal_buffer_no_save": "\x1b[?47l",  # Switch back to normal buffer without restoring the cursor
 
         # Screen Clearing
-        "clear_screen": "\033[2J",  # Clear the entire screen
-        "clear_screen_from_cursor": "\033[0J",  # Clear screen from the cursor down
-        "clear_screen_to_cursor": "\033[1J",  # Clear screen from the cursor up
+        "clear_screen": "\x1b[2J",  # Clear the entire screen
+        "clear_screen_from_cursor": "\x1b[0J",  # Clear screen from the cursor down
+        "clear_screen_to_cursor": "\x1b[1J",  # Clear screen from the cursor up
 
         # Line Clearing
-        "clear_line": "\033[2K",  # Clear the entire current line
-        "clear_line_from_cursor": "\033[0K",  # Clear from the cursor to the end of the line
-        "clear_line_to_cursor": "\033[1K",  # Clear from the beginning of the line to the cursor
+        "clear_line": "\x1b[2K",  # Clear the entire current line
+        "clear_line_from_cursor": "\x1b[0K",  # Clear from the cursor to the end of the line
+        "clear_line_to_cursor": "\x1b[1K",  # Clear from the beginning of the line to the cursor
 
         # Cursor Movement
-        "cursor_home": "\033[H",  # Move cursor to the home position (top-left corner)
-        "cursor_position": "\033[{row};{col}H",  # Move cursor to specified row and column
-        "cursor_up": "\033[{n}A",  # Move cursor up by n rows
-        "cursor_down": "\033[{n}B",  # Move cursor down by n rows
-        "cursor_right": "\033[{n}C",  # Move cursor forward (right) by n columns
-        "cursor_left": "\033[{n}D",  # Move cursor backward (left) by n columns
-        "save_cursor_position": "\033[s",  # Save the current cursor position
-        "restore_cursor_position": "\033[u",  # Restore saved cursor position
-        "hide_cursor": "\033[?25l",  # Hide the cursor
-        "show_cursor": "\033[?25h",  # Show the cursor
+        "cursor_home": "\x1b[H",  # Move cursor to the home position (top-left corner)
+        "cursor_position": "\x1b[{row};{col}H",  # Move cursor to specified row and column
+        "cursor_up": "\x1b[{n}A",  # Move cursor up by n rows
+        "cursor_down": "\x1b[{n}B",  # Move cursor down by n rows
+        "cursor_right": "\x1b[{n}C",  # Move cursor forward (right) by n columns
+        "cursor_left": "\x1b[{n}D",  # Move cursor backward (left) by n columns
+        "save_cursor_position": "\x1b[s",  # Save the current cursor position
+        "restore_cursor_position": "\x1b[u",  # Restore saved cursor position
+        "hide_cursor": "\x1b[?25l",  # Hide the cursor
+        "show_cursor": "\x1b[?25h",  # Show the cursor
 
         # Line and Text Manipulation
-        "insert_line": "\033[L",  # Insert a blank line at the current cursor position
-        "delete_line": "\033[M",  # Delete the current line
-        "scroll_up": "\033[S",  # Scroll the page up
-        "scroll_down": "\033[T",  # Scroll the page down
+        "insert_line": "\x1b[L",  # Insert a blank line at the current cursor position
+        "delete_line": "\x1b[M",  # Delete the current line
+        "scroll_up": "\x1b[S",  # Scroll the page up
+        "scroll_down": "\x1b[T",  # Scroll the page down
 
         # Mouse Control (Enable or disable mouse reporting)
-        "enable_mouse": "\033[?1000h",  # Enable basic mouse tracking (xterm-style)
-        "disable_mouse": "\033[?1000l",  # Disable mouse tracking
-        'enable_sgr_mouse': "\033[?1006h",  # Enable SGR mouse mode
-        "disable_sgr_mouse": "\033[?1006l", # Disable SGR mouse mode
-        "enable_mouse_button_event_tracking": "\033[?1002h",  # Enable mouse button event tracking
-        "disable_mouse_button_event_tracking": "\033[?1002l",  # Disable mouse button event tracking
+        "enable_mouse": "\x1b[?1000h",  # Enable basic mouse tracking (xterm-style)
+        "disable_mouse": "\x1b[?1000l",  # Disable mouse tracking
+        'enable_sgr_mouse': "\x1b[?1006h",  # Enable SGR mouse mode
+        "disable_sgr_mouse": "\x1b[?1006l", # Disable SGR mouse mode
+        "enable_mouse_button_event_tracking": "\x1b[?1002h",  # Enable mouse button event tracking
+        "disable_mouse_button_event_tracking": "\x1b[?1002l",  # Disable mouse button event tracking
 
         # Miscellaneous
         "bell": "\007",  # Bell (beep sound)
-        "enable_application_keypad": "\033[?1h",  # Enable application keypad mode (for arrow keys, etc.)
-        "disable_application_keypad": "\033[?1l",  # Disable application keypad mode
+        "enable_application_keypad": "\x1b[?1h",  # Enable application keypad mode (for arrow keys, etc.)
+        "disable_application_keypad": "\x1b[?1l",  # Disable application keypad mode
 
         # Key Codes (Special Keys)
-        "arrow_up": "\033[A",  # Up arrow key
-        "arrow_down": "\033[B",  # Down arrow key
-        "arrow_right": "\033[C",  # Right arrow key
-        "arrow_left": "\033[D",  # Left arrow key
+        "arrow_up": "\x1b[A",  # Up arrow key
+        "arrow_down": "\x1b[B",  # Down arrow key
+        "arrow_right": "\x1b[C",  # Right arrow key
+        "arrow_left": "\x1b[D",  # Left arrow key
 
         # Function Keys (F1 to F12)
         "f1": "\x1bOP",              # F1 key
@@ -985,7 +984,7 @@ DEFAULT_CONTROL_MAP: Dict[str, str] = {
 }
 
 
-DEFAULT_BYTE_PARSING_MAP = {
+DEFAULT_BYTE_MAP = {
     # Mouse Event Parsing
     "mouse_event_start": b"<",                 # Start of mouse event
     "mouse_event_end_press": b"M",             # End of mouse press event
@@ -995,9 +994,10 @@ DEFAULT_BYTE_PARSING_MAP = {
     "mouse_scroll_up": b"\x1b[<64;",           # Mouse scroll up
     "mouse_scroll_down": b"\x1b[<65;",         # Mouse scroll down
 
-    # Escape and Meta Keys
+    # Meta and Escape Keys
     "escape_key": b"\x1b",                     # Escape key
     "meta": b"\x1b",                           # Meta key (Alt or Esc)
+
 
     # Bracketed Paste Mode
     "paste_start": b"\x1b[200~",               # Start of pasted text
@@ -1012,8 +1012,31 @@ DEFAULT_BYTE_PARSING_MAP = {
     "fn_key_prefix": b"\x1bO",                 # Function key prefix (varies by terminal)
     "ctrl_escape": b"\x1b\x1b",                # Ctrl + Esc (double escape)
     "ctrl_backspace": b"\x1b\x7f",             # Ctrl + Backspace
+    "backspace": b"\x08",                      # Standard Backspace
+    "delete": b"\x1b[3~",                      # Delete key
+
+    # Function Keys (Common Variants)
+    "f1": b"\x1bOP",                           # F1 key
+    "f2": b"\x1bOQ",                           # F2 key
+    "f3": b"\x1bOR",                           # F3 key
+    "f4": b"\x1bOS",                           # F4 key
+    "f5": b"\x1b[15~",                         # F5 key
+    "f6": b"\x1b[17~",                         # F6 key
+    "f7": b"\x1b[18~",                         # F7 key
+    "f8": b"\x1b[19~",                         # F8 key
+    "f9": b"\x1b[20~",                         # F9 key
+    "f10": b"\x1b[21~",                        # F10 key
+    "f11": b"\x1b[23~",                        # F11 key
+    "f12": b"\x1b[24~",                        # F12 key
+
 
     # CSI Sequences (Control Sequence Introducer)
+    "cursor_up": b"\x1b[A",                    # Cursor up
+    "cursor_down": b"\x1b[B",                  # Cursor down
+    "cursor_right": b"\x1b[C",                 # Cursor right
+    "cursor_left": b"\x1b[D",                  # Cursor left
+    "cursor_home": b"\x1b[H",                  # Home key
+    "cursor_end": b"\x1b[F",                   # End key
     "cursor_position_report_start": b"\x1b[6n", # Start of cursor position report
     "window_resize_report": b"\x1b[8;",         # Resize report
     "focus_in": b"\x1b[I",                      # Focus in event
@@ -1021,12 +1044,27 @@ DEFAULT_BYTE_PARSING_MAP = {
     "application_mode_start": b"\x1b[=",        # Application keypad mode input
     "normal_mode_start": b"\x1b[>",             # Normal keypad mode input
 
+    # Extended Keypad Sequences
+    "keypad_0": b"\x1bOp",                     # Keypad 0
+    "keypad_1": b"\x1bOq",                     # Keypad 1
+    "keypad_2": b"\x1bOr",                     # Keypad 2
+    "keypad_3": b"\x1bOs",                     # Keypad 3
+    "keypad_4": b"\x1bOt",                     # Keypad 4
+    "keypad_5": b"\x1bOu",                     # Keypad 5
+    "keypad_6": b"\x1bOv",                     # Keypad 6
+    "keypad_7": b"\x1bOw",                     # Keypad 7
+    "keypad_8": b"\x1bOx",                     # Keypad 8
+    "keypad_9": b"\x1bOy",                     # Keypad 9
+    "keypad_period": b"\x1bOn",                # Keypad period
+    "keypad_enter": b"\x1bOM",                 # Keypad Enter
+
     # Terminal Reporting
     "terminal_ready_report": b"\x1b[>0;0;0c",  # Terminal ready (DA report)
     "device_status_report": b"\x1b[5n",        # Device status report (is terminal ready)
     "cursor_save": b"\x1b[s",                  # Save cursor position (parse this as input acknowledgment)
     "cursor_restore": b"\x1b[u",               # Restore cursor position (input acknowledgment)
     "bell_detected": b"\x07",                  # Bell detected in input stream
+
 
     # XTerm-Specific Events
     "window_focus_in": b"\x1b[I",              # Window focus in
@@ -1064,6 +1102,7 @@ DEFAULT_BYTE_PARSING_MAP = {
     "carriage_return_detected": b"\r",         # Carriage return detected
     "control_char_ignored": b"\x1f",           # Common ignored control character in parsing streams
 }
+
 
 
 

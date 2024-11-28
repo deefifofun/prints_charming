@@ -9,7 +9,7 @@ from .prints_charming_defaults import (
     DEFAULT_LOGGING_STYLES,
     DEFAULT_LEVEL_STYLES,
     DEFAULT_CONTROL_MAP,
-    DEFAULT_BYTE_PARSING_MAP,
+    DEFAULT_BYTE_MAP,
 )
 
 from .utils import (

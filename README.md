@@ -68,12 +68,342 @@ This will install the package from the source code.
 
 ### Here are examples of the basics. Please check out main.py in the examples folder for more. Will be updated soon. 
 
-- **show_colors module**: run python -m prints_charming.show_colors for an interactive way to select and name your own colors for the color_map.
+### Some random screenshots
 
+### Nested tables from TableManager nested in FrameBuilder frame
+![Project Illustration](./images/examples/main/snip1.png)
+
+### More tables and frames
+![Project Illustration](./images/examples/main/snip2.png)
+
+### More tables showing more dynamic styling
+![Project Illustration](./images/examples/main/snip3.png)
+
+### More nested tables in frames showing different alignments
+![Project Illustration](./images/examples/main/snip4.png)
+
+### Showing multi column frames wrapping text
+![Project Illustration](./images/examples/main/snip5.png)
+
+### Screenshot from the code snippet below... 
+create_logger_with_its_own_default_pc_instance()
+![Project Illustration](./images/examples/basic_logging/with_default_pc_instance.png)
+
+### Screenshot from the code snippet below... 
+create_logger_with_specific_pc_instance()
+![Project Illustration](./images/examples/basic_logging/specific_pc_instance_with_default_bg_color_provided.png)
+
+### Here is the PrintsCharming init method for reference used in the code below
+
+```python
+
+    def __init__(self,
+                 config: Optional[Dict[str, Union[bool, int, str]]] = None,
+                 color_map: Optional[Dict[str, str]] = None,
+                 default_bg_color: Optional[str] = None,
+                 effect_map: Optional[Dict[str, str]] = None,
+                 unicode_map: Optional[Dict[str, str]] = None,
+                 styles: Optional[Dict[str, PStyle]] = None,
+                 enable_input_parsing: bool = False,
+                 enable_trie_manager: bool = True,
+                 styled_strings: Optional[Dict[str, List[str]]] = None,
+                 styled_subwords: Optional[Dict[str, List[str]]] = None,
+                 style_conditions: Optional[Any] = None,
+                 formatter: Optional['Formatter'] = None,
+                 autoconf_win: bool = False
+                 ) -> None:
+
+        """
+        Initialize PrintsCharming with args to any of these optional params.
+
+        :param config: enable or disable various functionalities of this class.
+
+        :param color_map: supply your own color_map dictionary.
+                          'color_name': 'ansi_code'
+
+        :param default_bg_color: change the default background color to a color
+                                 other than your terminal's background color by
+                                 supplying the name of a color defined in the
+                                 color map.
+
+        :param effect_map: supply your own effect_map dictionary. Default is
+                           PrintsCharming.shared_effect_map
+
+        :param unicode_map: supply your own unicode_map dictionary. Default is
+                            PrintsCharming.shared_unicode_map
+
+        :param styles: supply your own style_map dictionary. Default is a copy
+                       of the DEFAULT_STYLES dictionary unless
+                       cls.shared_style_map is defined.
+
+        :param enable_input_parsing: if True define cls.shared_reverse_input_map
+                       by calling self.__class__.create_reverse_input_mapping()
+
+        :param enable_trie_manager: if True initializes an instance of
+                                    TrieManager passing self to the pc_instance
+                                    param.
+
+        :param styled_strings: calls the add_strings_from_dict method with your
+                               provided styled_strings dictionary.
+
+        :param styled_strings: calls the add_subwords_from_dict method with your
+                               provided styled_subwords dictionary.
+
+        :param style_conditions: A custom class for implementing dynamic
+                                 application of styles to text based on
+                                 conditions.
+
+        :param formatter: supply your own formatter class instance to be used
+                          for formatting text printed using the print method in
+                          this class.
+
+        :param autoconf_win: If your using legacy windows cmd prompt and not
+                             getting colored/styled text then change this to
+                             True to make things work.
+        """
+
+
+```
+
+### Here is the setup_logger function for reference used in the code below
+
+```python
+
+def setup_logger(
+    pc: Optional[PrintsCharming] = None,
+    name: Optional[str] = None,
+    level: Union[int, str] = logging.DEBUG,
+    datefmt: str = '%Y-%m-%d %H:%M:%S',
+    handler_configs: Optional[Dict[str, Dict[str, Union[bool, str, int]]]] = None,
+    color_map: Optional[Dict[str, str]] = None,
+    styles: Optional[Dict[str, PStyle]] = None,
+    level_styles: Optional[Dict[int, str]] = None,
+    default_bg_color: Optional[str] = None,
+    enable_unhandled_exception_logging: bool = False,
+    update_unhandled_exception_logging: bool = False,
+    log_exc_info: bool = True,
+    critical_exceptions: Optional[Tuple[Type[BaseException], ...]] = None,
+    unhandled_exception_debug: bool = False,
+    unique: bool = True,
+) -> logging.Logger:
+    """
+    Setup and return a logger with customizable handlers and formatters, including
+    user-supplied custom handlers. Use PrintsCharmingLogHandler by default for
+    custom styling and formatting.
+
+    Args:
+        pc (Optional[PrintsCharming]): An instance of PrintsCharming for styling logs.
+        name (Optional[str]): Logger name (uses calling module name if None).
+        level (int): Logging level for the logger. Defaults to logging.DEBUG.
+        datefmt (str): Date format for the formatter.
+        handler_configs (Optional[Dict[str, Dict[str, Union[bool, str, int]]]]):
+            Configuration for handlers. Example:
+                {
+                    'console': {
+                        'enabled': True,
+                        'use_styles': True,
+                        'formatter': CustomFormatter()
+                    },
+                    'file': {
+                        'path': '/path/to/log',
+                        'use_styles': False,
+                        'level': logging.INFO
+                    },
+                    'custom_handler': {
+                        'handler': MyCustomHandler(),
+                        'formatter': CustomFormatter(),
+                        'use_styles': False
+                    }
+                }
+        color_map (Optional[Dict[str, str]]): Custom color map.
+        styles (Optional[Dict[str, PStyle]]): Custom styles.
+        level_styles (Optional[Dict[int, str]]): Dictionary mapping logging
+            levels to style names.
+        default_bg_color (Optional[str]): Default background color for logs.
+        enable_unhandled_exception_logging (bool): Enable logging of unhandled exceptions.
+        update_unhandled_exception_logging (bool): Update exception logging to new values.
+        log_exc_info (bool): Enable logging of exception info.
+        critical_exceptions (Optional[Tuple[Type[BaseException], ...]]): A tuple
+            of exception types to log as critical.
+        unhandled_exception_debug (bool): Debug mode for unhandled exceptions.
+        unique (bool): If True (default), create a unique logger if the specified
+            or derived name already exists.
+
+    Returns:
+        logging.Logger: Configured logger instance with specified handlers.
+    """
+
+    # Convert level to integer
+    level = get_log_level(level)
+
+    pc = pc or PrintsCharming(
+        color_map=color_map or DEFAULT_COLOR_MAP.copy(),
+        styles=copy.deepcopy(styles) or copy.deepcopy(DEFAULT_STYLES),
+        default_bg_color=default_bg_color)
+
+    if name is None:
+        # Use inspect to get the module name of the caller
+        caller_frame = inspect.stack()[1]
+        caller_module = inspect.getmodule(caller_frame[0])
+        if caller_module is not None:
+            name = caller_module.__name__
+
+    # Check if a logger with this name already exists
+    if unique and name in logging.Logger.manager.loggerDict:
+        # Append a unique identifier to ensure a unique logger name
+        name = f"{name}_{uuid.uuid4().hex}"
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # Attach the `pc` instance to the logger for future access
+    logger.pc = pc
+
+    if enable_unhandled_exception_logging:
+        set_custom_excepthook_with_logging(
+            logger,
+            pc,
+            log_exc_info,
+            critical_exceptions,
+            unhandled_exception_debug,
+            update_unhandled_exception_logging,
+        )
+
+    # Helper function to create or use a supplied formatter
+    def create_formatter(
+            use_styles: Optional[bool] = None,
+            custom_formatter: Optional[logging.Formatter] = None,
+    ) -> logging.Formatter:
+        """
+        Helper function to create or use a supplied formatter.
+
+        Args:
+            use_styles (Optional[bool]): Whether to use styles.
+            custom_formatter (Optional[logging.Formatter]): Custom formatter provided by the user.
+
+        Returns:
+            logging.Formatter: Formatter instance.
+        """
+
+        if custom_formatter:
+            return custom_formatter  # If a custom formatter is provided, use it
+
+        # Otherwise, create a PrintsCharmingFormatter with or without styles
+        return PrintsCharmingFormatter(
+            pc=pc,
+            datefmt=datefmt,
+            level_styles=level_styles or {
+                logging.DEBUG: 'debug',
+                logging.INFO: 'info',
+                logging.WARNING: 'warning',
+                logging.ERROR: 'error',
+                logging.CRITICAL: 'critical'
+            },
+            use_styles=use_styles
+        )
+
+    # Handler factory function to create standard handlers
+    def handler_factory(
+            handler_name: str, config: Dict[str, Union[bool, str, int]]
+    ) -> Optional[logging.Handler]:
+        """
+        Factory function to create standard handlers.
+
+        Args:
+            handler_name (str): Name of the handler.
+            config (Dict[str, Any]): Configuration for the handler.
+
+        Returns:
+            Optional[logging.Handler]: Handler instance or None.
+        """
+
+        if handler_name == 'console':
+            return PrintsCharmingLogHandler(pc=pc)
+        elif handler_name == 'file':
+            return logging.FileHandler(config['path'])  # Use standard FileHandler
+        elif handler_name == 'rotating_file':
+            return logging.handlers.RotatingFileHandler(
+                config['path'],
+                maxBytes=config.get('max_bytes', 10485760),
+                backupCount=config.get('backup_count', 5)
+            )
+        elif handler_name == 'syslog':
+            return logging.handlers.SysLogHandler(address=config.get('address', '/dev/log'))
+        elif handler_name == 'smtp':
+            mailhost = config.get('mailhost', 'localhost')
+            fromaddr = config.get('fromaddr', 'error@example.com')
+            toaddrs = config.get('toaddrs', ['admin@example.com'])
+            subject = config.get('subject', 'Application Error')
+            credentials = config.get('credentials', None)
+            secure = config.get('secure', None)
+            return logging.handlers.SMTPHandler(
+                mailhost=mailhost,
+                fromaddr=fromaddr,
+                toaddrs=toaddrs,
+                subject=subject,
+                credentials=credentials,
+                secure=secure
+            )
+        return None  # Return None if no handler matches
+
+    # Helper function to add handler
+    def add_handler(
+            handler: logging.Handler,
+            level: int,
+            formatter: logging.Formatter,
+    ) -> None:
+        """
+        Helper function to add handler to the logger.
+
+        Args:
+            handler (logging.Handler): The logging handler.
+            level (int): Logging level.
+            formatter (logging.Formatter): Formatter for the handler.
+        """
+        handler.setLevel(level)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    # Set default handler configurations if none are provided
+    if not handler_configs:
+        handler_configs = {
+            'console': {'enabled': True, 'use_styles': True},
+            'file': {'enabled': False},
+            'rotating_file': {'enabled': False},
+            'syslog': {'enabled': False},
+            'smtp': {'enabled': False}
+        }
+
+    # Loop over handler configurations and create handlers
+    for handler_name, config in handler_configs.items():
+        if not config.get('enabled', False):
+            continue  # Skip disabled handlers
+
+        # Check if the user supplied a custom handler
+        handler = config.get('handler') or handler_factory(handler_name, config)
+        if not handler:
+            continue  # Skip if no handler was created
+
+        use_styles = config.get('use_styles', True)
+        custom_formatter = config.get('formatter')  # User-supplied custom formatter (optional)
+
+        # Determine the formatter to use (custom or default)
+        log_formatter = create_formatter(
+            use_styles=use_styles, custom_formatter=custom_formatter
+        )
+        handler_level = config.get('level', level)
+
+        # Add the handler to the logger
+        add_handler(handler, handler_level, log_formatter)
+
+    return logger
+
+```
 
 
 ```python
 
+import inspect
 from prints_charming import (
     PStyle,
     PrintsCharming,
@@ -81,6 +411,15 @@ from prints_charming import (
 
 from prints_charming.logging import setup_logger
 
+
+
+def get_pretty_caller_function_name():
+    # Get the current frame, then the caller's frame
+    stack = inspect.stack()
+    if len(stack) > 2:  # Ensure there is a caller
+        caller_frame = stack[1]
+        return f"=== {caller_frame.function} ===\n"
+    return None
 
 
 def apply_logging_style(pc, level, style_name, text):
@@ -108,11 +447,12 @@ def apply_logging_critical_style(pc, style_name, text):
 
 
 def more_log_message_examples(logger):
+    logger.pc.print(get_pretty_caller_function_name(), color='orange', italic=True, fill_to_end=True if logger.pc.default_bg_color else False)
 
     # PrintsCharming instance
     pc = logger.pc
 
-    newlines = f'\n\n'
+    nl = '\n\n'
 
     # Dynamically populate log_methods using PrintsCharming.log_level_style_names
     log_methods = {level_name: getattr(logger, level_name) for level_name in PrintsCharming.log_level_style_names}
@@ -124,7 +464,7 @@ def more_log_message_examples(logger):
         styled_text2 = apply_logging_style(pc, level_name, 'orange', 'message.')
 
         # Log the message with the dynamically styled texts
-        log_method(f"This is another {styled_text1} '{level_name}' {styled_text2}{newlines if level_name == 'critical' else ''}")
+        log_method(f"This is another {styled_text1} '{level_name}' {styled_text2}{nl if level_name == 'critical' else ''}")
 
     for level_name, log_method in log_methods.items():
         if level_name != 'critical':
@@ -132,7 +472,7 @@ def more_log_message_examples(logger):
             log_method("arg 1: {} and arg 2: {}", "arg1 is a phrase!", "arg2 is a phrase too!")
         else:
             # Log the message using log_method with positional formatting + newlines
-            log_method("arg 1: {} and arg 2: {} {}", "arg1 is a phrase!", "arg2 is a phrase too!", "\n\n")
+            log_method("arg 1: {} and arg 2: {} {}", "arg1 is a phrase!", "arg2 is a phrase too!", nl)
 
 
 # use positional formatting with *args
@@ -140,14 +480,17 @@ def positional_formatting_log_messages(logger,
                                        arg1='argument_1',
                                        arg2='argument_2'):
 
+    logger.pc.print(get_pretty_caller_function_name(), color='orange', italic=True, fill_to_end=True if logger.pc.default_bg_color else False)
+
     logger.debug("arg 1: {} and arg 2: {}", arg1, arg2)
     logger.info("arg 1: {} and arg 2: {}", arg1, arg2)
     logger.warning("arg 1: {} and arg 2: {}", arg1, arg2)
     logger.error("arg 1: {} and arg 2: {}", arg1, arg2)
-    logger.critical("arg 1: {} and arg 2: {}\n\n", arg1, arg2)
+    logger.critical("arg 1: {} and arg 2: {}\n", arg1, arg2)
 
 
 def prestyle_parts_of_log_messages(logger):
+    logger.pc.print(get_pretty_caller_function_name(), color='orange', italic=True, fill_to_end=True if logger.pc.default_bg_color else False)
     # Access pc instance with
     pc = logger.pc
 
@@ -173,24 +516,25 @@ def prestyle_parts_of_log_messages(logger):
     logger.info(f"This is an 'info' {info_styled_text[0]} with some {info_styled_text[1]} text.")
     logger.warning(f"This is a 'warning' {warning_styled_text[0]} with some {warning_styled_text[1]} text.")
     logger.error(f"This is an 'error' {error_styled_text[0]} with some {error_styled_text[1]} text.")
-    logger.critical(f"This is a 'critical' {critical_styled_text[0]} with some {critical_styled_text[1]} text.\n\n")
-
+    logger.critical(f"This is a 'critical' {critical_styled_text[0]} with some {critical_styled_text[1]} text.\n")
 
 
 def default_log_messages(logger):
+    logger.pc.trie_manager.add_string('===', 'vcyan')
+    logger.pc.print(get_pretty_caller_function_name(), color='orange', italic=True, fill_to_end=True if logger.pc.default_bg_color else False)
+
     logger.debug("This is a plain 'debug' message.")
     logger.info("This is a plain 'info' message.")
     logger.warning("This is a plain 'warning' message.")
     logger.error("This is a plain 'error' message.")
-    logger.critical("This is a plain 'critical' message.\n\n")
-
-
-
+    logger.critical("This is a plain 'critical' message.\n")
 
 
 def create_logger_with_specific_pc_instance():
     # Create specific PrintsCharming instance.
-    pc = PrintsCharming(default_bg_color='jupyter')
+    # use default_bg_color of the environment your printing to if not in a terminal session.
+    # For instance pycharm jupyter notebook
+    pc = PrintsCharming(default_bg_color='dgray')
 
     # Pass PrintsCharming instance 'pc' and give the logger a name
     logger = setup_logger(pc=pc, name='my_logger')
@@ -210,13 +554,12 @@ def create_logger_with_specific_pc_instance():
     more_log_message_examples(logger)
 
 
-
-
-
 def create_logger_with_its_own_default_pc_instance():
     # setup a logger with default values
     logger = setup_logger()
     pc = logger.pc
+
+    logger.pc.trie_manager.add_string('===', 'vcyan')
 
     default_log_messages(logger)
 
@@ -233,7 +576,7 @@ def create_logger_with_its_own_default_pc_instance():
     more_log_message_examples(logger)
 
 
-
+    
 def main():
 
     create_logger_with_its_own_default_pc_instance()
@@ -242,24 +585,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-```
-
-```python
-
-
-
-
-
-```
-
-```python
-
-
-
-
 
 ```
 

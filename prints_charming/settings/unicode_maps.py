@@ -1,0 +1,486 @@
+# prints_charming.settings.unicode_maps
+
+from typing import Dict
+
+
+DEFAULT_UNICODE_MAP = {
+        # Animals
+        "baboon": "𓃷",
+        "barbel": "𓆜",
+        "bird_pecking_at_fish": "𓅻",
+        "bull": "𓃒",
+        "bull_charging": "𓃓",
+        "buzzard": "𓅂",
+        "calf": "𓃔",
+        "cat": "𓃠",
+        "catfish": "𓆢",
+        "cattle_egret": "𓅥",
+        "centipede": "𓆨",
+        "charging_ox_head": "𓄀",
+        "claw": "𓆆",
+        "cobra": "𓆓",
+        "cobra_with_feather": "𓆔",
+        "cormorant": "𓅧",
+        "cow_suckling_calf": "𓃖",
+        "crocodile": "𓆊",
+        "crocodile_with_curved_tail": "𓆌",
+        "dog": "𓃡",
+        "donkey": "𓃘",
+        "duckling": "𓅷",
+        "dung_beetle": "𓆣",
+        "egg": "𓆇",
+        "elephant": "𓃰",
+        "elephant_snout_fish": "𓆞",
+        "erect_cobra": "𓆗",
+        "erect_cobra_on_basket": "𓆘",
+        "falcon": "𓅃",
+        "falcon_in_boat": "𓅇",
+        "falcon_on_basket": "𓅅",
+        "falcon_on_collar_of_beads": "𓅉",
+        "falcon_on_standard": "𓅆",
+        "falcon_with_sun_on_head": "𓅊",
+        "falcon_in_Sokar_barque": "𓅋",
+        "fish_scale": "𓆠",
+        "flamingo": "𓅟",
+        "fly": "𓆦",
+        "forepart_of_hartebeest": "𓄄",
+        "forepart_of_lion": "𓄂",
+        "forepart_of_ram": "𓄆",
+        "frog": "𓆏",
+        "gazelle": "𓃴",
+        "gecko": "𓆈",
+        "glossy_ibis": "𓅠",
+        "goat_with_collar": "𓃶",
+        "goose_picking_up_grain": "𓅼",
+        "guinea_fowl": "𓅘",
+        "hare": "𓃹",
+        "hartebeest_head": "𓄃",
+        "head_of_crested_bird": "𓆀",
+        "head_of_pintail": "𓅿",
+        "head_of_ram": "𓄅",
+        "head_of_spoonbill": "𓆁",
+        "head_of_vulture": "𓆂",
+        "heron": "𓅣",
+        "heron_on_perch": "𓅤",
+        "hippo": "𓃯",
+        "hippo_head": "𓄁",
+        "hoopoe": "𓅙",
+        "horse": "𓃗",
+        "horned_viper": "𓆑",
+        "horned_viper_crawling_out_of_enclosure": "𓆒",
+        "human_headed_bird_with_bowl_with_smoke": "𓅽",
+        "ibex": "𓃵",
+        "image_of_crocodile": "𓆍",
+        "image_of_falcon": "𓅌",
+        "image_of_falcon_on_standard": "𓅍",
+        "image_of_falcon_with_two_plumes": "𓅏",
+        "jackal": "𓃥",
+        "jackal_looking_back": "𓃦",
+        "kid": "𓃙",
+        "kid_jumping": "𓃚",
+        "lapwing": "𓅚",
+        "lapwing_with_twisted_wings": "𓅛",
+        "leopard_head": "𓄇",
+        "lion": "𓃬",
+        "locust": "𓆧",
+        "long_horned_bull": "𓃽",
+        "lying_canine": "𓃢",
+        "lying_lion": "𓃭",
+        "lying_Set_animal": "𓃫",
+        "mature_bovine_lying_down": "𓃜",
+        "monkey": "𓃸",
+        "mullet": "𓆝",
+        "newborn_hartebeest": "𓃛",
+        "northern_bald_ibis": "𓅜",
+        "oryx": "𓃲",
+        "ostrich": "𓅦",
+        "owl": "𓅓",
+        "panther": "𓃮",
+        "Petrocephalus_bane": "𓆟",
+        "pintail": "𓅭",
+        "pintail_alighting": "𓅯",
+        "pintail_flying": "𓅮",
+        "plucked_bird": "𓅾",
+        "quail_chick": "𓅱",
+        "ram": "𓃝",
+        "sacred_cow": "𓃕",
+        "sacred_Ibis": "𓅞",
+        "sacred_Ibis_on_standard": "𓅝",
+        "saddle_billed_stork": "𓅡",
+        "Set_animal": "𓃩",
+        "snake": "𓆙",
+        "sparrow": "𓅪",
+        "sparrow_low": "𓅫",
+        "swallow": "𓅨",
+        "swallow_low": "𓅩",
+        "tadpole": "𓆐",
+        "three_ducklings_in_nest": "𓅸",
+        "three_ducklings_in_pool": "𓅹",
+        "three_saddle_billed_storks": "𓅢",
+        "tilapia": "𓆛",
+        "turtle": "𓆉",
+        "two_cobras": "𓆕",
+        "two_Egyptian_vultures": "𓅀",
+        "two_owls": "𓅔",
+        "two_plovers": "𓅺",
+        "two_quail_chicks": "𓅳",
+        "vulture": "𓅐",
+        "vulture_and_cobra_each_on_a_basket": "𓅒",
+        "white_fronted_goose": "𓅬",
+        "widgeon": "𓅰",
+        "wing": "𓆃",
+
+
+        # Arrows
+        "arrow_up": "⭡",
+        "arrow_down": "⭣",
+        "arrow_left": "⇐",
+        "arrow_right": "⇒",
+
+
+        # Boxes and Blocks
+        "full_block": "█",
+        "seven_eighths_block": "▇",
+        "three_quarters_block": "▆",
+        "five_eighths_block": "▅",
+        "medium_block": "▄",
+        "half_block": "▄",
+
+
+        "light_shade": "░",
+        "medium_shade": "▒",
+        "dark_shade": "▓",
+
+
+        "square": "■",
+        "hollow_square": "⬜",
+        "medium_hollow_square": "□",
+        "rounded_hollow_square": "▢",
+        "medium_square": "⬛",
+        "small_square": "▪",
+        "small_hollow_square": "▫",
+
+
+        "square_corners": "⛶",
+        "square_inner_rounded_corners": "⛚",
+        "square_shadowed": "❏",
+        "squares_tiny": "⚏",
+        "square_diagonal_lines": "⛆",
+
+
+        "square_no_bottom": "⨅",
+        "square_no_top": "⨆",
+
+
+        "box_empty": "☐",
+        "box_filled_with_x": "☒",
+        "box_filled_with_checkmark": "☑",
+
+
+        "upper_half_block": "▀",
+        "lower_half_block": "▄",
+
+
+        "lower_three_eighths_block": "▃",
+
+
+        "blocks_large": "␩",
+        "blocks_medium": "␨",
+        "blocks_small": "␧",
+
+
+        "dashes_two": "⚋",
+
+
+        "upper_one_eighth_block": "▔",
+        "lower_one_eighth_block": "▁",
+
+
+        "box_drawings_light_horizontal": "─",
+        "box_drawings_heavy_horizontal": "━",
+
+
+        "light_left_half_arc": "╸",
+        "light_up_arc": "╹",
+
+
+        "parallelogram": "▰",
+        "hollow_rectangle": "▭",
+
+
+        "quarter_block": "▂",
+        "quad_block": "▖",
+        "rectangle": "▮",
+        "hollow_vert_rectangle": "▯",
+
+
+        "vertical_line":  "│",
+        "light_vertical": "│",
+        "heavy_vertical": "┃",
+
+
+        "upper_light_vertical_line": "⏐",
+
+
+        "thick_forward_slash": "/",
+        "slanted_forward_slash": "／",
+        "slanted_back_slash": "＼",
+        "thick_back_slash": "\"",
+
+
+        "left_one_eighth_block": "▏",
+        "right_one_eighths_block": "▕",
+        "left_quarter_block": "▎",
+        "left_three_eighths_block": "▍",
+        "left_half_block": "▌",
+        "left_five_eighths_block": "▋",
+        "left_three_quarters_block": "▊",
+        "left_seven_eighths_block": "▉",
+
+
+        "three_quadrant_block": "▞",
+        "quadrant_lower_left": "▖",
+        "quadrant_lower_right": "▗",
+        "quadrant_upper_left": "▘",
+        "quadrant_upper_right": "▝",
+
+
+        "lower_horizontal_bracket": "⏠",
+        "upper_horizontal_bracket": "⏡",
+
+
+        "upper_left_corner_rounded": "⎛",
+        "lower_left_corner_rounded": "⎝",
+        "upper_right_corner_rounded": "⎞",
+        "lower_right_corner_rounded": "⎠",
+
+
+        "vertical_right_left_thing": "⎰",
+        "vertical_left_right_thing": "⎱",
+
+
+        "lines_right": "⚞",
+        "lines_left": "⚟",
+
+
+        # Lines and Corners
+        "bottom_left_corner": "└",
+        "bottom_right_corner": "┘",
+        "bottom_t": "┴",
+        "cross": "┼",
+        "double_bottom_left_corner": "╚",
+        "double_bottom_right_corner": "╝",
+        "double_horizontal_line": "═",
+        "double_top_left_corner": "╔",
+        "double_top_right_corner": "╗",
+        "double_vertical_line": "║",
+        "horizontal_heavy_double_dash": "╍",
+        "horizontal_light_double_dash": "╌",
+        "horizontal_light_triple_dash": "┄",
+        "horizontal_line": "─",
+        "left_t": "├",
+        "right_t": "┤",
+        "top_left_corner": "┌",
+        "top_right_corner": "┐",
+        "top_t": "┬",
+        "vertical_heavy_double_dash": "╏",
+        "vertical_light_double_dash": "╎",
+        "vertical_light_triple_dash": "┆",
+
+
+        # Shapes
+        "bullet": "•",
+        "bullet_operator": "∙",
+        "circle": "●",
+        "circle_cross_hairs": "⨁",
+        "circle_diag_cross_hairs": "⨂",
+        "circle_medium": "⚫",
+        "circles_chained": "⚯",
+        "circles_small": "⛬",
+        "circle_filled_with_dot": "☉",
+        "circle_shadowed": "❍",
+        "circular_vertical": "⩇",
+        "diamond": "◆",
+        "hollow_circle": "◯",
+        "hollow_diamond": "◇",
+        "hollow_star": "☆",
+        "star": "★",
+        "triangle_down": "▼",
+        "triangle_left": "◀",
+        "triangle_right": "▶",
+        "triangle_up": "▲",
+        "triangular_bullet": "‣",
+
+
+        "crown": "♕",
+        "crown2": "♔",
+
+
+        "sixty_nine": "♋",
+
+
+        "dice_one": "Ķ",
+        "dice_two": "ķ",
+        "dice_three": "ĸ",
+        "dice_four": "Ĺ",
+        "dice_five": "ĺ",
+        "dice_six": "Ļ",
+
+
+        "triangles_less_than": "⫷",
+        "triangles_greater_than": "⫸",
+
+
+        "hour_glass_horizontal": "⨝",
+
+
+        "left_line": "⟝",
+        "right_line": "⟞",
+
+
+        # Currency and Finance
+        "alarm_clock": "⏰",
+        "atm": "🏧",
+        "balance_scale": "⚖️",
+        "bank": "🏦",
+        "banknotes": "💴",
+        "binance_coin": "⚡",
+        "bitcoin": "₿",
+        "calendar": "📅",
+        "chart": "📊",
+        "chart_decreasing": "📉",
+        "chart_increasing": "📈",
+        "coin": "🪙",
+        "credit_card": "💳",
+        "currency_exchange": "💱",
+        "currency_signs": "💲",
+        "dollar": "$",
+        "dollar_coin": "🪙",
+        "dollar_wings": "💸",
+        "dogecoin": "Ð",
+        "deposit": "🏦⬇️",
+        "ethereum": "Ξ",
+        "euro": "€",
+        "fees": "💸",
+        "fire": "🔥",
+        "gas": "⛽",
+        "gift": "🎁",
+        "gem": "💎",
+        "gemstone": "💎",
+        "gold": "🏅",
+        "gold_coin": "🪙",
+        "gold_medal": "🥇",
+        "handshake": "🤝",
+        "hacker": "🕵️‍♂️",
+        "incoming_money": "📥💵",
+        "infinite": "♾️",
+        "investment": "📈💵",
+        "key": "🔑",
+        "ledger": "📒",
+        "legal_scales": "⚖️",
+        "litecoin": "Ł",
+        "lock_with_key": "🔐",
+        "medal": "🥇",
+        "money_bag": "💰",
+        "money_mouth_face": "🤑",
+        "money_stack": "💵",
+        "money_with_wings": "💸",
+        "network": "🌐",
+        "nodes": "🔗",
+        "outgoing_money": "📤💵",
+        "padlock": "🔐",
+        "percent": "％",
+        "piggy_bank": "🐖",
+        "pound": "£",
+        "robot_trade": "🤖💹",
+        "rocket": "🚀",
+        "ruler": "📏",
+        "rupee": "₹",
+        "safe": "🛡",
+        "scales": "⚖️",
+        "shield": "🛡",
+        "skull": "💀",
+        "smart_contract": "📜🤖",
+        "stethoscope": "🩺",
+        "stopwatch": "⏱",
+        "target": "🎯",
+        "tether": "₮",
+        "trade": "🔄",
+        "trading_floor": "🏦",
+        "vault": "🏰",
+        "wallet": "👛",
+        "withdrawal": "🏦⬆️",
+        "yen": "¥",
+
+
+        # Miscellaneous Icons
+        "airplane": "✈️",
+        "alien": "👽",
+        "alien_robot": "",
+        "bar_chart": "📊",
+        "barrel": "🛢",
+        "bicycle": "🚲",
+        "books": "📚",
+        "camera": "📷",
+        "clipboard": "📋",
+        "computer": "💻",
+        "cross_mark": "❌",
+        "crossed_swords": '⚔',
+        "database": "🗄",
+        "debug": "🪲",
+        "desktop_computer": "🖥",
+        "email": "✉️",
+        "exception": "⚠️",
+        "ghost": "ᗣ",
+        "keyboard": "⌨️",
+        "lambda": "λ",
+        "lightning": "⚡",
+        "magnifying_glass": "🔍",
+        "music_note": "🎵",
+        "outbox_tray": "📤",
+        "package": "📦",
+        "pacman_left": "ᗤ",
+        "pacman_right": "ᗧ",
+        "pull_request": "🔃",
+        "robot": "🤖",
+        "robot_face": "🤖",
+        "server": "🖧",
+        "soccer_ball": "⚽",
+        "terminal": "💻",
+        "trophy": "🏆",
+        "trash": "🗑",
+        "watch": "⌚",
+
+
+        # Symbols
+        "check_box": "☑️",
+        "check_mark": "✔",
+        "exclamation_mark": "❗",
+        "fast_forward_button": "⏩",
+        "globe": "🌍",
+        "lock": "🔒",
+        "pause_button": "⏸",
+        "play_button": "▶️",
+        "question_mark": "❓",
+        "rewind_button": "⏪",
+        "stop_button": "⏹",
+        "thumbs_down": "👎",
+        "thumbs_up": "👍",
+        "unlock": "🔓",
+        "warning": "⚠️",
+        "x": "✖",
+
+
+        # Weather and Nature
+        "cloud": "☁️",
+        "rain": "🌧",
+        "snowflake": "❄️",
+        "sun": "☀️",
+        "umbrella": "☂️",
+}
+
+
+
+
+
+
