@@ -47,6 +47,10 @@ Though **prints_charming** is replete with features tailored for Linux terminals
 
 - **Snake Game**: A classic Snake game implementation demonstrating the use of dynamic content, real-time rendering, and keyboard input handling in the terminal.
 
+## Interactive Customizations
+
+To take customization even further, prints_charming includes an interactive color_map creation wizard, allowing you to define and name your own custom colors. Simply run python -m prints_charming.colors_wizard to launch the wizard and generate a personalized color_map that you can use throughout your project for seamless, consistent styling. styles_wizard coming soon.
+
 ## 🚀 Quick Start
 
 To get started, install the package and add it to your project.
