@@ -94,6 +94,9 @@ This will install the package from the source code.
 
 ### Some random screenshots
 
+### Calculator UI example supports keypresses too
+![Project Illustration](./images/examples/calculator-ui.gif)
+
 ### Nested tables from TableManager nested in FrameBuilder frame
 ![Project Illustration](./images/examples/main/snip1.png)
 
@@ -116,6 +119,9 @@ create_logger_with_its_own_default_pc_instance()
 ### Screenshot from the code snippet below... 
 create_logger_with_specific_pc_instance()
 ![Project Illustration](./images/examples/basic_logging/specific_pc_instance_with_default_bg_color_provided.png)
+
+### Basic Snake Game
+![Project Illustration](./images/examples/snake_game.gif)
 
 ### Here is the PrintsCharming init method for reference used in the code below
 
