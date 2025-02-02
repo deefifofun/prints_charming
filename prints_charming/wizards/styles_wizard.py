@@ -441,7 +441,7 @@ class ColorMapManager:
         """Interactively create a new color map."""
         os.system('clear')
 
-        pc.print(f'{pc.apply_indexed_styles(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
+        pc.print(f'{pc.apply_styles(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
 
         print(' ')
 
@@ -487,7 +487,7 @@ class ColorMapManager:
                 else:
                     message = self._add_color(user_input)
 
-            pc.print(f'{pc.apply_indexed_styles(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
+            pc.print(f'{pc.apply_styles(['Prints Charming:', 'Color Map Wizard'], ['pc_title', 'vcyan'])}\n')
 
             if message:
                 pc.print(f'{message}', style='message')
@@ -846,165 +846,8 @@ def main():
 
 
 
-def main2():
-    menu = InteractiveMenu(
-        pc=pc,
-        selected_style='vcyan',
-        unselected_style='default',
-        confirmed_style='vgreen',
-    )
-
-    # Create a menu table
-    menu_options = ["Edit Styles", "Display Table", "Exit"]
-    current_menu_index = [0]  # Track current menu selection index
-
-    # Define a function to get the currently selected menu option text
-    def get_menu_option(index):
-        return menu_options[index]
-
-    # Menu table data and dynamic highlighting
-    menu_table_data = [["Menu Options"]] + [[BoundCell(lambda i=i: menu_options[i])] for i in range(len(menu_options))]
-
-    def menu_style_function(value):
-        return 'selected_style' if value == menu_options[current_menu_index[0]] else 'unselected_style'
-
-    table_manager = TableManager(pc)
-
-    # Add menu table to TableManager
-    menu_table = table_manager.add_bound_table(
-        table_data=menu_table_data,
-        table_name="menu_table",
-        header_style="cyan",
-        border_style="vgreen",
-        col_sep_style="vgreen",
-        target_text_box=True,
-        cell_style=["yellow", "blue"],
-        conditional_style_functions={"Menu Options": menu_style_function},
-        ephemeral=False,
-        append_newline=True,
-    )
-
-
-
-    # Initialize the menu with its options
-    menu.create_menu("main_menu", "vert", menu_options)
-    menu.current_menu = "main_menu"  # Set the initial active menu
-
-
-    # Sensor data generation for table display
-    sensor_data = {sensor_id: {
-        "temperature": random.uniform(20, 30),
-        "humidity": random.uniform(30, 70),
-        "pressure": random.uniform(1000, 1020),
-        "battery": random.uniform(50, 100),
-        "status": "OK"
-    } for sensor_id in range(1, 26)}
-
-    # Sensor data update functions
-    def get_temperature(sensor_id):
-        return round(sensor_data[sensor_id]["temperature"] + random.uniform(-0.5, 0.5), 2)
-
-    def get_humidity(sensor_id):
-        return round(sensor_data[sensor_id]["humidity"] + random.uniform(-1, 1), 2)
-
-    def get_pressure(sensor_id):
-        return round(sensor_data[sensor_id]["pressure"] + random.uniform(-0.2, 0.2), 2)
-
-    def get_battery(sensor_id):
-        return max(round(sensor_data[sensor_id]["battery"] - random.uniform(0.1, 0.5), 2), 0)
-
-    def get_status(sensor_id):
-        return "Low Battery" if sensor_data[sensor_id]["battery"] < 20 else "OK"
-
-    def make_bound_cell(func, sensor_id):
-        return BoundCell(lambda s_id=sensor_id: func(s_id))
-
-    # Bound table for sensor data
-    bound_table_data = [["Sensor ID", "Temperature (°C)", "Humidity (%)", "Pressure (hPa)", "Battery (%)", "Status"]] + [
-        [sensor_id, make_bound_cell(get_temperature, sensor_id), make_bound_cell(get_humidity, sensor_id),
-         make_bound_cell(get_pressure, sensor_id), make_bound_cell(get_battery, sensor_id),
-         make_bound_cell(get_status, sensor_id)]
-        for sensor_id in range(1, 26)
-    ]
-
-    # Table styling functions
-    def battery_style_function(value):
-        return 'red' if float(value) < 20 else 'yellow' if float(value) < 50 else 'green'
-
-    def status_style_function(value):
-        return 'red' if value == "Low Battery" else 'green'
-
-    # Create TableManager instance and add sensor data table
-    table_manager.add_bound_table(
-        table_data=bound_table_data,
-        table_name="sensor_metrics",
-        show_table_name=True,
-        header_style="magenta",
-        border_style="vgreen",
-        col_sep_style="vgreen",
-        target_text_box=True,
-        cell_style=["orange", "purple"],
-        conditional_style_functions={"Battery (%)": battery_style_function, "Status": status_style_function},
-        append_newline=True
-    )
-
-    # Function to handle menu selection
-    def handle_menu_selection():
-        selected_option = menu_options[current_menu_index[0]]
-        if selected_option == "Edit Styles":
-            styles_editor = StylesEditor(menu_instance=menu)
-            styles_editor.load_style_editor(colors=pc.color_map, styles=pc.styles)
-            styles_editor.run_styles_editor()
-        elif selected_option == "Display Table":
-            os.system('clear')
-            print("\nDisplaying Sensor Metrics:\n")
-            table_manager.refresh_bound_table("sensor_metrics")
-        elif selected_option == "Exit":
-            print("Exiting program.")
-            exit()
-
-    os.system('clear')
-    # Display both tables and navigate menu
-    print(table_manager.tables['menu_table']["generated_table"])
-
-    try:
-        while True:
-            table_manager.refresh_bound_table("menu_table")
-            time.sleep(0.1)
-
-
-
-            key = menu.get_key()
-
-            if key in ['k', 'h', pc.ctl_map['arrow_up'], pc.ctl_map['arrow_left']]:
-                menu.navigate(-1)
-                #current_menu_index[0] = (current_menu_index[0] - 1) % len(menu_options)
-
-            elif key in ['j', 'l', pc.ctl_map['arrow_down'], pc.ctl_map['arrow_right']]:
-                menu.navigate(1)
-                #current_menu_index[0] = (current_menu_index[0] + 1) % len(menu_options)
-
-            elif key == '\r':
-                confirmed_option = menu.menus[menu.current_menu][menu.selected_index]
-                handle_menu_selection()
-                break
-
-            time.sleep(0.1)  # Adjust the refresh rate as needed
-    except KeyboardInterrupt:
-        print("\nProgram terminated.")
-
-
-
 if __name__ == "__main__":
     pc = PrintsCharming()
     reset = PrintsCharming.RESET
 
-    # Does not work correctly yet
-    enable_main2 = False
-
-    if enable_main2:
-        #does not work correctly yet
-        main2()
-    else:
-        # works correctly
-        main()
+    main()

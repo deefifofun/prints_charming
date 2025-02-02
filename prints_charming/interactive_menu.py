@@ -11,49 +11,33 @@ from .prints_charming_defaults import (
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES
 )
 
 from .prints_charming import PrintsCharming
+from .table_manager import TableManager
+from .frame_builder import FrameBuilder
 
 from .prints_style import PStyle
 
-from .utils import get_key
+from .utils import get_key, pole_key_nonblock, AsyncKeyReader
 
 
 class InteractiveMenu:
-    _shared_instance = {}
 
-    @classmethod
-    def get_shared_instance(cls, key):
-        """
-        Get a shared instance of InteractiveMenu.
-
-        Returns:
-            InteractiveMenu: A shared InteractiveMenu instance or None if not set.
-        """
-        return cls._shared_instance.get(key)
-
-
-    @classmethod
-    def set_shared_instance(cls, instance, key):
-        """
-        Set a shared InteractiveMenu instance.
-
-        Args:
-            instance (InteractiveMenu): An InteractiveMenu instance to set as shared.
-            key (str): The dictionary key used to store the shared instance.
-        """
-        cls._shared_instance[key] = instance
-
-
-    def __init__(self, *initial_menu_configs, pc=None,
-                 selected_style=None,
-                 unselected_style=None,
-                 confirmed_style=None,
-                 alt_buffer=True,
-                 menu_start_row=10,
-                 ):
+    def __init__(
+        self,
+        *initial_menu_configs,
+        pc=None,
+        selected_style=None,
+        unselected_style=None,
+        confirmed_style=None,
+        alt_buffer=True,
+        menu_start_row=10,
+        menu_start_column=None,
+        confirm_select_digit_key=False,
+        display_instructions=True,
+        enable_frames_and_tables=True,
+    ) -> None:
 
         if isinstance(pc, str):
             self.pc = PrintsCharming.get_shared_instance(pc)
@@ -89,8 +73,13 @@ class InteractiveMenu:
 
         self.alt_buffer = alt_buffer
         self.menu_start_row = menu_start_row
+        self.menu_start_column = menu_start_column
+
+        self.confirm_select_digit_key = confirm_select_digit_key
 
         self.get_key = get_key
+        self.pole_key_nonblock = pole_key_nonblock
+        self.async_key_reader = AsyncKeyReader
 
         self.arrows = {
             'down': self.pc.apply_style(style_name='down_arrow', text="⭣"),
@@ -102,6 +91,14 @@ class InteractiveMenu:
         self.vert_nav_directions = f" 'j' or {self.arrows.get('down')} to move down, 'k' or {self.arrows.get('up')} to move up.\n"
         self.hor_nav_directions = f" 'l' or {self.arrows.get('right')} to move right, 'h' or {self.arrows.get('left')} to move left.\n"
 
+        self.enable_expand_submenu = True
+
+        # Track expanded dictionary menus: key = tuple (menu_name, index_of_dict_option)
+        self.expanded_submenus = set()
+
+        self.display_instructions = display_instructions
+
+        self.enable_frames_and_tables = enable_frames_and_tables
 
 
 
@@ -136,6 +133,24 @@ class InteractiveMenu:
             print(f"Menu '{menu_name}' does not exist.")
 
 
+    def handle_input(self, key):
+        if key == '/':
+            self.search_menu()
+        elif key.isdigit():
+            self.quick_select(int(key))
+
+    def search_menu(self):
+        """Filters visible menu options based on user input."""
+        query = input("Search: ").lower()
+        self.filtered_options = [opt for opt in self.menus[self.current_menu] if query in opt.lower()]
+        self.selected_index = 0  # Reset selection
+
+    def quick_select(self, num):
+        """Allows direct number-based menu selection."""
+        if 1 <= num <= len(self.menus[self.current_menu]):
+            self.selected_index = num - 1
+
+
     def go_back(self):
         """Go back to the previous menu in the stack."""
         if self.menu_stack:
@@ -146,25 +161,162 @@ class InteractiveMenu:
 
 
 
-    def display_highlighted_menu(self):
+    def display_highlighted_menu(self, row=None, col=None, clear_display=True):
         """Displays the options for the current menu with the selected one highlighted."""
         if self.current_menu is None:
             print("No menu is currently active.")
             return
 
-        self.write('cursor_position', row=self.menu_start_row, col=1)
+        self.write('cursor_position', row=self.menu_start_row, col=self.menu_start_column or 1)
+
         menu_options = self.menus[self.current_menu]  # Access options for the current menu
         menu_type = self.menu_types[self.current_menu]  # Get whether it's 'vert' or 'hor'
 
-        for i, option in enumerate(menu_options):
-            if isinstance(option, dict):
-                option = list(option.keys())[0]  # If it's a nested menu, show the submenu name
-            style = self.selected_style if i == self.selected_index else self.unselected_style
-            display_text = f"({i + 1}) {option}" if menu_type == 'vert' else f"{option}  "
-            self.pc.print(display_text, style=style)
+        if clear_display:
+            # Clear display area first
+            # Assuming a max number of lines; adjust as needed or implement a more dynamic clear
+            for clear_i in range(0, len(menu_options) + 50):
+                self.write('cursor_position', row=self.menu_start_row + clear_i, col=1)
+                self.write('clear_line')
+
+            self.write('cursor_position', row=self.menu_start_row, col=1)
+
+        display_text = ""
+
+        if menu_type == 'vert':
+            # Display each option on a new line
+            for i, option in enumerate(menu_options):
+                if isinstance(option, dict):
+                    option = list(option.keys())[0]  # If it's a nested menu, show the submenu name
+                style = self.selected_style if i == self.selected_index else self.unselected_style
+                display_text = f"({i + 1}) {option}"
+                self.pc.print(display_text, style=style)
+
+        elif menu_type == 'hor':
+            """
+            # Display all options on the same line
+            display_text = ""
+            for i, option in enumerate(menu_options):
+                if isinstance(option, dict):
+                    option = list(option.keys())[0]  # If it's a nested menu, show the submenu name
+                style = self.selected_style if i == self.selected_index else self.unselected_style
+                option_text = self.pc.apply_style(style, option)
+                display_text += f"{option_text}   "  # Add spacing between options
+                
+
+                # Distinguish dictionary entries
+                if isinstance(option, dict):
+                    dict_label = list(option.keys())[0]
+                    # Mark expanded or collapsed
+                    arrow_symbol = "▼" if (self.current_menu, i) in self.expanded_submenus else "▶"
+                    display_text = f"({i + 1}) {arrow_symbol} {dict_label}"
+                else:
+                    display_text = f"({i + 1}) {option}"
+
+                style = self.selected_style if i == self.selected_index else self.unselected_style
+                self.pc.print(display_text, style=style)
+            """
+
+            # For horizontal menus:
+            # 1. Identify top-level items (including dictionaries) and print them in one horizontal line.
+            # 2. For any expanded dictionary, print its submenu items vertically below.
+
+            top_level_items = []
+            expansions = {}  # key: dict_index, value: list of (item, global_index)
+            #skip_until = -1  # used to skip printing expansions in the top-level line
+
+            # First pass: separate top-level and expansions
+            i = 0
+            while i < len(menu_options):
+                option = menu_options[i]
+                if isinstance(option, dict):
+                    # A dictionary option represents a nested menu trigger
+                    dict_index = i
+                    dict_label = list(option.keys())[0]
+                    is_expanded = (self.current_menu, dict_index) in self.expanded_submenus
+                    arrow_symbol = "▼" if is_expanded else "▶"
+                    # Prepare the displayed text for the dictionary entry
+                    text = f"({i + 1}) {arrow_symbol} {dict_label}"
+                    top_level_items.append((text, i))  # store text and index
+
+                    if is_expanded:
+                        # If expanded, the submenu items follow immediately after
+                        submenu_items = option[dict_label]
+                        expansion_list = []
+                        for j, sub_item in enumerate(submenu_items, start=1):
+                            exp_index = dict_index + j
+                            if exp_index < len(menu_options):
+                                expansion_list.append((sub_item, exp_index))
+                        expansions[dict_index] = expansion_list
+
+                        # We'll print these expansions vertically after printing the top-level line.
+                        # Do not add them to the top-level line.
+                        i += len(submenu_items)
+                else:
+                    # A regular (non-dict) top-level item
+                    text = f"({i + 1}) {option}"
+                    top_level_items.append((text, i))
+                i += 1
+
+            # Now print the top-level line horizontally
+            # Apply styles to each top-level item individually
+            horizontal_line_parts = []
+            for text, idx in top_level_items:
+                is_selected = (idx == self.selected_index)
+                style = self.selected_style if is_selected else self.unselected_style
+                styled_text = self.pc.apply_style(style, text)
+                horizontal_line_parts.append(styled_text)
+
+            # Print the entire horizontal line
+            horizontal_line = "   ".join(horizontal_line_parts)
+            self.pc.print(horizontal_line)
+
+            # After printing the horizontal line, print expansions for each expanded dictionary
+            # vertically beneath the line.
+            # For each expanded dictionary entry, print its expansions on subsequent lines
+            vertical_line_offset = 1  # Start printing expansions below the horizontal line
+            for dict_idx, exp_list in expansions.items():
+                # For each submenu item, print on a new line
+                for (sub_item, exp_idx) in exp_list:
+                    # Check if this expansion item is selected
+                    is_selected = (exp_idx == self.selected_index)
+                    style = self.selected_style if is_selected else self.unselected_style
+                    #self.write('cursor_position', row=self.menu_start_row + vertical_line_offset, col=1)
+                    # Indent expansions a bit so they're visually distinguishable
+                    display_text = f"     ({exp_idx + 1}) {sub_item}"
+                    self.pc.print(display_text, style=style)
+                    vertical_line_offset += 1
+
+            #self.pc.print(display_text)
 
 
-    def navigate(self, direction):
+    def toggle_submenu(self, dict_index):
+        # dict_index is the index of the dictionary option in the current menu
+        current_options = self.menus[self.current_menu]
+        dict_item = current_options[dict_index]
+        dict_label = list(dict_item.keys())[0]
+        submenu_items = dict_item[dict_label]
+
+        # Check if currently expanded
+        key = (self.current_menu, dict_index)
+        if key in self.expanded_submenus:
+            # Collapse: remove inserted submenu items
+            # Find how many items belong to this submenu
+            # They follow directly after the dictionary item until a "Back" is encountered or end of submenu
+            remove_count = len(submenu_items)
+            # Remove those items from the current menu options
+            # dict_index+1 to dict_index+remove_count
+            del current_options[dict_index + 1:dict_index + 1 + remove_count]
+            self.expanded_submenus.remove(key)
+        else:
+            # Expand: insert submenu items directly after the dictionary item
+            for idx, sub_item in enumerate(submenu_items, start=1):
+                current_options.insert(dict_index + idx, sub_item)
+            self.expanded_submenus.add(key)
+
+
+
+    def navigate(self, direction, col=None, clear_display=True):
         """Navigate through the current menu options."""
         if self.current_menu is None:
             print("No menu is currently active.")
@@ -187,9 +339,9 @@ class InteractiveMenu:
 
         # Clear and redisplay the menu
         for i in range(len(menu_options)):
-            self.write('cursor_position', row=self.menu_start_row + i, col=1)
+            self.write('cursor_position', row=self.menu_start_row + i, col=col or 1)
 
-        self.display_highlighted_menu()
+        self.display_highlighted_menu(clear_display=clear_display)
 
 
     def run(self):
@@ -200,39 +352,186 @@ class InteractiveMenu:
             print("No menu is currently active.")
             return
 
-        # Display instructions
-        self.write(f"{self.pc.apply_style(style_name='vgreen', text='Please select an option:')}\n\n")
-        self.write(self.vert_nav_directions if self.menu_types[self.current_menu] == 'vert' else self.hor_nav_directions)
-        self.pc.print(f"\n  'q' to quit.\n\n", style="vred")
+        if self.display_instructions:
+            # Display instructions
+            self.write(f"{self.pc.apply_style(style_name='vgreen', text='Please select an option:')}\n\n")
+            self.write(self.vert_nav_directions if self.menu_types[self.current_menu] == 'vert' else self.hor_nav_directions)
+            self.pc.print2(f"\n", f" 'q' to quit", end='\n', sep='', style=['default', 'vred'], italic=True, bold=True, style_args_as_one=False)
 
         self.display_highlighted_menu()
 
         confirmed_option = None
 
-        while True:
-            # Clear the input line before capturing the next input
-            self.write('cursor_position', row=self.menu_start_row + len(self.menus[self.current_menu]) + 1, col=1)
-            self.write('clear_line')  # Clear the current input line
+        message_row = self.menu_start_row + len(self.menus[self.current_menu]) + 10  # Define a row for messages
 
-            key = get_key()
+        if not self.enable_frames_and_tables:
 
-            if key == 'q':
-                break
+            while True:
+                # Clear the input line before capturing the next input
+                self.write('cursor_position', row=message_row, col=1)
+                self.write('clear_line')  # Clear the current input line
 
-            elif key in ['k', 'h', self.pc.ctl_map['arrow_up'], self.pc.ctl_map['arrow_left']]:
-                self.navigate(-1)
+                key = get_key()
 
-            elif key in ['j', 'l', self.pc.ctl_map['arrow_down'], self.pc.ctl_map['arrow_right']]:
-                self.navigate(1)
+                if key == 'q':
+                    # Quit this menu
+                    if self.alt_buffer:
+                        self.write('normal_buffer', 'show_cursor')
+                    return None  # Return None to indicate user pressed 'q'
 
-            elif key == '\r':
-                confirmed_option = self.menus[self.current_menu][self.selected_index]
-                break
+                if not self.enable_expand_submenu:
+
+                    if key in ['k', 'h', self.pc.ctl_map['arrow_up'], self.pc.ctl_map['arrow_left']]:
+                        self.navigate(-1)
+                        # Clear any existing message
+                        self.write('cursor_position', row=message_row, col=1)
+                        self.write('clear_line')
+
+                    elif key in ['j', 'l', self.pc.ctl_map['arrow_down'], self.pc.ctl_map['arrow_right']]:
+                        self.navigate(1)
+                        # Clear any existing message
+                        self.write('cursor_position', row=message_row, col=1)
+                        self.write('clear_line')
+
+                    elif key == '\r':
+                        confirmed_option = self.menus[self.current_menu][self.selected_index]
+                        break
+
+                    elif key.isdigit():
+                        num = int(key)
+                        menu_length = len(self.menus[self.current_menu])
+                        if 1 <= num <= menu_length:
+                            self.selected_index = num - 1
+                            self.display_highlighted_menu()
+                            if self.confirm_select_digit_key:
+                                confirmed_option = self.menus[self.current_menu][self.selected_index]
+                                break
+                        else:
+                            self.write('cursor_position', row=message_row, col=1)
+
+                            self.pc.print(f"\nInvalid selection: {num}. Please select a valid option.", style='vred')
+
+                else:
+                    if key in ['k', 'h', self.pc.ctl_map['arrow_up'], self.pc.ctl_map['arrow_left']]:
+                        self.selected_index = (self.selected_index - 1) % len(self.menus[self.current_menu])
+                        self.display_highlighted_menu()
+
+                    elif key in ['j', 'l', self.pc.ctl_map['arrow_down'], self.pc.ctl_map['arrow_right']]:
+                        self.selected_index = (self.selected_index + 1) % len(self.menus[self.current_menu])
+                        self.display_highlighted_menu()
+
+                    elif key == '\r':
+                        current_option = self.menus[self.current_menu][self.selected_index]
+                        if isinstance(current_option, dict):
+                            # Toggle submenu expansion
+                            self.toggle_submenu(self.selected_index)
+                            # Re-display after expansion/collapse
+                            self.display_highlighted_menu()
+                            continue  # Don't break; allow user to navigate new expanded/collapsed menu
+                        else:
+                            # Confirm a non-dict option
+                            confirmed_option = current_option
+                            break
+
+                    elif key.isdigit():
+                        num = int(key)
+                        menu_length = len(self.menus[self.current_menu])
+                        if 1 <= num <= menu_length:
+                            self.selected_index = num - 1
+                            self.display_highlighted_menu()
+                            if self.confirm_select_digit_key:
+                                current_option = self.menus[self.current_menu][self.selected_index]
+                                if isinstance(current_option, dict):
+                                    self.toggle_submenu(self.selected_index)
+                                    self.display_highlighted_menu()
+                                    continue
+                                else:
+                                    confirmed_option = current_option
+                                    break
+                        else:
+                            self.write('cursor_position', row=message_row, col=1)
+                            self.pc.print(f"\nInvalid selection: {num}. Please select a valid option.", style='vred')
+        else:
+            tm = TableManager(pc=self.pc)
+            fb = FrameBuilder(pc=self.pc)
+
+            while True:
+                self.write('cursor_position', row=message_row, col=1)
+                self.write('clear_line')
+                key = self.get_key()
+
+                if key == 'q':
+                    if self.alt_buffer:
+                        self.write('normal_buffer', 'show_cursor')
+                    return None
+
+                elif key in ['k', 'h', self.pc.ctl_map['arrow_up'], self.pc.ctl_map['arrow_left']]:
+                    self.selected_index = (self.selected_index - 1) % len(self.menus[self.current_menu])
+                    self.display_highlighted_menu()
+
+                elif key in ['j', 'l', self.pc.ctl_map['arrow_down'], self.pc.ctl_map['arrow_right']]:
+                    self.selected_index = (self.selected_index + 1) % len(self.menus[self.current_menu])
+                    self.display_highlighted_menu()
+
+                elif key in ['\r', ' ']:  # Enter or space toggles expansions if dict, confirms if normal option
+                    current_option = self.menus[self.current_menu][self.selected_index]
+                    if isinstance(current_option, dict):
+                        # Toggle submenu expansion
+                        self.toggle_submenu(self.selected_index)
+                        self.display_highlighted_menu()
+
+                        # Example: Use TableManager to print some info after toggling (adapt as needed)
+                        info_table = [
+                            ["Status", "Action"],
+                            ["Toggled", "Expansion" if (self.current_menu, self.selected_index) in self.expanded_submenus else "Collapse"]
+                        ]
+                        table_str = tm.generate_table(info_table, table_name="toggle_info", show_table_name=True, border_style="vblue", target_text_box=True)
+                        self.pc.print(table_str)
+
+                        # Example: Use FrameBuilder to print a framed message
+                        fb.print_border_boxed_text2(
+                            texts=[["Expansion toggled"]],
+                            style='default',
+                            horiz_style='vblue',
+                            vert_style='vblue',
+                            border_top=True, border_bottom=True, border_left=True, border_right=True,
+                            border_inner=False
+                        )
+                        continue
+                    else:
+                        # Confirm a non-dict option if Enter pressed
+                        if key == '\r':
+                            confirmed_option = current_option
+                            break
+                        # If space pressed on a non-dict, do nothing special (just continue navigation)
+                        continue
+
+                elif key.isdigit():
+                    num = int(key)
+                    menu_length = len(self.menus[self.current_menu])
+                    if 1 <= num <= menu_length:
+                        self.selected_index = num - 1
+                        self.display_highlighted_menu()
+                        # If confirm_select_digit_key is True, confirm immediately
+                        if self.confirm_select_digit_key:
+                            current_option = self.menus[self.current_menu][self.selected_index]
+                            if isinstance(current_option, dict):
+                                self.toggle_submenu(self.selected_index)
+                                self.display_highlighted_menu()
+                                continue
+                            else:
+                                confirmed_option = current_option
+                                break
+                    else:
+                        self.write('cursor_position', row=message_row, col=1)
+                        self.pc.print(f"\nInvalid selection: {num}. Please select a valid option.", style='vred')
+
 
         if self.alt_buffer:
             self.write('normal_buffer', 'show_cursor')
 
-        self.pc.print(f'confirmed_option: {confirmed_option}', style={1: self.confirmed_style, (2, 3): self.selected_style})
+        if confirmed_option and not isinstance(confirmed_option, dict):
+            self.pc.print(f'confirmed_option: {confirmed_option}', style={1: self.confirmed_style, (2, 3): self.selected_style})
 
         return self.selected_index + 1
 

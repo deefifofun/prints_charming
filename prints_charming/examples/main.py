@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Union
 from prints_charming import (
     DEFAULT_COLOR_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES,
     DynamicFormatter,
     get_terminal_width,
     PStyle,
@@ -428,10 +427,11 @@ def formatted_text_box_stuff():
     pc = PrintsCharming(config={"enable_logging": True}, style_conditions=StyleConditionsManager(), styled_strings=styled_strings)
     builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
 
-    horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style='purple',
-                                                                                                                 horiz_border_bottom_style='orange',
-                                                                                                                 vert_border_left_style='orange',
-                                                                                                                 vert_border_right_style='purple')
+    horiz_border_top, vert_border_left, vert_border_inner, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(border_top_style='purple',
+                                                                                                                                    border_bottom_style='orange',
+                                                                                                                                    border_left_style='orange',
+                                                                                                                                    border_inner_style='orange',
+                                                                                                                                    border_right_style='purple')
 
     purple_horiz_border = pc.apply_style('purple', builder.horiz_border)
     orange_horiz_border = pc.apply_style('orange', builder.horiz_border)
@@ -531,8 +531,6 @@ def formatted_text_box_stuff():
     print(f'{orange_vert_border}{three_col_strings_mixed}{purple_vert_border}')
     print(f'{orange_horiz_border}\n\n\n\n')
 
-    # Print a simple border boxed text for the welcome message in the welcome function
-    builder.print_simple_border_boxed_text("Prints Charming", subtitle="Hope you find the user guide helpful!", align='center')
     print()
 
 
@@ -1442,7 +1440,7 @@ def welcome():
      vert_border_left,
      vert_border_inner,
      vert_border_right,
-     horiz_border_bottom) = builder.build_styled_border_box2(style="dblue")
+     horiz_border_bottom) = builder.build_styled_border_box(style="dblue")
 
 
 
@@ -1466,10 +1464,10 @@ def welcome():
     text_styles = ['default', 'purple', 'default', 'vgreen', 'white', 'orange', 'default', 'default']
 
     builder.print_border_boxed_text4(texts, text_styles=text_styles,
-                                     horiz_border_top=horiz_border_top,
-                                     vert_border_left=vert_border_left,
-                                     vert_border_right=vert_border_right,
-                                     horiz_border_bottom=horiz_border_bottom,
+                                     border_top=horiz_border_top,
+                                     border_left=vert_border_left,
+                                     border_right=vert_border_right,
+                                     border_bottom=horiz_border_bottom,
                                      table_strs=[colors_table], table_strs_alignments=['left'],
                                      horiz_border_height=1)
 
@@ -1508,10 +1506,10 @@ def welcome():
     text_styles = ['default', 'purple', 'default', 'vgreen', 'white', 'orange', 'default', 'default']
 
     builder.print_border_boxed_text4(texts, text_styles=text_styles,
-                                     horiz_border_top=horiz_border_top,
-                                     vert_border_left=vert_border_left,
-                                     vert_border_right=vert_border_right,
-                                     horiz_border_bottom=horiz_border_bottom,
+                                     border_top=horiz_border_top,
+                                     border_left=vert_border_left,
+                                     border_right=vert_border_right,
+                                     border_bottom=horiz_border_bottom,
                                      table_strs=[colors_table, colors_table], table_strs_alignments=['left', 'right'])
     print(horiz_border_bottom)
     print()
@@ -1550,6 +1548,52 @@ def welcome():
     builder.print_border_boxed_tables2([less_simple_table, less_simple_table, less_simple_table, less_simple_table],
                                        horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom,
                                        table_alignments=['center', 'center', 'center', 'center'])
+
+    pc.printnl()
+
+    builder.print_border_boxed_tables2([less_simple_table, less_simple_table, less_simple_table, less_simple_table],
+                                       horiz_border_top, vert_border_left, vert_border_right, None,
+                                       table_alignments=['center', 'center', 'center', 'center'])
+
+    builder.print_border_boxed_tables2([less_simple_table, less_simple_table, less_simple_table, less_simple_table],
+                                       None, vert_border_left, vert_border_right, None,
+                                       table_alignments=['center', 'center', 'center', 'center'])
+
+    builder.print_border_boxed_tables2([less_simple_table, less_simple_table, less_simple_table, less_simple_table],
+                                       None, vert_border_left, vert_border_right, horiz_border_bottom,
+                                       table_alignments=['center', 'center', 'center', 'center'])
+
+    pc.printnl()
+    pc.printnl()
+
+    pc.printnl(bg_color='blue')
+
+    pc.printnl()
+
+    pc.printnl(fill_with='|=|', color='vgreen', bg_color='vwhite', container_width=50)
+
+    pc.printnl()
+
+    container_widths = []  # List to store container widths
+    divisor = 40  # Initial divisor
+    terminal_width = pc.terminal_width  # Example: 80, replace or mock if needed
+
+    while divisor > 0:
+        #container_width = terminal_width // divisor + 1 // 3
+        container_width = terminal_width // divisor
+        container_widths.append(container_width)
+        divisor -= 1
+
+    n = len(container_widths)
+
+    for i in range(n + n - 2):  # Forward and reverse combined
+        if i < n:  # Forward iteration
+            width = container_widths[i]
+        else:  # Reverse iteration, skipping the last index
+            width = container_widths[-2 - (i - n)]
+
+        pc.printnl(bg_color='vgreen', container_width=width)
+
 
     conditional_style_functions1 = {
         "Age": age_style_function,
@@ -1766,11 +1810,11 @@ def welcome():
     print(more_complex_table_str)
 
     builder = FrameBuilder(pc=pc, horiz_width=100, horiz_char=' ', vert_width=5, vert_padding=1, vert_char='|')
-    horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(horiz_border_top_style=style_conditions.welcome_style('top'),
-                                                                                                                 vert_border_left_style=style_conditions.welcome_style('left'),
-                                                                                                                 vert_border_right_style=style_conditions.welcome_style(
+    horiz_border_top, vert_border_left, _, vert_border_right, horiz_border_bottom = builder.build_styled_border_box(border_top_style=style_conditions.welcome_style('top'),
+                                                                                                                    border_left_style=style_conditions.welcome_style('left'),
+                                                                                                                    border_right_style=style_conditions.welcome_style(
                                                                                                                      'right'),
-                                                                                                                 horiz_border_bottom_style=style_conditions.welcome_style(
+                                                                                                                    border_bottom_style=style_conditions.welcome_style(
                                                                                                                      'bottom'))
 
     builder.print_border_boxed_table(less_simple_table, horiz_border_top, vert_border_left, vert_border_right, horiz_border_bottom, text_style="default", text_align="right")
@@ -1790,18 +1834,19 @@ def experiment():
 
     (horiz_border_top,
      vert_border_left,
+     _,
      vert_border_right,
-     horiz_border_bottom) = builder.build_styled_border_box(horiz_border_top_style='dblue',
-                                                            vert_border_left_style='vblue',
-                                                            vert_border_right_style='dblue',
-                                                            horiz_border_bottom_style='vblue')
+     horiz_border_bottom) = builder.build_styled_border_box(border_top_style='dblue',
+                                                            border_left_style='vblue',
+                                                            border_right_style='dblue',
+                                                            border_bottom_style='vblue')
 
 
 # Define the markdown printer using def
 @time_step
 def create_markdown_printer(pc_instance):
     def printer(*args, **kwargs):
-        pc_instance.print_markdown(*args, sep=' ', **kwargs)
+        pc_instance.markdown_processor.print(*args, sep=' ', **kwargs)
 
     return printer
 
@@ -1981,7 +2026,7 @@ def highlight(text, style_name=None, return_list=False):
     if isinstance(text, str):
         return pc.apply_style(style_name, text)
     else:
-        return pc.apply_indexed_styles(text, style_name, return_list=return_list)
+        return pc.apply_styles(text, style_name, return_list=return_list)
 
 
 
@@ -2003,7 +2048,7 @@ class NewClass:
         if isinstance(text, str):
             return self.pc.apply_style(style_name, text)
         else:
-            return self.pc.apply_indexed_styles(text, style_name, return_list=return_list)
+            return self.pc.apply_styles(text, style_name, return_list=return_list)
 
 
     @time_step
@@ -2025,8 +2070,13 @@ def play_around_with_logging():
 
     print()
 
+    logger_pc_config = pc.config
+
     init_message = f"logger initialized with pc configuration:\n{pc.format_dict(pc.config)}"
     logger.debug(init_message)
+
+    init_message2 = f"logger initialized with pc configuration:\n{pc.format_structure(logger_pc_config, fill_bg_only=True)}"
+    logger.debug(init_message2)
 
     logger.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
 
@@ -2047,8 +2097,13 @@ def play_around_with_logging():
     # default_bg_color set to match jupyter notebook background in pycharm
     logger2 = setup_logger(name='scratch', default_bg_color='jupyter', enable_unhandled_exception_logging=True)
 
+    logger2_pc_config = logger2.pc.config
+
     init_message = f"logger2 initialized with pc configuration:\n{logger2.pc.format_dict(logger2.pc.config)}"
     logger2.debug(init_message)
+
+    init_message2 = f"logger2 initialized with pc configuration:\n{logger2.pc.format_structure(logger2_pc_config)}"
+    logger2.debug(init_message2)
 
     logger2.info(f"default_bg_color is set to 'jupyter' for this instance of PrintsCharming.")
     logger2.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
@@ -2269,6 +2324,51 @@ def live_realtime_updates():
         print("\nLive update terminated.")
 
 
+def nested_structure_examples():
+    pc_for_struct = PrintsCharming(default_bg_color='jupyter')
+    yellowstone_data = {
+        "show_title": "Yellowstone",
+        "seasons": 5,
+        "main_characters": [
+            {"name": "John Dutton", "role": "Patriarch", "actor": "Kevin Costner"},
+            {"name": "Beth Dutton", "role": "Daughter", "actor": "Kelly Reilly"},
+            {"name": "Rip Wheeler", "role": "Ranch Hand", "actor": "Cole Hauser"},
+        ],
+        "ranch_details": {
+            "name": "Dutton Ranch",
+            "location": ("Paradise Valley", "Montana"),
+            "size_acres": 250000,
+            "livestock": {"cattle", "horses"},
+        },
+        "themes": {"family", "power", "land ownership", "betrayal"},
+        "episodes_per_season": [9, 10, 10, 10, 14],
+        "notable_quotes": (
+            "You are the trailer park. I am the tornado.",
+            "Learn to be meaner than evil and still love your family.",
+        ),
+    }
+
+    styled_structure = pc_for_struct.format_structure(yellowstone_data)
+    print(f'\n\n{styled_structure}')
+    pc.print(f'\n\n{styled_structure}', skip_ansi_check=True)
+    pc_for_struct.print(f'\n\n{styled_structure}', skip_ansi_check=True, container_width=120)
+    pc_config_structure = pc_for_struct.format_structure(pc.config)
+    print(f'\n\n{pc_config_structure}')
+    pc.print(f'\n\n{pc_config_structure}', skip_ansi_check=True)
+    pc_for_struct.print(f'\n\n{pc_config_structure}', skip_ansi_check=True, container_width=80)
+
+
+def print_locals_test(pc):
+    print(f'\n\n\n\nlocals:\n')
+    print(locals())
+    print(f'\n\n\n\n\n')
+
+    locals_formatted_structure = pc.format_structure(locals())
+    pc.print(f'\n\n\nlocals_formatted_structure:', color='blue')
+    print(locals_formatted_structure)
+    print(f'\n\n\n')
+
+
 
 @time_total_execution
 def main():
@@ -2315,11 +2415,36 @@ def main():
     #progress_bar(pc)
     print_markdown(pc)
 
-    example_menu()
+    #example_menu()
 
     #uncomment for realtime updates example
     #live_realtime_updates()
 
+    nested_structure_examples()
+
+    print_locals_test(pc)
+
+    print(locals())
+    print(f'\n\n\n\n\n')
+
+    locals_formatted_structure = pc.format_structure(locals())
+    pc.print(f'\n\n\nlocals_formatted_structure:', color='blue')
+    print(locals_formatted_structure)
+    print(f'\n\n\n')
+
+    pc_with_default_bg = PrintsCharming(default_bg_color='jupyter')
+    locals_formatted = pc_with_default_bg.format_structure(locals())
+    pc_with_default_bg.print(f'locals_formatted_with_bg:', color='blue')
+    print(locals_formatted)
+    pc_with_default_bg.print(f'\n\n\n', container_width=80)
+    print(f'\n\n\n')
+
+    pc_with_default_bg.printnl(5, container_width=80)
+
+    pc_with_default_bg.printnl(5, bg_color='red', container_width=80)
+
+    print(f'\n\ninspect:')
+    print(inspect.signature('deefifofun'))
 
 
     #example_dynamic_formatter()
@@ -2333,9 +2458,10 @@ def divide_term_width(divisor):
 
 
 if __name__ == "__main__":
+
     PrintsCharming.set_shared_maps(shared_color_map=DEFAULT_COLOR_MAP.copy())
-    term_width = os.get_terminal_size().columns
-    pc = PrintsCharming()
+    pc = PrintsCharming(enable_markdown=True)
+    term_width = pc.terminal_width
 
     mini_border = '!' * divide_term_width(6)
     styled_mini_border = pc.apply_color('orange', mini_border)
@@ -2352,5 +2478,7 @@ if __name__ == "__main__":
         print(f"Additional info: {e.additional_info}")
         e.handle_exception()
     """
+
+
     main()
 

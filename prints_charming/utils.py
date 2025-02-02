@@ -3,6 +3,8 @@ import sys
 import math
 import tty
 import termios
+import select
+import asyncio
 
 
 
@@ -18,6 +20,84 @@ def get_terminal_height() -> int:
     return terminal_size.lines
 
 
+class AsyncKeyReader:
+    """
+    Sets up an asyncio-based, truly non-blocking way to capture
+    single keystrokes from stdin on a POSIX system in raw mode.
+    """
+
+    # Minimal mapping from escape sequences to tokens
+    ARROW_SEQS = {
+        '\x1b[A': 'arrow_up',
+        '\x1b[B': 'arrow_down',
+        '\x1b[C': 'arrow_right',
+        '\x1b[D': 'arrow_left',
+    }
+
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.queue = asyncio.Queue()
+
+        # Save the original tty settings so we can restore them on exit
+        self.fd = sys.stdin.fileno()
+        self.original_settings = termios.tcgetattr(self.fd)
+
+        # Put stdin in raw mode so keystrokes are immediately available
+        tty.setraw(sys.stdin.fileno())
+
+        # Tell the event loop to call our _on_stdin_ready() whenever stdin has data
+        self.loop.add_reader(sys.stdin, self._on_stdin_ready)
+
+    def _on_stdin_ready(self):
+        """
+        Callback invoked by the event loop whenever stdin has data available.
+        We read exactly 1 character to keep it simple, but you could read more if desired.
+        """
+        ch = sys.stdin.read(1)
+
+        if ch == '\x1b':
+            # Potential arrow key or other escape sequence
+            # We'll attempt to read the next 2 chars right now (non-blocking).
+            seq = ch + sys.stdin.read(2)  # e.g. "\x1b[A"
+            if seq in self.ARROW_SEQS:
+                # recognized arrow
+                token = self.ARROW_SEQS[seq]
+                self.queue.put_nowait(token)
+            else:
+                # Not recognized as a known arrow; push partial chars individually
+                # or you could do more advanced partial logic here
+                self.queue.put_nowait(seq)  # fallback
+        else:
+            # Single char
+            self.queue.put_nowait(ch)
+
+
+    async def get_key(self):
+        """
+        Waits until a single character is available in the queue, then returns it.
+        This 'blocks' only within the async context (it yields to the event loop).
+        """
+        return await self.queue.get()
+
+    def get_key_nowait(self):
+        """
+        Attempts to get a keystroke immediately if available.
+        Raises asyncio.QueueEmpty if none is available.
+        """
+        return self.queue.get_nowait()
+
+    def restore_tty(self):
+        """
+        Restore original terminal settings.
+        Call this upon exiting to leave the terminal in a sane state.
+        """
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+        # Also remove the reader so we don't keep reading from stdin
+        self.loop.remove_reader(sys.stdin)
+
+
+
+
 def get_key():
     """Captures a single key press, including multi-byte sequences for arrow keys."""
     fd = sys.stdin.fileno()
@@ -30,6 +110,33 @@ def get_key():
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return key
+
+
+def pole_key_nonblock():
+    """
+    Checks if a key is available in stdin (non-blocking).
+    Returns the character read if available, or None otherwise.
+    """
+    # Save original terminal settings
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    try:
+        # Switch to raw mode so we can read immediately
+        tty.setraw(fd)
+
+        # Use select to see if stdin has data
+        rlist, _, _ = select.select([sys.stdin], [], [], 0)
+        if rlist:
+            # Data is ready, read 1 character
+            ch = sys.stdin.read(1)
+            return ch
+        else:
+            # No data available
+            return None
+    finally:
+        # Restore terminal settings no matter what
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 # Function to get the foreground ANSI escape sequence, including reset handling

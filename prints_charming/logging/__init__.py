@@ -13,7 +13,6 @@ from .log_handler import PrintsCharmingLogHandler
 from ..prints_charming_defaults import (
     DEFAULT_COLOR_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES
 )
 from ..prints_charming import PrintsCharming, PStyle
 from ..exceptions.utils import set_excepthook

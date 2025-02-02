@@ -1,21 +1,29 @@
 import sys
 import time
+import asyncio
 import termios
 import tty
-import select
-from prints_charming import(
+from prints_charming import (
+    PStyle,
     PrintsCharming,
     FrameBuilder,
     TableManager,
     BoundCell,
 )
 
+
+
+
 class CalculatorUI:
     def __init__(self):
         self.pc = PrintsCharming(enable_input_parsing=True)
         self.write = self.pc.write
-        self.byte_map = self.pc.__class__.shared_byte_map
-        self.fb = FrameBuilder(pc=self.pc, horiz_char='-', vert_width=1, vert_padding=0, vert_char='|', horiz_width=45)
+        self.fb = FrameBuilder(pc=self.pc, horiz_char='-', vert_width=1, vert_padding=0, vert_char='|', inner_width=1, inner_padding=0, inner_char='|', horiz_width=45)
+        styles_to_edit = {
+            'horiz_border': PStyle(color='purple'),
+            'vert_border': PStyle(color='orange')
+        }
+        self.pc.edit_styles(styles_to_edit)
         self.tm = TableManager(pc=self.pc)
         self.expression = ""
         self.display_table_name = "display"
@@ -51,50 +59,14 @@ class CalculatorUI:
         else:
             pass
 
-    def get_mouse_event(self):
-        byte_map = self.pc.__class__.shared_byte_map
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            # Set cbreak mode to allow signals like Ctrl-C
-            tty.setcbreak(fd, termios.TCSANOW)
-            c = sys.stdin.buffer.read(1)
-            if c == b'\x1b':  # Start of an escape sequence
-                c += sys.stdin.buffer.read(1)
-                if c[-1:] == b'[':
-                    c += sys.stdin.buffer.read(1)
-                    if c[-1:] == byte_map['mouse_event_start']:
-                        # Read until 'M' or 'm' is found
-                        while True:
-                            ch = sys.stdin.buffer.read(1)
-                            c += ch
-                            if ch in (
-                                    byte_map['mouse_event_end_press'],
-                                    byte_map['mouse_event_end_release']
-                            ):
-                                break
-                        # Now parse the sequence
-                        params = c[3:-1].split(b';')
-                        if len(params) == 3:
-                            b = int(params[0])
-                            x = int(params[1])
-                            y = int(params[2])
-                            event_type = c[-1:]  # b'M' for press, b'm' for release
-                            # Return the event code 'b' as well
-                            return b, x, y, event_type
-        except KeyboardInterrupt:
-            raise  # Allow Ctrl-C to interrupt
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return None
 
 
     def build_calculator_ui(self):
+
         # Clear screen
         self.write("clear_screen", "cursor_home")
 
         # Build the display area using TableManager with BoundCell
-        # Define a fixed width and height for the display
         display_data = [[BoundCell(lambda: self.get_display_text())]]
         display_table = self.tm.add_bound_table(
             table_data=display_data,
@@ -126,20 +98,32 @@ class CalculatorUI:
 
         start_row = self.display_height + 1  # Start after the display area
         button_width = 10  # Adjusted button width
-        button_height = 3  # Adjusted button height
+        button_border_top = True
+        button_border_bottom = True
+        button_height = 3 + int(button_border_top) + int(button_border_bottom)
+        row_height_to_tallest_col = False
+        row_height = (button_height - (int(button_border_top) + int(button_border_bottom))) if not row_height_to_tallest_col else None
 
         for row_index, row in enumerate(buttons):
-            # Set the cursor position at the start of the row
+            # Set cursor position at the start of the row
             self.write('cursor_position', row=start_row + row_index * button_height, col=1)
 
-            # Draw buttons in the row
-            self.fb.print_multi_column_box2(
-                columns=row,
+            # Modify each button to be multi-line to fill full height
+            padded_buttons = [
+                f"\n{' ' * button_width}\n{label.center(button_width)}\n{' ' * button_width}\n"
+                for label in row
+            ]
+
+            # Draw buttons in the row with extra padding
+            self.fb.print_multi_column_box2B(
+                columns=padded_buttons,
                 col_widths=[button_width] * 4,
                 col_styles=["white"] * 4,
-                col_alignments=["center"] * 4,
-                horiz_border_top=True,
-                horiz_border_bottom=True,
+                horiz_col_alignments=["center"] * 4,
+                vert_col_alignments='center',
+                row_height=row_height,
+                horiz_border_top=button_border_top,
+                horiz_border_bottom=button_border_bottom,
                 vert_border_left=True,
                 vert_border_right=True,
                 col_sep="|",
@@ -150,12 +134,13 @@ class CalculatorUI:
                 x_start = (col_index * (button_width + 1)) + 1  # +1 for the separator '|'
                 x_end = x_start + button_width - 1
                 y_start = start_row + row_index * button_height
-                y_end = y_start + button_height - 1
+                y_end = y_start + button_height - 1  # Updated to match new height
 
                 self.button_positions[label] = {
                     'x_range': (x_start, x_end),
                     'y_range': (y_start, y_end),
                 }
+
 
     def get_display_text(self):
         # Ensure the display text fits within the display area
@@ -204,20 +189,6 @@ class CalculatorUI:
             self.expression = ""
         self.update_display()
 
-    def handle_escape_sequence(self, seq):
-        # You can process the escape sequence here
-        byte_map = self.byte_map
-        if seq == byte_map['cursor_up']:
-            self.handle_keystroke('UP_ARROW')
-        elif seq == byte_map['cursor_down']:
-            self.handle_keystroke('DOWN_ARROW')
-        elif seq == byte_map['cursor_right']:
-            self.handle_keystroke('RIGHT_ARROW')
-        elif seq == byte_map['cursor_left']:
-            self.handle_keystroke('LEFT_ARROW')
-        else:
-            # Handle other escape sequences if needed
-            pass
 
 
     def event_loop(self):
@@ -259,5 +230,12 @@ class CalculatorUI:
 if __name__ == "__main__":
     calculator_ui = CalculatorUI()
     calculator_ui.main()
+
+
+
+
+
+
+
 
 

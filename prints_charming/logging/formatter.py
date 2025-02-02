@@ -11,7 +11,6 @@ from ..prints_charming_defaults import (
     DEFAULT_COLOR_MAP,
     DEFAULT_EFFECT_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES
 )
 
 from ..prints_charming import PrintsCharming

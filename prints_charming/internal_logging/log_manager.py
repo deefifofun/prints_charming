@@ -4,6 +4,7 @@ import logging
 import inspect
 from datetime import datetime
 
+
 class LoggingManager:
     def __init__(self, prints_charming_instance, log_level="DEBUG"):
         """

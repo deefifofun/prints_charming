@@ -2,24 +2,9 @@
 
 import os
 import time
-import random
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from .prints_charming_defaults import (
-    DEFAULT_CONFIG,
-    DEFAULT_COLOR_MAP,
-    DEFAULT_EFFECT_MAP,
-    DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES
-)
-
 from .prints_charming import PrintsCharming
-from .utils import get_terminal_width
-import copy
-import re
-
-
-ANSI_ESCAPE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
 
 
@@ -34,31 +19,15 @@ class BoundCell:
 
 
 class TableManager:
-    _shared_instances = {}
 
-    @classmethod
-    def get_shared_instance(cls, key):
-        """
-        Get a shared TableManager instance.
+    def __init__(
+        self,
+        pc: Union[PrintsCharming, str, None] = None,
+        conditional_styles: dict = None,
+        specific_headers: dict = None,
+        ansi_escape_pattern: str = 'csi'
+    ) -> None:
 
-        Returns:
-            TableManager: A shared TableManager instance or None if not set.
-        """
-        return cls._shared_instances.get(key)
-
-    @classmethod
-    def set_shared_instance(cls, key, instance):
-        """
-        Set a shared TableManager instance.
-
-        Args:
-            key (str): The dictionary key used to identify the instance.
-            instance (TableManager): The TableManager instance to set as shared.
-        """
-        cls._shared_instances[key] = instance
-
-
-    def __init__(self, pc: Union[PrintsCharming, str, None] = None, style_themes: dict = None, conditional_styles: dict = None, specific_headers: dict = None):
         if isinstance(pc, str):
             self.pc = PrintsCharming.get_shared_instance(pc)
             if not self.pc:
@@ -67,9 +36,11 @@ class TableManager:
         else:
             self.pc = pc or PrintsCharming()
 
-        self.style_themes = style_themes
         self.conditional_styles = conditional_styles
         self.specific_headers = specific_headers or {}
+        self.ansi_escape_pattern = (
+            self.pc.__class__.ansi_escape_patterns.get(ansi_escape_pattern)
+        )
         self.tables = {}
         self.previous_values = {}
 
@@ -381,13 +352,11 @@ class TableManager:
         return position
 
 
-    @staticmethod
-    def visible_length(s):
-        return len(ANSI_ESCAPE.sub('', s))
+    def visible_length(self, s):
+        return len(self.ansi_escape_pattern.sub('', s))
 
 
-
-    def refresh_bound_table(self, table_name: str) -> None:
+    def refresh_bound_table(self, table_name: str, starting_line: int = 0) -> None:
         """
         Refreshes a bound table by updating only changed cells in-place.
         """
@@ -403,6 +372,9 @@ class TableManager:
         max_col_lengths = table_info["max_col_lengths"]
         col_sep = format_params.get('col_sep', " | ")
         target_text_box = format_params.get('target_text_box', False)
+
+        # Adjust data_start_line with starting_line
+        data_start_line += starting_line
 
         # Resolve BoundCell instances
         resolved_data = self.resolve_bound_instances(table_data)

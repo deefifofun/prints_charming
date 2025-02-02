@@ -189,34 +189,6 @@ DEFAULT_ERROR_STYLES: Dict[str, PStyle] = {
 }
 
 
-DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
-        "default": PStyle(),
-        "timestamp": PStyle(color="vwhite"),
-        "filename": PStyle(color="cyan", bold=True),
-        'record_name': PStyle(color="orange"),
-        "hostname": PStyle(color="white"),
-        "class_name": PStyle(color="dfff"),
-        "method_name": PStyle(color="vwhite"),
-        "line_number": PStyle(color="vcyan"),
-        "highlight_arg": PStyle(color="vcyan"),
-        "args": PStyle(color="dfff", italic=True),
-        "debug": PStyle(color="blue"),
-        "info": PStyle(color="green"),
-        "warning": PStyle(color="yellow"),
-        "error": PStyle(color="red"),
-        "critical": PStyle(color="vred", bold=True, italic=True),
-        "dict_key": PStyle(color="lblue"),
-        "dict_value": PStyle(color="white"),
-        "true": PStyle(color="vgreen"),
-        "false": PStyle(color="vred"),
-        'none': PStyle(color="lpurple"),
-        "int": PStyle(color="cyan"),
-        "float": PStyle(color="vcyan"),
-        "other": PStyle(color="lav"),
-        "conceal": PStyle(conceal=True)
-}
-
-
 
 DEFAULT_LEVEL_STYLES = {
     logging.DEBUG: 'debug',

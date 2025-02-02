@@ -190,7 +190,7 @@ def prestyle_parts_of_log_messages(logger: logging.Logger) -> None:
         return pc.style_codes.get(level)
 
     # Pre-style parts of log messages
-    styled_text = pc.apply_indexed_styles(
+    styled_text = pc.apply_styles(
         ['message', 'pre-styled'],
         ['vyellow', 'purple'],
         return_list=True

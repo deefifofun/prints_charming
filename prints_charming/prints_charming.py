@@ -2,8 +2,11 @@
 
 import time
 import os
-import shutil
+import pty
 import sys
+import subprocess
+import threading
+import asyncio
 import termios
 import tty
 import select
@@ -13,6 +16,7 @@ import logging
 import inspect
 from datetime import datetime
 from dataclasses import dataclass, asdict
+
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -29,19 +33,53 @@ from .prints_charming_defaults import (
     DEFAULT_EFFECT_MAP,
     DEFAULT_UNICODE_MAP,
     DEFAULT_STYLES,
-    DEFAULT_LOGGING_STYLES,
     DEFAULT_CONTROL_MAP,
     DEFAULT_BYTE_MAP,
 )
 
+from .regex_patterns import (
+    ansi_escape_patterns,
+    LEADING_WS_PATTERN,
+    WORDS_AND_SPACES_PATTERN,
+)
+
 from .prints_style import PStyle
+from .prints_ui import PrintsUI
 from .utils import compute_bg_color_map
 from .trie_manager import TrieManager
+from .markdown_processor import MarkdownProcessor
 from .formatter import Formatter
 from .internal_logging_utils import shared_logger
+from .terminal_size_watcher import TerminalSizeWatcher
+from .segment_styler import SegmentStyler
+from .progress_bar import PBar
 
 if sys.platform == 'win32':
     from .win_utils import WinUtils
+
+
+
+
+
+
+def get_variable_name_from_stack(value, f_back_num=1):
+    """
+    Attempts to retrieve the name of a variable holding the given value from the calling stack.
+
+    :param value: The value to find the variable name for.
+    :param f_back_num: How many frames back to look for the variable name.
+    :return: The name of the variable, if found; otherwise, None.
+    """
+    frame = inspect.currentframe()
+    for _ in range(f_back_num + 1):  # Traverse back the specified number of frames
+        frame = frame.f_back
+        if frame is None:
+            break
+    if frame:
+        names = [name for name, val in frame.f_locals.items() if val is value]
+        return names[0] if names else None
+    return None
+
 
 
 
@@ -74,7 +112,7 @@ class PrintsCharming:
 
     **Note:**
     The `PrintsCharming` class serves as the foundation for other components
-    within the library, such as logging, exception handling, tables, boxes,
+    within the library, such as logging, exception handling, tables, frames,
     borders, interactive utilities, and more which build upon its
     functionalities to provide a cohesive toolkit for terminal applications.
 
@@ -91,265 +129,23 @@ class PrintsCharming:
     """
 
     RESET = "\033[0m"
-    _TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
-    LEADING_WS_PATTERN = re.compile(r'^([\n\t]+)')
 
-    # Dictionary to hold the patterns
-    ansi_escape_patterns = {}
+    leading_ws_pattern = LEADING_WS_PATTERN
+    words_and_spaces_pattern = WORDS_AND_SPACES_PATTERN
 
+    # Dictionary of ansi escape patterns
+    ansi_escape_patterns = ansi_escape_patterns
 
-    ANSI_ALL_PATTERN = re.compile(
-        r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*\x07)'
-    )
-    """
-    Matches any ANSI escape sequences.
-
-    Starts with:
-    - ESC character (\x1b)
-
-    Contains:
-    - Single-character sequences: any character from '@' to '_', including 
-      backslash '\\' and hyphen '-'.
-    - CSI sequences: '[' followed by optional parameter bytes ([0-?]*), 
-      optional intermediate bytes ([ -/]*), and a final byte in the range [@-~].
-    - OSC sequences: ']' followed by any characters not including BEL (\x07), 
-      ending with BEL.
-
-    Ends with:
-    - Single-character sequences: character from '@' to '_'.
-    - CSI sequences: final byte in the range '@' to '~'.
-    - OSC sequences: BEL character (\x07).
-
-    **Example matches beyond previous levels:**
-    - '\x1b]0;Title\x07' (Set window title)
-    - '\x1b[P' (Device Control String)
-
-    Use cases:
-    - Removing all types of ANSI escape sequences from text.
-    - Parsing and interpreting any ANSI escape code.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['all'] = ANSI_ALL_PATTERN
-
-
-    ANSI_ALL_NON_OSC_PATTERN = re.compile(
-        r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
-    )
-    """
-    Matches any ANSI escape sequences excluding OSC (Operating System Command) 
-    sequences.
-
-    Starts with:
-    - ESC character (\x1b).
-
-    Contains:
-    - Single-character sequences: a single character from '@' to '_', including 
-      backslash '\\' and hyphen '-'.
-    - CSI (Control Sequence Introducer) sequences: '[' followed by optional 
-      parameter bytes ([0-?]*), optional intermediate bytes ([ -/]*), and a 
-      final byte in the range '@' to '~'.
-
-    Does not match:
-    - OSC sequences (which start with ']' and end with BEL (\x07)).
-
-    **Example matches beyond previous levels:**
-    - '\x1b[D' (Move cursor left, single-character).
-    - '\x1b[1;31m' (Set text attributes, CSI).
-    - '\x1b[2J' (Clear screen, CSI).
-
-    Use cases:
-    - Parsing or interpreting most ANSI escape sequences except OSC.
-    - Simplifying text processing when OSC sequences are irrelevant.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['all_non_osc'] = ANSI_ALL_NON_OSC_PATTERN
-
-
-    ANSI_CSI_PATTERN = re.compile(
-        r'\x1b\[[0-?]*[ -/]*[@-~]'
-    )
-    """
-    Matches ANSI CSI (Control Sequence Introducer) sequences.
-
-    Starts with:
-    - ESC character (\x1b) followed by '['
-
-    Contains:
-    - Optional parameter bytes: digits, semicolons, or '?'.
-    - Optional intermediate bytes: characters from ' ' (space) to '/'.
-    - Final byte: any character from '@' to '~'.
-
-    Ends with:
-    - Final byte in the range '@' to '~'.
-    
-    Does Not Match:
-    - Single-character ANSI sequences (e.g., \x1b[D).
-    - OSC sequences (e.g., \x1b]0;Title\x07).
-
-    **Example matches beyond previous levels:**
-    - '\x1b[1;31;40m' (Set text attributes)
-    - '\x1b[0c' (Device Attributes request)
-    - '\x1b[2J' (Clear Screen)
-
-    Use cases:
-    - Parsing standard CSI sequences like cursor movement, styling, and screen 
-      clearing, including non-alphabetic final bytes.
-    - Implementing terminal control functions.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['csi'] = ANSI_CSI_PATTERN
-
-
-    ANSI_CORE_PATTERN = re.compile(
-        r'\x1b\[[0-9;]*[a-zA-Z]'
-    )
-    """
-    Matches core ANSI escape sequences commonly used for text styling, cursor 
-    movement, and screen manipulation.
-
-    Starts with:
-    - ESC character (\x1b) followed by '['
-
-    Contains:
-    - Optional numeric parameters separated by semicolons.
-
-    Ends with:
-    - An alphabetic character (a-z or A-Z).
-    
-    Does Not Match:
-    - CSI sequences with non-alphabetic final bytes (e.g., @, [, or ~).
-    - Single-character ANSI sequences (e.g., \x1b[D).
-    - OSC sequences (e.g., \x1b]0;Title\x07).
-
-    **Example matches beyond previous levels:**
-    - '\x1b[12;24r' (Set scrolling region)
-    - '\x1b[5n' (Device status report)
-
-    Use cases:
-    - Handling CSI sequences with alphabetic final bytes.
-    - Filtering out sequences that use non-standard characters.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['core'] = ANSI_CORE_PATTERN
-
-
-    ANSI_SGR_OR_ERASE = re.compile(
-        r'\x1b\[[0-9;]*[mK]'
-    )
-    """
-    Matches ANSI CSI sequences ending with 'm' or 'K'.
-
-    Starts with:
-    - ESC character (\x1b) followed by '['
-
-    Contains:
-    - Optional numeric parameters separated by semicolons.
-
-    Ends with:
-    - Either 'm' or 'K'.
-
-    Example matches beyond previous levels:
-    - '\x1b[K' (Erase to end of line)
-    - '\x1b[1;2K' (Erase line with parameters)
-
-    Use cases:
-    - Specifically targeting text formatting and line modification sequences.
-    - Simplifying parsing when only 'm' or 'K' sequences are relevant.
-    - Handling both SGR styling and line clearing commands in terminal outputs.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['sgr_mk'] = ANSI_SGR_OR_ERASE
-
-
-    ANSI_SGR_LOOSE_PATTERN = re.compile(
-        r'\x1b\[[0-9;]*m'
-    )
-    """
-    Matches ANSI SGR sequences with optional numeric parameters.
-
-    Starts with:
-    - ESC character (\x1b) followed by '['
-
-    Contains:
-    - Optional numeric parameters separated by semicolons.
-
-    Ends with:
-    - 'm' character.
-
-    Example matches beyond previous levels:
-    - '\x1b[m' (Shorthand Reset all attributes or no params)
-
-    Use cases:
-    - Parsing or removing text styling codes.
-    - Applying text attributes in terminal applications.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['sgr_loose'] = ANSI_SGR_LOOSE_PATTERN
-
-
-    ANSI_SGR_STRICT_PATTERN = re.compile(
-        r'\x1b\[([0-9]+)(;[0-9]+)*m'
-    )
-    """
-    Matches ANSI SGR sequences with at least one numeric parameter.
-
-    Starts with:
-    - ESC character (\x1b) followed by '['
-
-    Contains:
-    - One or more numeric parameters separated by semicolons.
-
-    Ends with:
-    - 'm' character.
-
-    Example matches beyond previous levels:
-    - '\x1b[31m' (red text)
-    - '\x1b[1;4m' (bold and underlined text).
-    - '\x1b[38;5;231m' (256-color foreground).
-    - '\x1b[38;2;24;28;33m' (TrueColor foreground).
-
-    Use cases:
-    - Parsing or stripping SGR codes for color or style in text output.
-    - Useful in strict parsing scenarios where at least one parameter is 
-      required. 
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['sgr_strict'] = ANSI_SGR_STRICT_PATTERN
-
-
-    ANSI_SINGLE_CHAR_PATTERN = re.compile(
-        r'\x1b[@-Z\\-_]'
-    )
-    """
-    Matches ANSI single-character escape sequences that do not use parameters
-    or CSI sequences.
-
-    Starts with:
-    - ESC character (\x1b)
-
-    Contains:
-    - A single character from '@' to '_', including backslash '\\' and hyphen '-'.
-
-    Ends with:
-    - The single character after ESC.
-
-    **Example matches beyond previous levels:**
-    - '\x1b=' (Set alternate keypad mode)
-    - '\x1b>' (Set numeric keypad mode)
-    - '\x1b[D' (cursor left).
-    - '\x1b[M' (scroll up).
-
-    Use cases:
-    - Processing simple, single-character control sequences.
-    - Specifically for simple ANSI escape sequences used for terminal control, 
-      like keyboard inputs or mode toggles.
-    """
-    # Add to ansi_escape_patterns dictionary
-    ansi_escape_patterns['single_char'] = ANSI_SINGLE_CHAR_PATTERN
-
-
-    # default ansi escape pattern
+    # Default ansi escape pattern
     ansi_escape_pattern = ansi_escape_patterns['sgr_mk']
+
+    is_alt_buffer = False  # Track current buffer state
+
+    # Add locks for thread safety
+    _write_lock = threading.Lock()  # For synchronous workflows
+    _async_lock = asyncio.Lock()  # For asynchronous workflows
+
+
 
 
     @classmethod
@@ -361,13 +157,13 @@ class PrintsCharming:
         :raises ValueError: If the provided pattern_key does not exist in ansi_escape_patterns.
         """
         # Retrieve the pattern
-        pattern = cls.ansi_escape_patterns.get(pattern_key)
+        pattern = ansi_escape_patterns.get(pattern_key)
 
         # Validate the pattern key
         if pattern is None:
             raise ValueError(
                 f"Invalid pattern_key '{pattern_key}'. "
-                f"Available keys are: {list(cls.ansi_escape_patterns.keys())}."
+                f"Available keys are: {list(ansi_escape_patterns.keys())}."
             )
 
         # Update the default pattern
@@ -385,32 +181,22 @@ class PrintsCharming:
         :return: The text without ANSI codes.
         :raises ValueError: If an invalid `pattern_key` is provided.
         """
-        if not isinstance(text, str):
-            raise TypeError(f"Expected 'text' to be a string, got {type(text).__name__}.")
 
         # Use the default pattern if no pattern_key is provided
         if not pattern_key:
             return cls.ansi_escape_pattern.sub('', text)
 
         # Retrieve the pattern for the provided key
-        pattern = cls.ansi_escape_patterns.get(pattern_key)
+        pattern = ansi_escape_patterns.get(pattern_key)
         if not pattern:
             raise ValueError(
                 f"Invalid pattern_key '{pattern_key}'. "
-                f"Available keys are: {list(cls.ansi_escape_patterns.keys())}."
+                f"Available keys are: {list(ansi_escape_patterns.keys())}."
             )
 
         # Use the retrieved pattern to remove ANSI codes
         return pattern.sub('', text)
 
-
-
-    words_and_spaces_pattern = re.compile(r'\S+|\s+')
-
-    # For package wide internal and subclass logging purposes.
-    _shared_internal_logging_styles: Optional[Dict[str, PStyle]] = (
-        copy.deepcopy(DEFAULT_LOGGING_STYLES)
-    )
 
     _shared_instance = None
     _shared_instances = {}
@@ -429,6 +215,7 @@ class PrintsCharming:
 
 
     log_level_style_names: List[str] = ['debug', 'info', 'warning', 'error', 'critical']
+
 
     @classmethod
     def get_shared_instance(cls, key: str) -> Optional["PrintsCharming"]:
@@ -605,6 +392,7 @@ class PrintsCharming:
         else:
             return None
 
+
     @classmethod
     def parse_input(cls) -> Tuple[Optional[str], Optional[Any]]:
         """Parse input and determine if it's a mouse event, keystroke, or escape sequence."""
@@ -713,11 +501,275 @@ class PrintsCharming:
 
 
     @classmethod
-    def write(cls, *control_keys_or_text: Union[str, bytes], **kwargs: Any) -> None:
+    def write(
+        cls,
+        *control_keys_or_text: Union[str, bytes],
+        dynamic_state_handling: bool = True,
+        track_alt_buffer_state: bool = True,
+        **kwargs: Any
+    ) -> None:
+        """
+        Synchronous method to write control sequences or text to sys.stdout.
+
+        :param dynamic_state_handling: Enable advanced handling of interleaved buffer transitions.
+        :param track_alt_buffer_state: Track and update the buffer state (alt_buffer or normal_buffer).
+        """
+        with cls._write_lock:
+            cls._write_internal(
+                control_keys_or_text,
+                dynamic_state_handling=dynamic_state_handling,
+                track_alt_buffer_state=track_alt_buffer_state,
+                kwargs=kwargs
+            )
+
+
+    @classmethod
+    async def write_async(
+        cls,
+        *control_keys_or_text: Union[str, bytes],
+        dynamic_state_handling: bool = True,
+        track_alt_buffer_state: bool = True,
+        use_queue: bool = False,
+        queue: Optional[asyncio.Queue] = None,
+        batch_size: int = 0,
+        max_batch_size: int = 50,
+        min_batch_size: int = 5,
+        **kwargs: Any
+    ) -> None:
+        """
+        Asynchronous method to write control sequences or text to sys.stdout with optional queue-based processing.
+
+        :param dynamic_state_handling: Enable advanced handling of interleaved buffer transitions.
+        :param track_alt_buffer_state: Track and update the buffer state (alt_buffer or normal_buffer).
+        :param use_queue: Enable queue-based buffering of output.
+        :param queue: An optional asyncio.Queue instance for custom queue management.
+        :param batch_size: Number of items to process per batch in queue-based mode.
+        """
+        if use_queue:
+            if not queue:
+                queue = asyncio.Queue()  # Create a default queue if not provided
+            await cls._process_queue(queue, batch_size, max_batch_size, min_batch_size, dynamic_state_handling, track_alt_buffer_state, kwargs)
+        else:
+            await cls._write_internal_async(
+                control_keys_or_text,
+                dynamic_state_handling=dynamic_state_handling,
+                track_alt_buffer_state=track_alt_buffer_state,
+                kwargs=kwargs
+            )
+
+
+    @classmethod
+    async def _process_queue(
+        cls,
+        queue: asyncio.Queue,
+        batch_size: Optional[int],
+        max_batch_size: Optional[int],
+        min_batch_size: Optional[int],
+        dynamic_state_handling: bool,
+        track_alt_buffer_state: bool,
+        kwargs: Any
+    ) -> None:
+        """
+        Process items in an asyncio.Queue in batches.
+        """
+        while not queue.empty():
+            # Dynamically calculate the effective batch size
+            effective_batch_size = batch_size or min(max(queue.qsize() // 2, min_batch_size), max_batch_size)
+
+            # Collect items for this batch
+            items = []
+            for _ in range(min(effective_batch_size, queue.qsize())):
+                items.append(await queue.get())
+
+            async with cls._async_lock:
+                await cls._write_internal_async(items, dynamic_state_handling, track_alt_buffer_state, kwargs)
+
+
+    @classmethod
+    def _write_internal(
+        cls,
+        control_keys_or_text: Union[List[Any], Any],
+        dynamic_state_handling: bool,
+        track_alt_buffer_state: bool,
+        kwargs: Any
+    ) -> None:
+        """
+        Internal method to handle writing logic with support for both synchronous and asynchronous workflows.
+        """
+
+
+        if dynamic_state_handling:
+            # Advanced method: Handles dynamic buffer state transitions
+            current_state = cls.is_alt_buffer if track_alt_buffer_state else None
+            output_buffer = []
+
+            for item in control_keys_or_text:
+                if item == 'alt_buffer':
+                    if track_alt_buffer_state and not current_state:  # Transition to alt_buffer
+                        cls.is_alt_buffer = True
+                        current_state = True
+                    # Flush the current buffer
+                    if output_buffer:
+                        cls._flush_buffer(output_buffer)
+                        output_buffer = []
+                    cls._write_direct(cls.shared_ctl_map.get('alt_buffer', ''))
+                elif item == 'normal_buffer':
+                    if track_alt_buffer_state and current_state:  # Transition to normal_buffer
+                        cls.is_alt_buffer = False
+                        current_state = False
+                    # Flush the current buffer
+                    if output_buffer:
+                        cls._flush_buffer(output_buffer)
+                        output_buffer = []
+                    cls._write_direct(cls.shared_ctl_map.get('normal_buffer', ''))
+                else:
+                    # Handle regular text or control sequences
+                    if isinstance(item, str):
+                        control_sequence = cls.shared_ctl_map.get(item, item)
+                        if kwargs and '{' in control_sequence and '}' in control_sequence:
+                            control_sequence = control_sequence.format(**kwargs)
+                        output_buffer.append(control_sequence)
+
+            # Flush remaining output
+            if output_buffer:
+                cls._flush_buffer(output_buffer)
+
+        else:
+            # Simpler method: Assumes no interleaved buffer transitions
+            if track_alt_buffer_state:
+                if 'alt_buffer' in control_keys_or_text:
+                    cls.is_alt_buffer = True
+                elif 'normal_buffer' in control_keys_or_text:
+                    cls.is_alt_buffer = False
+
+            # Collect and write output
+            for item in control_keys_or_text:
+                if isinstance(item, str):
+                    # Check if the item is a control key in the ctl_map
+                    control_sequence = cls.shared_ctl_map.get(item, item)  # If not found, treat it as plain text
+                    # If there are kwargs like row, col, format the control sequence
+                    if kwargs and '{' in control_sequence and '}' in control_sequence:
+                        control_sequence = control_sequence.format(**kwargs)
+                    sys.stdout.write(control_sequence)
+            sys.stdout.flush()
+
+
+    @classmethod
+    async def _write_internal_async(
+        cls,
+        control_keys_or_text: Union[List[Any], Any],
+        dynamic_state_handling: bool,
+        track_alt_buffer_state: bool,
+        kwargs: Any
+    ) -> None:
+        """
+        Internal method to handle writing logic with support for both synchronous and asynchronous workflows.
+        """
+
+        if dynamic_state_handling:
+            # Advanced method: Handles dynamic buffer state transitions
+            current_state = cls.is_alt_buffer if track_alt_buffer_state else None
+            output_buffer = []
+
+            for item in control_keys_or_text:
+                if item == 'alt_buffer' and not current_state:  # Transition to alt_buffer
+                    async with cls._async_lock:
+                        cls.is_alt_buffer = True
+                        current_state = True
+                        if output_buffer:
+                            await cls._flush_buffer_async(output_buffer, True)  # Flush buffered content
+                            output_buffer = []
+                        await cls._write_direct_async(cls.shared_ctl_map.get('alt_buffer', ''))
+                elif item == 'normal_buffer' and current_state:  # Transition to normal_buffer
+                    async with cls._async_lock:
+                        cls.is_alt_buffer = False
+                        current_state = False
+                        if output_buffer:
+                            await cls._flush_buffer_async(output_buffer, True)  # Flush buffered content
+                            output_buffer = []
+                        await cls._write_direct_async(cls.shared_ctl_map.get('normal_buffer', ''))
+                else:
+                    # Buffer regular text or control sequences
+                    if isinstance(item, str):
+                        control_sequence = cls.shared_ctl_map.get(item, item)
+                        if kwargs and '{' in control_sequence and '}' in control_sequence:
+                            control_sequence = control_sequence.format(**kwargs)
+                        output_buffer.append(control_sequence)
+
+            # Final flush of any remaining output
+            if output_buffer:
+                async with cls._async_lock:  # Lock for final flush
+                    await cls._flush_buffer_async(output_buffer, True)
+
+        else:
+            # Simpler method: Assumes no interleaved buffer transitions
+            if track_alt_buffer_state:
+                if 'alt_buffer' in control_keys_or_text:
+                    cls.is_alt_buffer = True
+                elif 'normal_buffer' in control_keys_or_text:
+                    cls.is_alt_buffer = False
+
+            # Collect and write output
+            for item in control_keys_or_text:
+                if isinstance(item, str):
+                    # Check if the item is a control key in the ctl_map
+                    control_sequence = cls.shared_ctl_map.get(item, item)  # If not found, treat it as plain text
+                    # If there are kwargs like row, col, format the control sequence
+                    if kwargs and '{' in control_sequence and '}' in control_sequence:
+                        control_sequence = control_sequence.format(**kwargs)
+                    sys.stdout.write(control_sequence)
+            sys.stdout.flush()
+
+
+    @classmethod
+    def _flush_buffer(cls, output_buffer: List[str], force_flush: bool = False) -> None:
+        """
+        Flushes the output buffer to sys.stdout, consolidating flushes when possible.
+        """
+        if not output_buffer and not force_flush:
+            return  # No flush needed
+        sys.stdout.write(''.join(output_buffer))
+        sys.stdout.flush()
+
+
+    @classmethod
+    async def _flush_buffer_async(cls, output_buffer: List[str], force_flush: bool = False) -> None:
+        """
+        Flushes the output buffer to sys.stdout, consolidating flushes when possible.
+        """
+        if not output_buffer and not force_flush:
+            return  # No flush needed
+        await asyncio.to_thread(sys.stdout.write, ''.join(output_buffer))
+        await asyncio.to_thread(sys.stdout.flush)
+
+
+    @classmethod
+    def _write_direct(cls, text: str) -> None:
+        """
+        Writes directly to sys.stdout.
+        """
+        sys.stdout.write(text)
+
+
+    @classmethod
+    async def _write_direct_async(cls, text: str) -> None:
+        """
+        Writes directly to sys.stdout.
+        """
+        await asyncio.to_thread(sys.stdout.write, text)
+
+
+
+    @classmethod
+    def write_orig(cls, *control_keys_or_text: Union[str, bytes], **kwargs: Any) -> None:
         """
         Writes control sequences or text passed as arguments to sys.stdout.
         If the control sequence has formatting placeholders, it uses the kwargs for formatting.
         """
+        if 'alt_buffer' in control_keys_or_text:
+            cls.is_alt_buffer = True
+        elif 'normal_buffer' in control_keys_or_text:
+            cls.is_alt_buffer = False
         for item in control_keys_or_text:
             if isinstance(item, str):
                 # Check if the item is a control key in the ctl_map
@@ -757,8 +809,6 @@ class PrintsCharming:
 
 
 
-
-
     def __init__(self,
                  config: Optional[Dict[str, Union[bool, int, str]]] = None,
                  color_map: Optional[Dict[str, str]] = None,
@@ -767,12 +817,14 @@ class PrintsCharming:
                  unicode_map: Optional[Dict[str, str]] = None,
                  styles: Optional[Dict[str, PStyle]] = None,
                  enable_input_parsing: bool = False,
+                 enable_term_size_watcher: bool = False,
                  enable_trie_manager: bool = True,
                  styled_strings: Optional[Dict[str, List[str]]] = None,
                  styled_subwords: Optional[Dict[str, List[str]]] = None,
+                 enable_markdown: bool = False,
+                 terminal_mode: str = "single",
                  style_conditions: Optional[Any] = None,
                  formatter: Optional['Formatter'] = None,
-                 autoconf_win: bool = False
                  ) -> None:
 
         """
@@ -801,14 +853,22 @@ class PrintsCharming:
         :param enable_input_parsing: if True define cls.shared_reverse_input_map
                        by calling self.__class__.create_reverse_input_mapping()
 
+        :param enable_term_size_watcher: if True initializes an instance of
+                                         TerminalSizeWatcher passing self to
+                                         the pc param.
+
         :param enable_trie_manager: if True initializes an instance of
                                     TrieManager passing self to the pc_instance
                                     param.
 
+        :param enable_markdown: if True initializes an instance of
+                                MarkdownProcessor passing self to the
+                                pc_instance param.
+
         :param styled_strings: calls the add_strings_from_dict method with your
                                provided styled_strings dictionary.
 
-        :param styled_strings: calls the add_subwords_from_dict method with your
+        :param styled_subwords: calls the add_subwords_from_dict method with your
                                provided styled_subwords dictionary.
 
         :param style_conditions: A custom class for implementing dynamic
@@ -818,15 +878,9 @@ class PrintsCharming:
         :param formatter: supply your own formatter class instance to be used
                           for formatting text printed using the print method in
                           this class.
-
-        :param autoconf_win: If your using legacy windows cmd prompt and not
-                             getting colored/styled text then change this to
-                             True to make things work.
         """
 
         self.config = {**DEFAULT_CONFIG, **(config or {})}
-
-        self.terminal_width = self.get_terminal_width()
 
         self.color_map = (
             color_map
@@ -851,6 +905,8 @@ class PrintsCharming:
         if enable_input_parsing:
             self.__class__.create_reverse_input_mapping()
 
+        self.enable_term_size_watcher = enable_term_size_watcher
+
         self.styles = (
             copy.deepcopy(styles)
             or PrintsCharming.shared_styles
@@ -873,20 +929,25 @@ class PrintsCharming:
             if self.styles[name].color in self.color_map
         }
 
-        self._internal_logging_styles = (
-            PrintsCharming._shared_internal_logging_styles
-        )
-
-
-        self._internal_logging_style_codes: Dict[str, str] = {
-            name: self.create_style_code(style)
-            for name, style in self._internal_logging_styles.items()
-            if (
-                self._internal_logging_styles[name].color in self.color_map
-            )
-        }
 
         self.reset = PrintsCharming.RESET
+
+        self.win_utils = None
+        if sys.platform == 'win32':
+            self.win_utils = WinUtils
+            if not WinUtils.is_ansi_supported_natively():
+                if not WinUtils.enable_win_console_ansi_handling():
+                    logging.error("Failed to enable ANSI handling on Windows")
+
+        self.terminal_width = None
+        self.terminal_height = None
+
+        self.terminal_mode = terminal_mode
+
+        self.terminals = {}  # For managing multiple terminals
+        self.single_terminal_config = {"title": "PrintsCharming Terminal"}
+
+        self.term_size_watcher = TerminalSizeWatcher(self)
 
         self.trie_manager = None
         if enable_trie_manager:
@@ -897,6 +958,11 @@ class PrintsCharming:
             if styled_subwords:
                 self.trie_manager.add_subwords_from_dict(styled_subwords)
 
+
+        self.markdown_processor = None
+        if enable_markdown:
+            self.markdown_processor = MarkdownProcessor(self)
+
         self.sentence_ending_characters = ".,!?:;"
 
         self.style_conditions = style_conditions
@@ -906,11 +972,6 @@ class PrintsCharming:
 
         self.style_cache = {}
 
-        if sys.platform == 'win32':
-            self.win_utils = WinUtils
-            if autoconf_win and not WinUtils.is_ansi_supported_natively():
-                if not WinUtils.enable_win_console_ansi_handling():
-                    logging.error("Failed to enable ANSI handling on Windows")
 
         # Instance-level flag to control logging
         self.internal_logging_enabled = (
@@ -923,32 +984,127 @@ class PrintsCharming:
 
         self.formatter = formatter or Formatter()
 
+        self.segment_styler = SegmentStyler(self)
 
-    @staticmethod
-    def get_terminal_width():
-        try:
-            # First, try using os.get_terminal_size()
-            return os.get_terminal_size().columns
-        except OSError:
+        if terminal_mode == "single":
+            self._setup_single_terminal()
+
+
+
+
+
+    def _setup_single_terminal(self):
+        """Setup configurations for single-terminal mode."""
+        self.single_terminal_streams = {
+            "stdout": sys.stdout,
+            "stdin": sys.stdin,
+        }
+        self.write("set_window_title", title=self.single_terminal_config["title"])
+
+
+    def launch_terminal(self, name, terminal_emulator="gnome-terminal", width=80, height=24, title="New Terminal", task=None):
+        """
+        Launch a new terminal with a given task.
+        """
+        if self.terminal_mode != "multi":
+            raise RuntimeError("Multi-terminal mode is not enabled.")
+
+        master_fd, slave_fd = pty.openpty()
+        terminal_cmd = [
+            terminal_emulator,
+            "--geometry", f"{width}x{height}",
+            "--", "bash", "-c", "cat",
+        ]
+        subprocess.Popen(
+            terminal_cmd,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+        )
+        os.close(slave_fd)
+
+        time.sleep(0.5)  # Allow terminal to initialize
+
+        # Store the terminal instance
+        self.terminals[name] = master_fd
+
+        # Redirect sys.stdout to the new terminal for the task
+        sys.stdout = os.fdopen(master_fd, "w")
+        sys.stdin = os.fdopen(master_fd, "r")
+        self.write("alt_buffer")
+        self.write("set_window_title", title=title)
+
+        # Run the task in a separate thread
+        if task:
+            threading.Thread(target=task, args=(master_fd,)).start()
+
+
+    def restore_terminal(self, name=None):
+        """
+        Restore a specific terminal or all terminals if no name is provided.
+        """
+        if name:
+            self._restore_single_terminal(name)
+        else:
+            for terminal_name in list(self.terminals.keys()):
+                self._restore_single_terminal(terminal_name)
+
+
+    def _restore_single_terminal(self, name):
+        """
+        Restore and close a specific terminal.
+        """
+        master_fd = self.terminals.get(name)
+        if master_fd:
+            sys.stdout = sys.__stdout__  # Restore to original stdout
+            self.write("normal_buffer")
+            os.close(master_fd)
+            del self.terminals[name]
+
+
+    def single_terminal_task(self):
+        """Example task for single-terminal mode."""
+        self.write("Welcome to the single terminal mode!\n")
+        while True:
             try:
-                # Fallback to shutil.get_terminal_size()
-                return shutil.get_terminal_size().columns
-            except OSError:
-                # Ultimate fallback: Estimate width manually
-                width = 0
-                print("x" * 80, end="", flush=True)
-                while True:
-                    try:
-                        sys.stdout.write("\r")
-                        width += 1
-                    except Exception:
-                        break
-                sys.stdout.write("\n")
-                return width - 1  # Subtract 1 for overflow
+                self.write("\nEnter a command (type 'exit' to quit): ")
+                command = input()
+                if command.lower() == "exit":
+                    break
+                self.write(f"You entered: {command}\n")
+            except KeyboardInterrupt:
+                break
+
+
+    def write_multi_terminal(self, master_fd: int, *control_keys_or_text: Union[str, bytes], **kwargs: Any):
+        """
+        Multi-terminal task that writes control sequences or text to the terminal's stdout.
+
+        Args:
+            master_fd (int): The file descriptor of the master end of the pseudo-terminal.
+            *control_keys_or_text (Union[str, bytes]): Control sequences or text to be written to the terminal.
+            **kwargs: Formatting options for the control sequences.
+        """
+        try:
+            # Redirect stdout to the master file descriptor
+            with os.fdopen(master_fd, "w") as terminal_output:
+                sys.stdout = terminal_output
+
+                # Write the content to the terminal using the `write` method
+                self.write(*control_keys_or_text, **kwargs)
+        finally:
+            # Restore the original stdout
+            sys.stdout = sys.__stdout__
 
 
 
-    def escape_ansi_codes(self, ansi_string: str, escape_to: str = "\\033") -> str:
+    def get_progress_bar(self, total: int, desc: str = "", width: int = 40, style: str = "progress", mode="auto"):
+        return PBar(self, total, desc, width, style, mode)
+
+
+
+    def escape_ansi_codes(self, ansi_string: str, escape_to: str = "\\x1b") -> str:
         """
         Escapes ANSI escape codes in a given string, replacing them with a specified escape sequence.
 
@@ -1164,7 +1320,6 @@ class PrintsCharming:
 
 
 
-
     def apply_style(self, style_name: str, text: Any, fill_space: bool = True, fill_bg_only: bool = True, reset: bool = True) -> str:
         """
         Applies a style to the given text.
@@ -1219,12 +1374,13 @@ class PrintsCharming:
         return styled_text
 
 
-    def apply_indexed_styles(self, strs_list: List[str], styles_list: Union[str, List[str]], return_list: bool = False) -> Union[str, List[str]]:
+    def apply_styles(self, strs_list: List[str], styles_list: Union[str, List[str]], sep: str = ' ', return_list: bool = False) -> Union[str, List[str]]:
         """
         Applies styles to a list of strings, optionally returning them as a list.
 
         :param strs_list: A list of strings to style.
         :param styles_list: A single style or a list of styles to apply.
+        :param sep: The separator between joined list items.
         :param return_list: Whether to return a list of styled strings.
         :return: The styled strings as a single concatenated string or a list.
         """
@@ -1249,7 +1405,7 @@ class PrintsCharming:
         ]
 
         # Return either the list of styled strings or a joined string
-        return ' '.join(styled_strs) if not return_list else styled_strs
+        return sep.join(styled_strs) if not return_list else styled_strs
 
 
     def get_color_code(self, color_name: str) -> str:
@@ -1309,25 +1465,6 @@ class PrintsCharming:
         return bg_color_block
 
 
-    def generate_bg_bar_strip(self, color_name: str, length: int = 10) -> str:
-        """
-        Generates a block of background color as a string.
-
-        :param color_name: The name of the color as per self.bg_color_map.
-        :param length: The length of the color block in terms of spaces.
-
-        :return: A string representing the background color block.
-        """
-        self.debug("Generating background color strip: {} with length: {}", color_name, length)
-
-        # Retrieve background color code
-        bg_color_code = self.bg_color_map.get(color_name)
-
-        # Generate and return the styled color block
-        return f"{bg_color_code}{' ' * length}{self.reset}"
-
-
-
     def get_effect_code(self, effect_name: str) -> str:
         """
         Retrieves the ANSI effect code for the given effect name.
@@ -1348,6 +1485,24 @@ class PrintsCharming:
         """
         effect_code = self.get_effect_code(effect_name)
         return f'{effect_code}{text}{self.reset}'
+
+
+    def generate_bg_bar_strip(self, color_name: str, length: int = 10) -> str:
+        """
+        Generates a block of background color as a string.
+
+        :param color_name: The name of the color as per self.bg_color_map.
+        :param length: The length of the color block in terms of spaces.
+
+        :return: A string representing the background color block.
+        """
+        self.debug("Generating background color strip: {} with length: {}", color_name, length)
+
+        # Retrieve background color code
+        bg_color_code = self.bg_color_map.get(color_name)
+
+        # Generate and return the styled color block
+        return f"{bg_color_code}{' ' * length}{self.reset}"
 
 
     def conceal_text(
@@ -1379,6 +1534,85 @@ class PrintsCharming:
             concealed_text = f"{style_code}{text_to_conceal}{self.reset}"
 
         return concealed_text
+
+
+    def format_structure(self, structure: Any, indent: int = 4, prepend_fill: bool = True, pad_left_style: str = 'green', fill_to_end: bool = True, fill_bg_only: bool = False, include_var_name: bool = True, f_back_num: int = 1) -> str:
+        """
+        Formats and styles a structure (list, tuple, set, dict, or other nested data types) as a styled string.
+
+        :param structure: The structure to format and style.
+        :param indent: The number of spaces to use for indentation.
+        :param include_var_name: If True, attempts to include the variable name.
+        :param f_back_num: How many frames back to look for the variable name.
+        :return: A string representing the formatted and styled structure.
+        """
+
+        def format_inner(structure: Any, level: int = 0) -> str:
+            result = ""
+            if isinstance(structure, dict):
+                open_bracket = self.apply_style('python_bracket', '{')
+                close_bracket = self.apply_style('python_bracket', '}')
+                result += f"{open_bracket}\n"
+                items = list(structure.items())
+                for i, (key, value) in enumerate(items):
+                    styled_colon = self.apply_style('python_colon', ":")
+                    result += (
+                            " " * ((level + 1) * indent) if not prepend_fill else self.apply_style(pad_left_style, " " * ((level + 1) * indent), fill_bg_only=fill_bg_only)
+                            + self.apply_style('dict_key', f'"{key}"')
+                            + styled_colon
+                            + self.apply_style('default', " ", fill_bg_only=False)
+                    )
+                    result += format_inner(value, level + 1)
+                    if i < len(items) - 1:  # Add a styled comma if not the last item
+                        styled_comma = self.apply_style('python_comma', ",")
+                        result = result.rstrip("\n") + styled_comma + "\n"
+                result += " " * (level * indent) + close_bracket
+            elif isinstance(structure, (list, tuple, set)):
+                brackets = {
+                    list: ("[", "]"),
+                    tuple: ("(", ")"),
+                    set: ("{", "}"),
+                }
+                open_bracket, close_bracket = map(lambda b: self.apply_style('python_bracket', b), brackets[type(structure)])
+                result += f"{open_bracket}\n"
+                items = list(structure)
+                for i, item in enumerate(items):
+                    result += (
+                            " " * ((level + 1) * indent)
+                            + format_inner(item, level + 1)
+                    )
+                    if i < len(items) - 1:  # Add a styled comma if not the last item
+                        styled_comma = self.apply_style('python_comma', ",")
+                        result = result.rstrip("\n") + styled_comma + "\n"
+                result += " " * (level * indent) + close_bracket
+            elif isinstance(structure, bool):
+                bool_style = 'true' if structure else 'false'
+                result += self.apply_style(bool_style, str(structure))
+            elif structure is None:
+                result += self.apply_style('none', str(structure))
+            elif isinstance(structure, int):
+                result += self.apply_style('int', str(structure))
+            elif isinstance(structure, float):
+                result += self.apply_style('float', str(structure))
+            elif isinstance(structure, str):
+                if (
+                        structure.isupper()
+                        and structure.lower() in self.__class__.log_level_style_names
+                ):
+                    result += self.apply_style(structure.lower(), structure)
+                else:
+                    result += self.apply_style('string', f'"{structure}"')
+            else:
+                result += self.apply_style('other', str(structure))
+            return result.rstrip("\n") + "\n"
+
+        formatted_structure = format_inner(structure).rstrip(",\n") + "\n"
+        if include_var_name:
+            var_name = get_variable_name_from_stack(structure, f_back_num)
+            if var_name:
+                styled_equal = self.apply_style('python_operator', ' = ')
+                return f"{self.apply_style('python_variable', var_name)}{styled_equal}{formatted_structure}"
+        return formatted_structure
 
 
     def format_dict(self, d: Dict[Any, Any], indent: int = 4) -> str:
@@ -1431,7 +1665,7 @@ class PrintsCharming:
                     and value.lower() in self.__class__.log_level_style_names
                 ):
                     result += (
-                        self._apply_style_internal(value.lower(), str(value))
+                        self.apply_style(value.lower(), str(value))
                         + "\n"
                     )
                 else:
@@ -1441,495 +1675,7 @@ class PrintsCharming:
         return "{\n" + pprint_dict(d) + "}"
 
 
-    def segment_with_splitter_and_style(self,
-                                        text: str,
-                                        splitter_match: str,
-                                        splitter_swap: Union[str, bool],
-                                        splitter_show: bool,
-                                        splitter_style: Union[str, List[str]],
-                                        splitter_arms: bool,
-                                        string_style: List[str]
-                                        ) -> str:
-        """
-        Segments a text string using a specified splitter, applies style to
-        each segment and splitter, and returns the styled result.
 
-        This method splits `text` based on `splitter_match`, applies a list of
-        styles to each segment and optionally to the splitter, then reassembles
-        and returns the styled text.
-
-        Parameters:
-            text (str): The text to be segmented and styled.
-            splitter_match (str): The string that identifies where to split `text`.
-            splitter_swap (Union[str, bool]): The string to replace the splitter with;
-                if set to False, `splitter_match` is used as the splitter.
-            splitter_show (bool): Determines if the splitter should be included in
-                the output between segments.
-            splitter_style (Union[str, List[str]]): A single style or list of styles
-                to apply to the splitter; if a list is provided, styles rotate
-                across instances of the splitter.
-            splitter_arms (bool): If True, applies styles to both the splitter
-                and padding around it.
-            string_style (List[str]): List of styles to apply to each segment;
-                styles rotate across segments if the list length is shorter than
-                the number of segments.
-
-        Returns:
-            str: The fully assembled, styled text with segments and splitters
-            styled according to the parameters.
-
-        """
-        if isinstance(splitter_style, str):
-            splitter_styles = [splitter_style]
-        else:
-            splitter_styles = splitter_style
-
-        # Determine the actual splitter to use
-        actual_splitter = splitter_swap if splitter_swap else splitter_match
-
-        # Split the text based on the splitter_match
-        segments = text.split(splitter_match)
-        styled_segments = []
-
-        for i, segment in enumerate(segments):
-            # Apply string style to the segment
-            segment_style = (
-                string_style[i % len(string_style)]
-                if string_style else 'default'
-            )
-            styled_segment = (
-                f"{self.style_codes[segment_style]}{segment}{self.reset}"
-            )
-            #styled_segment = segment  # Start with the original segment
-
-            if splitter_show and i > 0:
-
-                if len(splitter_styles) == 1:
-                    styled_splitter = (
-                        f"{self.style_codes[splitter_styles[0]]}"
-                        f"{actual_splitter}{self.reset}"
-                    )
-                else:
-                    splitter_len = len(splitter_styles)
-                    styled_splitter = (
-                        f"{self.style_codes[splitter_styles[i % splitter_len]]}"
-                        f"{actual_splitter}{self.reset}"
-                    )
-                    #styled_segment = styled_splitter + styled_segment
-
-                # Apply the appropriate style to the splitter and padding
-                if splitter_arms:
-                    styled_segment = styled_splitter + styled_segment
-                else:
-                    styled_segment = actual_splitter + styled_segment
-
-            styled_segments.append(styled_segment)
-
-        return ''.join(styled_segments)
-
-    # breaking changes i need to fix and combine with another one of these methods.
-    def segment_and_style2(self,
-                           text: str,
-                           styles_dict: Dict[str, Union[str, int, List[Union[str, int]]]]
-                           ) -> str:
-        """
-        Segments the input text and applies specified styles to words based on
-        indices or word matches provided in a styles dictionary.
-
-        This method splits the `text` into words, then applies styling to specific
-        words according to `styles_dict`, where each style is associated with either
-        word indices or word content. Optionally, a final style can be applied to
-        any words not styled by previous operations.
-
-        Parameters:
-            text (str): The input text to be segmented and styled.
-            styles_dict (Dict[str, Union[str, int, List[Union[str, int]]]]):
-                A dictionary mapping styles to indices or words. Each key is a style,
-                and each value indicates the words to style with that style.
-                - If the value is an integer, it represents a 1-based index of a word
-                  in `text` to style with the key's style.
-                - If the value is a list, it can contain a mix of integers (1-based
-                  indices) and words, where each item specifies words to style with
-                  the corresponding key.
-                - If the value is an empty string (""), the style will be applied as
-                  the final style to any remaining unstyled words.
-
-        Returns:
-            str: The fully styled text, with each word styled according to the
-            mappings specified in `styles_dict`.
-
-        Example:
-            Given `text = "This is a sample text"` and
-            `styles_dict = {"bold": [1, "sample"], "italic": "", "underline": 3}`,
-            the method will:
-            - Apply "bold" style to the 1st word and the word "sample".
-            - Apply "underline" style to the 3rd word.
-            - Apply "italic" style to any remaining unstyled words.
-
-        """
-        words = text.split()
-        word_indices = {word: i for i, word in enumerate(words)}  # Map words to their indices
-        operations = []
-
-        final_style = None
-
-        # Prepare operations by iterating over the styles_dict
-        for style, value in styles_dict.items():
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, int):
-                        operations.append((item - 1, style))  # Convert 1-based index to 0-based
-                    elif item in word_indices:
-                        operations.append((word_indices[item], style))
-            else:
-                if isinstance(value, int):
-                    operations.append((value - 1, style))  # Convert 1-based index to 0-based
-                elif value in word_indices:
-                    operations.append((word_indices[value], style))
-                elif value == '':  # Handle the final style indicated by an empty string
-                    final_style = style
-
-        # Sort operations by index
-        operations.sort()
-
-        # Initialize the styled words with the entire text unstyled
-        styled_words = words.copy()
-
-        # Apply styles in the correct order
-        for i, (index, style) in enumerate(operations):
-            prev_index = operations[i - 1][0] + 1 if i > 0 else 0
-            for j in range(prev_index, index + 1):
-                styled_words[j] = f"{self.style_codes[style]}{words[j]}{self.reset}"
-
-        # Apply the final style to any remaining words after the last operation
-        if final_style:
-            last_index = operations[-1][0] if operations else 0
-            for j in range(last_index + 1, len(words)):
-                styled_words[j] = f"{self.style_codes[final_style]}{words[j]}{self.reset}"
-
-        return " ".join(styled_words)
-
-
-
-    def segment_and_style(self,
-                          text: str,
-                          styles_dict: Dict[str, Union[str, int]]
-                          ) -> str:
-        """
-        Segments the input text and applies specified styles to words based on
-        indices or word matches from a dictionary of styles.
-
-        This method divides `text` into individual words, then iterates over
-        `styles_dict` to apply styles to specific words, based on either their
-        index or content. Additionally, a final style can be applied to all
-        remaining words after the last specified index or match.
-
-        Parameters:
-           text (str): The input text to be segmented and styled.
-           styles_dict (Dict[str, Union[str, int]]): A dictionary where each key
-               is a style to apply, and each value specifies either the index
-               or the word in `text` to which the style should be applied.
-               - If the value is an integer, it represents a 1-based index of the
-                 word in `text` to style with the corresponding style.
-               - If the value is a string, it matches the word in `text` to style
-                 with the corresponding style.
-               - If the value is an empty string or `None`, the style will be applied
-                 as the final style to all remaining unstyled words in `text`.
-
-        Returns:
-           str: The fully styled text, with each word styled according to the
-           mappings specified in `styles_dict`.
-
-        Example:
-           Given `text = "This is a sample text"` and
-           `styles_dict = {"bold": 1, "italic": "sample", "underline": ""}`,
-           the method will:
-           - Apply "bold" style to the 1st word ("This").
-           - Apply "italic" style to the word "sample".
-           - Apply "underline" style to any remaining words after "sample".
-
-        """
-        words = text.split()
-        previous_index = 0
-        value_style = None
-
-        # Iterate over the styles_dict items
-        for style, key in styles_dict.items():
-            if key:  # If key is provided (not an empty string or None)
-                if isinstance(key, int):  # Handle key as an index
-                    key_index = key - 1  # Convert 1-based index to 0-based
-                else:  # Handle key as a word (string)
-                    try:
-                        key_index = words.index(str(key), previous_index)
-                    except ValueError:
-                        continue  # If key is not found, skip to the next item
-
-                # Apply the style to the words between previous_index and key_index
-                for i in range(previous_index, key_index):
-                    words[i] = f"{self.style_codes[style]}{words[i]}{self.reset}"
-
-                # Apply the style to the key word itself
-                words[key_index] = f"{self.style_codes[style]}{words[key_index]}{self.reset}"
-
-                # Update previous_index to the current key_index + 1 for the next iteration
-                previous_index = key_index + 1
-            else:
-                # This handles the case where the key is empty, meaning style from the last key to the end
-                value_style = style
-
-        # Apply the final style to the remaining words after the last key
-        if value_style:
-            for i in range(previous_index, len(words)):
-                words[i] = f"{self.style_codes[value_style]}{words[i]}{self.reset}"
-
-        return " ".join(words)
-
-    # Work in progress made some breaking changes i need to correct.
-    def segment_and_style_update(self, text: str, styles_dict: Dict[str, Union[str, int]]) -> str:
-        """
-        Segments the input text and applies specified styles to words based on
-        indices or word matches from a dictionary of styles.
-
-        This method divides `text` into individual words and spaces, then iterates over
-        `styles_dict` to apply styles to specific words, based on either their
-        index or content. Additionally, a final style can be applied to all
-        remaining words after the last specified index or match.
-
-        Parameters:
-           text (str): The input text to be segmented and styled.
-           styles_dict (Dict[str, Union[str, int]]): A dictionary where each key
-               is a style to apply, and each value specifies either the index
-               or the word in `text` to which the style should be applied.
-               - If the value is an integer, it represents a 1-based index of the
-                 word in `text` to style with the corresponding style.
-               - If the value is a string, it matches the word in `text` to style
-                 with the corresponding style.
-               - If the value is an empty string or `None`, the style will be applied
-                 as the final style to all remaining unstyled words in `text`.
-
-        Returns:
-           str: The fully styled text, with each word and space styled according to the
-           mappings specified in `styles_dict`.
-        """
-        # Use regular expression to split the text into words and spaces
-        words_and_spaces = re.findall(r'\S+|\s+', text)
-        styled_tokens = [None] * len(words_and_spaces)
-        word_indices = {}
-        word_index = 0
-        previous_token_index = -1  # Initialize to -1 to start from the beginning
-
-        # First pass: Style words based on styles_dict and record their indices
-        for i, token in enumerate(words_and_spaces):
-            if not token.isspace():
-                word_index += 1  # Increment word index
-                applied_style = False
-                for style, key in styles_dict.items():
-                    if key:  # If key is provided (not empty or None)
-                        style_code = self.style_codes.get(style, '')
-                        if isinstance(key, int):
-                            if key == word_index and style in self.styles:
-                                styled_tokens[i] = f"{style_code}{token}{self.reset}"
-                                word_indices[i] = style_code
-                                previous_token_index = i
-                                applied_style = True
-                                break
-                        else:  # key is a string (word match)
-                            if token.strip() == key and style in self.styles:
-                                styled_tokens[i] = f"{style_code}{token}{self.reset}"
-                                word_indices[i] = style_code
-                                previous_token_index = i
-                                applied_style = True
-                                break
-                if not applied_style:
-                    styled_tokens[i] = token
-                    word_indices[i] = None
-            else:
-                # Temporarily store spaces; we'll handle them in the next pass
-                styled_tokens[i] = token
-
-        # Second pass: Apply styles to words between specified indices or words
-        last_style = None
-        last_key_index = -1
-        for style, key in styles_dict.items():
-            if key:  # If key is provided
-                style_code = self.style_codes.get(style, '')
-                if isinstance(key, int):
-                    key_indices = [i for i, idx in enumerate(word_indices.values()) if idx == style_code]
-                else:
-                    key_indices = [i for i, token in enumerate(words_and_spaces) if token.strip() == key]
-                if key_indices:
-                    key_index = key_indices[0]
-                    # Apply style to tokens between last_key_index and key_index
-                    for i in range(last_key_index + 1, key_index):
-                        if styled_tokens[i] is None and not words_and_spaces[i].isspace():
-                            styled_tokens[i] = f"{style_code}{words_and_spaces[i]}{self.reset}"
-                            word_indices[i] = style_code
-                    last_key_index = key_index
-                    last_style = style_code
-            else:
-                # Store the last style code for final styling
-                last_style = self.style_codes.get(style, '')
-
-        # Apply final style to remaining unstyled words after the last key
-        if last_style:
-            for i in range(last_key_index + 1, len(words_and_spaces)):
-                if styled_tokens[i] is None and not words_and_spaces[i].isspace():
-                    styled_tokens[i] = f"{last_style}{words_and_spaces[i]}{self.reset}"
-                    word_indices[i] = last_style
-
-        # Third pass: Style spaces based on adjacent words
-        for i, token in enumerate(words_and_spaces):
-            if token.isspace():
-                prev_style = word_indices.get(i - 1)
-                next_style = word_indices.get(i + 1)
-                if prev_style == next_style and prev_style is not None:
-                    # If both adjacent words have the same style, use it
-                    styled_tokens[i] = f"{prev_style}{token}{self.reset}"
-                elif prev_style is not None:
-                    # If only the previous word is styled, use its style
-                    styled_tokens[i] = f"{prev_style}{token}{self.reset}"
-                elif next_style is not None:
-                    # If only the next word is styled, use its style
-                    styled_tokens[i] = f"{next_style}{token}{self.reset}"
-                else:
-                    # Leave space unstyled
-                    pass
-            else:
-                if styled_tokens[i] is None:
-                    # Ensure any unstyled tokens are assigned
-                    styled_tokens[i] = words_and_spaces[i]
-
-        return ''.join(styled_tokens)
-
-    # Special method called by the print method when style param is a dict
-    # Does not style spaces only words
-    def _style_words_by_index(self,
-                              text: str, style: Dict[Union[int, Tuple[int, int]], str]
-                              ) -> str:
-        """
-        Styles words in the text based on their index or a range of indices.
-
-        :param text: The input text to style.
-        :param style: A dictionary mapping indices or index ranges to style names.
-        :return: The styled text.
-        """
-
-        words = text.split()
-
-        for i, word in enumerate(words, start=1):  # Start indexing from 1
-            for key in style:
-                style_name = style[key]
-                style_code = self.style_codes[style_name]
-                if isinstance(key, tuple):
-                    start, end = key
-                    if start <= i <= end and style_name in self.styles:  # Inclusive end
-                        words[i - 1] = f"{style_code}{word}{self.reset}"
-                elif isinstance(key, int):
-                    if key == i and style_name in self.styles:
-                        words[i - 1] = f"{style_code}{word}{self.reset}"
-
-        return " ".join(words)
-
-    # Public facing method that accounts for whitespace and styles it and words.
-    def style_words_by_index(self, text: str, style: Dict[Union[int, Tuple[int, int]], str]) -> str:
-        """
-        Styles words and whitespace in the text based on their index or a range of indices.
-
-        :param text: The input text to style.
-        :param style: A dictionary mapping indices or index ranges to style names.
-        :return: The styled text.
-        """
-        words_and_spaces = re.findall(r'\S+|\s+', text)
-        styled_words_and_spaces = [None] * len(words_and_spaces)
-        word_indices: Dict[int, Optional[str]] = {}
-        word_index = 0
-
-        # First pass: style words and record their indices
-        for i, token in enumerate(words_and_spaces):
-            if not token.isspace():
-                word_index += 1
-                applied_style = False
-                for key in style:
-                    style_name = style[key]
-                    style_code = self.style_codes.get(style_name, '')
-                    if isinstance(key, tuple):
-                        start, end = key
-                        if start <= word_index <= end and style_name in self.styles:
-                            styled_words_and_spaces[i] = f"{style_code}{token}{self.reset}"
-                            word_indices[i] = style_code
-                            applied_style = True
-                            break
-                    elif isinstance(key, int):
-                        if key == word_index and style_name in self.styles:
-                            styled_words_and_spaces[i] = f"{style_code}{token}{self.reset}"
-                            word_indices[i] = style_code
-                            applied_style = True
-                            break
-                if not applied_style:
-                    styled_words_and_spaces[i] = token
-                    word_indices[i] = None
-            else:
-                # Temporarily store spaces as is; we'll handle them in the next pass
-                styled_words_and_spaces[i] = token
-
-
-        # Second pass: style spaces based on adjacent words
-        for i, token in enumerate(words_and_spaces):
-            if token.isspace():
-                prev_style = word_indices.get(i - 1)
-                next_style = word_indices.get(i + 1)
-                if prev_style == next_style and prev_style is not None:
-                    # If both adjacent words have the same style, use it
-                    styled_words_and_spaces[i] = f"{prev_style}{token}{self.reset}"
-                elif prev_style is not None:
-                    # If only the previous word is styled, use its style
-                    styled_words_and_spaces[i] = f"{prev_style}{token}{self.reset}"
-                elif next_style is not None:
-                    # If only the next word is styled, use its style
-                    styled_words_and_spaces[i] = f"{next_style}{token}{self.reset}"
-                else:
-                    # Leave space unstyled
-                    pass
-
-
-        return ''.join(styled_words_and_spaces)
-
-
-    @staticmethod
-    def replace_leading_newlines_tabs(s: str, fill_with: str, tab_width: int, pattern_key: str = None) -> str:
-        pattern_dict = PrintsCharming.ansi_escape_patterns
-        pattern = pattern_dict.get(pattern_key, pattern_dict['core'])
-
-        # Extract leading ANSI codes
-        leading_ansi_codes = ''
-        index = 0
-        while index < len(s):
-            if s[index] == '\x1b':
-                m = pattern.match(s, index)
-                if m:
-                    ansi_seq = m.group()
-                    leading_ansi_codes += ansi_seq
-                    index = m.end()
-                else:
-                    break
-            else:
-                break
-        s = s[index:]
-
-        # Match leading newlines and tabs
-        leading_ws_match = PrintsCharming.LEADING_WS_PATTERN.match(s)
-        if leading_ws_match:
-            leading_ws = leading_ws_match.group(1)
-            n_newlines = leading_ws.count('\n')
-            n_tabs = leading_ws.count('\t')
-            fill_prefix = '\n' * n_newlines + fill_with * (tab_width * n_tabs)
-            s = s[len(leading_ws):]
-        else:
-            fill_prefix = ''
-
-        # Reconstruct the string
-        s = leading_ansi_codes + fill_prefix + s
-        return s
 
 
     @staticmethod
@@ -1937,7 +1683,7 @@ class PrintsCharming:
         """
         Wraps the styled text (which includes ANSI codes) to the specified width.
         """
-        pattern_dict = PrintsCharming.ansi_escape_patterns
+        pattern_dict = ansi_escape_patterns
         pattern = pattern_dict.get(pattern_key, pattern_dict['core'])
 
         i = 0
@@ -1989,17 +1735,24 @@ class PrintsCharming:
         return lines
 
 
-    def get_visible_length(self, text, tab_width=None):
+    def get_visible_length(self, text, tab_width=None, ansi_pattern_key=None, contains_ansi=True):
         """
-        Calculate the visible length of a single line after removing ANSI codes.
+        Calculate the visible length of a single line.
         - Resets the length after each `\n`.
         - Expands `\t` to the next tab stop.
         """
+
         if not tab_width:
-            tab_width = self.config.get('tab_width', 8)
+            tab_width = self.config.get('tab_width', 4)
+
+        if contains_ansi:
+            # Remove ANSI codes
+            visible_text = PrintsCharming.remove_ansi_codes(text, pattern_key=ansi_pattern_key)
+        else:
+            visible_text = text
 
         length = 0
-        for char in text:
+        for char in visible_text.expandtabs(tab_width):
             if char == '\n':
                 length = 0  # Reset length after newline
             elif char == '\t':
@@ -2007,6 +1760,247 @@ class PrintsCharming:
             else:
                 length += 1  # Count visible characters
         return length
+
+
+    @staticmethod
+    def replace_leading_newlines_tabs(s: str, fill_with: str, tab_width: int, pattern_key: str = None, contains_ansi=True) -> str:
+        leading_ansi_codes = ''
+        if contains_ansi:
+            # Extract leading ANSI codes
+            pattern_dict = ansi_escape_patterns
+            pattern = pattern_dict.get(pattern_key, pattern_dict['core'])
+
+            index = 0
+            while index < len(s):
+                if s[index] == '\x1b':
+                    m = pattern.match(s, index)
+                    if m:
+                        ansi_seq = m.group()
+                        leading_ansi_codes += ansi_seq
+                        index = m.end()
+                    else:
+                        break
+                else:
+                    break
+            s = s[index:]
+
+        # Match leading newlines and tabs
+        leading_ws_match = PrintsCharming.leading_ws_pattern.match(s)
+        if leading_ws_match:
+            leading_ws = leading_ws_match.group(1)
+            n_newlines = leading_ws.count('\n')
+            n_tabs = leading_ws.count('\t')
+            fill_prefix = '\n' * n_newlines + fill_with * (tab_width * n_tabs)
+            s = s[len(leading_ws):]
+        else:
+            fill_prefix = ''
+
+        # Reconstruct the string
+        s = leading_ansi_codes + fill_prefix + s
+        return s
+
+
+
+    def wrap_text_ansi_aware(
+            self,
+            text: str,
+            width: int,
+            indent: int = 0,
+            tab_width: int = 4,
+            max_lines: int = 0,
+            fill_char: str = ' ',
+            prepend_fill: Union[bool, int] = False,
+            fill_to_end: Union[bool, int] = False,
+            pattern_key: str = None,
+            markdown: bool = False,
+            preserve_newlines: bool = False  # <-- Our new toggle
+    ) -> List[str]:
+        """
+        If preserve_newlines=True, do a line-by-line approach:
+           - Keep every explicit newline exactly once,
+           - but still wrap lines that exceed 'width'.
+
+        Otherwise, use the old paragraph-based logic.
+        """
+
+        indent_str = ' ' * indent
+
+        # ------------------------------------------------------------------------
+        #  1) LINE-BY-LINE LOGIC (preserve_newlines = True)
+        # ------------------------------------------------------------------------
+        if preserve_newlines:
+            lines_in = text.splitlines(True)  # each item may end with '\n'
+            # If the first line is only ANSI + newline, discard it:
+            if lines_in and not PrintsCharming.remove_ansi_codes(lines_in[0]).strip():
+                lines_in.pop(0)
+            #print(f'lines_in:')
+            #print(repr(lines_in))
+            #print(f'\n\n\n')
+            wrapped_lines: List[str] = []
+
+            for original_line in lines_in:
+                # Check trailing newline
+                has_trailing_newline = original_line.endswith('\n')
+                # Strip it from the end so we can wrap cleanly
+                line_no_nl = original_line.rstrip('\n')
+
+                # If line_no_nl is blank (just whitespace or empty), preserve it
+                if not PrintsCharming.remove_ansi_codes(line_no_nl.strip()):
+                    # Might still want to do leading tab replacements if desired
+                    if prepend_fill:
+                        line_no_nl = self.replace_leading_newlines_tabs(
+                            line_no_nl, fill_char, tab_width, pattern_key, contains_ansi=True
+                        )
+                    # Just append the blank line (no wrapping needed)
+                    # If there was a trailing newline, we still want a single newline in the output
+                    if has_trailing_newline:
+                        wrapped_lines.append(line_no_nl + '\n')
+                    else:
+                        wrapped_lines.append(line_no_nl)
+                    continue
+
+                # Optional: leading whitespace replacement
+                if prepend_fill:
+                    line_no_nl = self.replace_leading_newlines_tabs(
+                        line_no_nl, fill_char, tab_width,
+                        pattern_key=pattern_key, contains_ansi=True
+                    )
+
+                current_line = indent_str
+                current_len = self.get_visible_length(
+                    current_line, tab_width=tab_width, ansi_pattern_key=pattern_key, contains_ansi=True
+                )
+
+                words = line_no_nl.split()
+                lines_for_this_original = 0
+
+                for word in words:
+                    if not word:
+                        continue
+                    word_len = self.get_visible_length(
+                        word, tab_width=tab_width, ansi_pattern_key=pattern_key, contains_ansi=True
+                    )
+                    spacer = 1 if current_line.strip() else 0
+
+                    # If we exceed the width, push current_line and start a new line
+                    if current_len + word_len + spacer > width:
+                        if fill_to_end:
+                            pad_amount = max(0, width - self.get_visible_length(current_line, tab_width))
+                            current_line += fill_char * pad_amount
+
+                        wrapped_lines.append(current_line)
+                        current_line = indent_str + word
+                        current_len = self.get_visible_length(
+                            current_line, tab_width=tab_width,
+                            ansi_pattern_key=pattern_key, contains_ansi=True
+                        )
+
+                        lines_for_this_original += 1
+                        # Handle max_lines if given
+                        if max_lines > 0 and lines_for_this_original >= max_lines:
+                            if len(words) > 1:
+                                # Add ellipsis
+                                wrapped_lines[-1] = wrapped_lines[-1].rstrip('\n') + '...\n'
+                            break
+                    else:
+                        # Add word to current line
+                        current_line += (' ' if current_line.strip() else '') + word
+                        current_len += word_len + spacer
+
+                # Add the remainder of current_line (if any)
+                if current_line.strip():
+                    if fill_to_end:
+                        pad_amount = max(0, width - self.get_visible_length(current_line, tab_width))
+                        current_line += fill_char * pad_amount
+
+                    # DO NOT forcibly add '\n' here in all cases
+                    # We'll do that conditional logic below
+                    wrapped_lines.append(current_line)
+                else:
+                    # If the line ended up empty, just preserve it
+                    wrapped_lines.append(current_line)
+
+                # If original line had a trailing newline,
+                # ensure exactly one newline at the end of the last appended line
+                if has_trailing_newline and wrapped_lines:
+                    if not wrapped_lines[-1].endswith('\n'):
+                        wrapped_lines[-1] += '\n'
+
+            return wrapped_lines
+
+        # ------------------------------------------------------------------------
+        #  2) PARAGRAPH-BASED LOGIC (old approach)
+        # ------------------------------------------------------------------------
+        paragraphs = text.splitlines(keepends=True)
+        wrapped_lines: List[str] = []
+
+        for paragraph in paragraphs:
+            has_trailing_newline = paragraph.endswith('\n')
+            paragraph_no_nl = paragraph.rstrip('\n')
+
+            # If blank paragraph => just preserve
+            if not paragraph_no_nl.strip():
+                # e.g. it's empty or only spaces
+                wrapped_lines.append(paragraph)
+                continue
+
+            # Possibly do leading whitespace/tabs replacement
+            if prepend_fill:
+                paragraph_no_nl = self.replace_leading_newlines_tabs(
+                    paragraph_no_nl, fill_char, tab_width,
+                    pattern_key=pattern_key, contains_ansi=True
+                )
+
+            current_line = indent_str
+            current_len = self.get_visible_length(
+                current_line, tab_width=tab_width, ansi_pattern_key=pattern_key, contains_ansi=True
+            )
+            lines_this_paragraph = 0
+            words = paragraph_no_nl.split()
+
+            for word in words:
+                if not word:
+                    continue
+                word_len = self.get_visible_length(
+                    word, tab_width=tab_width, ansi_pattern_key=pattern_key, contains_ansi=True
+                )
+                spacer = 1 if current_line.strip() else 0
+
+                if current_len + word_len + spacer > width:
+                    if fill_to_end:
+                        pad_amount = max(0, width - self.get_visible_length(current_line, tab_width))
+                        current_line += fill_char * pad_amount
+
+                    wrapped_lines.append(current_line)
+                    current_line = indent_str + word
+                    current_len = self.get_visible_length(
+                        current_line, tab_width=tab_width, ansi_pattern_key=pattern_key, contains_ansi=True
+                    )
+                    lines_this_paragraph += 1
+
+                    if max_lines > 0 and lines_this_paragraph >= max_lines:
+                        if len(words) > 1:
+                            wrapped_lines[-1] = wrapped_lines[-1].rstrip('\n') + '...\n'
+                        break
+                else:
+                    current_line += (' ' if current_line.strip() else '') + word
+                    current_len += word_len + spacer
+
+            # Add the final line of this paragraph
+            if current_line.strip():
+                if fill_to_end:
+                    pad_amount = max(0, width - self.get_visible_length(current_line, tab_width))
+                    current_line += fill_char * pad_amount
+                wrapped_lines.append(current_line)
+            else:
+                wrapped_lines.append(current_line)
+
+            # Now reapply exactly one trailing newline if original paragraph had it
+            if has_trailing_newline and wrapped_lines:
+                if not wrapped_lines[-1].endswith('\n'):
+                    wrapped_lines[-1] += '\n'
+
+        return wrapped_lines
 
 
     @staticmethod
@@ -2144,7 +2138,6 @@ class PrintsCharming:
 
 
 
-
     def print(self,
               *args: Any,
               style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None,
@@ -2172,10 +2165,11 @@ class PrintsCharming:
               end: str = '\n',
               tab_width: int = None,
               container_width: int = None,
+              ansi_pattern_key: str = None,
               prepend_fill: bool = False,
               fill_to_end: bool = False,
               fill_with: str = ' ',
-              word_wrap: bool = False,
+              word_wrap: bool = True,
               filename: str = None,
               skip_ansi_check: bool = False,
               phrase_search: bool = True,
@@ -2184,6 +2178,7 @@ class PrintsCharming:
               word_search: bool = True,
               subword_search: bool = True,
               subword_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
+              return_styled_text: bool = False,
               **kwargs: Any) -> None:
 
 
@@ -2221,7 +2216,7 @@ class PrintsCharming:
 
 
         if not tab_width:
-            tab_width = self.config.get('tab_width', 8)
+            tab_width = self.config.get('tab_width', 4)
 
         if not container_width:
             container_width = self.terminal_width
@@ -2635,8 +2630,8 @@ class PrintsCharming:
 
         if fill_to_end or word_wrap or prepend_fill:
             if word_wrap:
-                # Use the new wrap_styled_text function
-                wrapped_styled_lines = self.wrap_styled_text(styled_text, container_width, tab_width)
+                #wrapped_styled_lines = self.wrap_styled_text(styled_text, container_width, tab_width)
+                wrapped_styled_lines = self.wrap_text_ansi_aware(styled_text, container_width, tab_width=tab_width)
             else:
                 wrapped_styled_lines = styled_text.splitlines(keepends=True)
 
@@ -2673,9 +2668,7 @@ class PrintsCharming:
 
                     final_lines.append(padded_line)
                     """
-                    # Calculate the visible length of the line
-                    visible_line = PrintsCharming.remove_ansi_codes(stripped_line)
-                    current_length = self.get_visible_length(visible_line.expandtabs(tab_width), tab_width=tab_width)
+                    current_length = self.get_visible_length(stripped_line, tab_width=tab_width)
                     chars_needed = max(0, container_width - current_length)
 
                     # If the line ends with the ANSI reset code, remove it temporarily
@@ -2711,6 +2704,9 @@ class PrintsCharming:
 
         else:
             final_all_styled_text = styled_text
+
+        if return_styled_text:
+            return final_all_styled_text + end
 
         # Print or write to file
         if filename:
@@ -2896,128 +2892,6 @@ class PrintsCharming:
             self.print(f"Progress: |{bar}| {int(progress * 100)}%", end='', color=color)
             sys.stdout.flush()
             time.sleep(0.25)  # Simulate work
-
-    # This is for internal logging within this class!!!
-    def setup_internal_logging(self, log_level: str, log_format: str = '%(message)s') -> None:
-        """
-        Sets up internal logging.
-
-        :param log_level: Logging level (e.g., 'DEBUG', 'INFO').
-        :param log_format: Logging format.
-        """
-        # Configure the shared logger's level
-        self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
-
-        # Logging is controlled by the instance, not by disabling the logger itself
-        if self.internal_logging_enabled:
-            self.info("Internal Logging Enabled for this instance.")
-            logging_enabled_init_message = f"Instance config dict:\n{self.format_dict(self.config)}"
-            self.debug(logging_enabled_init_message)
-
-
-
-    def _apply_style_internal(self, style_name: str, text: Any, reset: bool = True) -> str:
-        """
-        Applies a style internally without logging debug messages.
-
-        :param style_name: The name of the style to apply.
-        :param text: The text to style.
-        :param reset: Whether to reset styles after the text.
-        :return: The styled text.
-        """
-        text = str(text)
-        if isinstance(text, str) and text.isspace():
-            style_code = self.bg_color_map.get(
-                style_name,
-                self.bg_color_map.get(
-                    self.styles.get(style_name, PStyle(bg_color="default_bg")).bg_color
-                )
-            )
-        else:
-            style_code = self._internal_logging_style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
-
-        # Append the style code at the beginning of the text and the reset code at the end
-        styled_text = f"{style_code}{text}{self.reset if reset else ''}"
-
-        return styled_text
-
-
-
-    def log(self, level: str, message: str, *args: Any, **kwargs: Any) -> None:
-        """
-        Logs a message with styling.
-
-        :param level: The log level (e.g., 'DEBUG', 'INFO').
-        :param message: The message to log.
-        :param args: Positional arguments for message formatting.
-        :param kwargs: Keyword arguments for message formatting.
-        """
-        if not self.config['internal_logging']:
-            return
-
-        level = getattr(logging, level, None)
-
-        if args:
-            try:
-                message = message.format(*args)
-            except (IndexError, KeyError, ValueError) as e:
-                self.logger.error(f"Error formatting log message: {e}")
-                return
-
-        if kwargs:
-            message = message.format(**kwargs)
-
-        timestamp = time.time()
-        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self._TIMESTAMP_FORMAT)
-
-        timestamp_style = 'timestamp'
-
-        level_styles = {
-            10: 'debug',
-            20: 'info',
-            30: 'warning',
-            40: 'error',
-            50: 'critical',
-        }
-
-        log_level_style = level_styles.get(level, 'default')
-
-        styled_log_level_prefix = self._apply_style_internal(log_level_style, f"LOG[{logging.getLevelName(level)}]")
-        styled_timestamp = self._apply_style_internal(timestamp_style, formatted_timestamp)
-        styled_level = self._apply_style_internal(log_level_style, logging.getLevelName(level))
-        styled_text = self._apply_style_internal(log_level_style, message)
-
-        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
-        self.logger.log(level, log_message)
-
-
-    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
-        # Get the current stack frame
-        current_frame = inspect.currentframe()
-        # Get the caller frame
-        caller_frame = current_frame.f_back
-        # Extract the relevant information
-        class_name = self._apply_style_internal('class_name', self.__class__.__name__)
-        method_name = self._apply_style_internal('method_name', caller_frame.f_code.co_name)
-        line_number = self._apply_style_internal('line_number', caller_frame.f_lineno)
-
-        # Include the extracted information in the log message
-        message = f"{class_name}.{method_name}:{line_number} - {message}"
-
-        self.log('DEBUG', message, *args, **kwargs)
-
-    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
-        self.log('INFO', message, *args, **kwargs)
-
-    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
-        self.log('WARNING', message, *args, **kwargs)
-
-    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
-        self.log('ERROR', message, *args, **kwargs)
-
-    def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
-        self.log('CRITICAL', message, *args, **kwargs)
-
 
 
     def handle_other_styled_text_and_spaces(self,
@@ -3388,6 +3262,129 @@ class PrintsCharming:
 
         return style_instance, style_code
 
+    def printnl(
+        self,
+        lines: int = 1,
+        fill_with: str = ' ',
+        style: str = 'default',
+        color: Optional[str] = None,
+        bg_color: Optional[str] = None,
+        reverse: Optional[bool] = None,
+        bold: Optional[bool] = None,
+        dim: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        underline: Optional[bool] = None,
+        overline: Optional[bool] = None,
+        strikethru: Optional[bool] = None,
+        conceal: Optional[bool] = None,
+        blink: Optional[bool] = None,
+        container_width: Optional[Union[None, int]] = None,
+    ) -> None:
+
+        """
+        Prints a newline-separated styled string using the `print` method.
+
+        This method provides a simplified interface to the more comprehensive `print` method,
+        focusing on styling and formatting the fill_with string. It is ideal
+        for printing blank lines or styled right side padding
+        with default or custom configurations.
+
+        Args:
+            lines (int): The number of lines to print. Default to 1.
+            fill_with (str): The character used to fill empty space. Defaults to a single space (' ').
+            style (str): The style to apply to the characters. Defaults to 'default'.
+            color (Optional[str]): The foreground color of the characters. Defaults to None.
+            bg_color (Optional[str]): The background color of the characters. Defaults to None.
+            reverse (Optional[bool]): Whether to reverse the foreground and background colors. Defaults to None.
+            bold (Optional[bool]): Whether to render the characters in bold. Defaults to None.
+            dim (Optional[bool]): Whether to render the characters in dim (faint) mode. Defaults to None.
+            italic (Optional[bool]): Whether to render the characters in italic. Defaults to None.
+            underline (Optional[bool]): Whether to underline the characters. Defaults to None.
+            overline (Optional[bool]): Whether to overline the characters. Defaults to None.
+            strikethru (Optional[bool]): Whether to apply a strikethrough to the characters. Defaults to None.
+            conceal (Optional[bool]): Whether to conceal the characters. Defaults to None.
+            blink (Optional[bool]): Whether to render the characters with a blinking effect. Defaults to None.
+            container_width(Optional[Union[None, int]]: width of the newline. Defaults to None.
+
+        Returns:
+            None: This method does not return a value. It outputs the styled characters to the terminal.
+
+        Behavior:
+            - Automatically determines whether to fill the line to the end (`fill_to_end`) based on the
+              presence of certain params.
+            - Delegates the printing functionality to the `print2` method.
+
+        Example Usages:
+            ```python
+            obj.printnl()
+            obj.printnl(fill_with='-', color='blue', bg_color='dgray', underline=True)
+            ```
+            First usage prints a newline respecting the instances default bg_color.
+            Second usage prints a line of filled dashes with a blue foreground, dark gray bg_color, underlined.
+        """
+
+        # Determine if we need to fill the line based on styling and content
+        should_fill = any([
+            self.default_bg_color,  # Instance has a default background color
+            style != 'default',  # A specific style is applied
+            bg_color,  # A background color is specified
+            (color and fill_with != ' ')  # There's a foreground color and fill character is not a space
+        ])
+
+        if fill_with != ' ':
+            if not container_width:
+                container_width = self.terminal_width
+            #fill_with = (fill_with * container_width) / len(fill_with)
+            fill_with = (fill_with * ((container_width // len(fill_with)) + 1))[:container_width]
+
+        # Generate the styled line once
+        styled_line = self.print2(
+            fill_with,
+            style=style,
+            color=color,
+            bg_color=bg_color,
+            reverse=reverse,
+            bold=bold,
+            dim=dim,
+            italic=italic,
+            underline=underline,
+            overline=overline,
+            strikethru=strikethru,
+            conceal=conceal,
+            blink=blink,
+            container_width=container_width,
+            fill_to_end=should_fill,
+            return_styled_args_list=True,  # Return the styled line instead of printing
+        )[0]
+
+        # Generate multiple lines by repeating the styled line
+        output = (styled_line + "\n") * lines
+
+        # Print the final output
+        #sys.stdout.write(output)
+        self.write(output)
+
+
+        """
+        self.print2(
+            fill_with,
+            style=style,
+            color=color,
+            bg_color=bg_color,
+            reverse=reverse,
+            bold=bold,
+            dim=dim,
+            italic=italic,
+            underline=underline,
+            overline=overline,
+            strikethru=strikethru,
+            conceal=conceal,
+            blink=blink,
+            fill_to_end=should_fill,
+            container_width=min(container_width, self.terminal_width),
+        )
+        """
+
 
     def print2(self,
                *args: Any,
@@ -3414,6 +3411,13 @@ class PrintsCharming:
                share_alike_sep_bl: bool = False,
                start: str = '',
                end: str = '\n',
+               tab_width: Union[None, int] = None,
+               container_width: Union[None, int] = None,
+               prepend_fill: bool = False,
+               prepend_with: str = ' ',
+               fill_to_end: bool = False,
+               fill_with: str = ' ',
+               word_wrap: bool = False,
                filename: str = None,
                skip_ansi_check: bool = False,
                phrase_search: bool = True,
@@ -3424,6 +3428,7 @@ class PrintsCharming:
                subword_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
                style_args_as_one: bool = True,
                return_styled_args_list: bool = False,
+               rtl: bool = False,
                **kwargs: Any
                ) -> Union[None, List[str]]:
 
@@ -3502,7 +3507,7 @@ class PrintsCharming:
                 return
 
             # Convert the text to a list of words and spaces
-            words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(text)
+            words_and_spaces = self.get_words_and_spaces(start + text)
             words_and_spaces_length = len(words_and_spaces)
             self.debug(f'words_and_spaces:\n{words_and_spaces}')
 
@@ -3529,7 +3534,7 @@ class PrintsCharming:
                     # Method level check
                     if phrase_search:
                         # Only perform phrase lookup if there are multiple elements (implying a possible phrase)
-                        if words_and_spaces_length > 1:
+                        if words_and_spaces_length >= trie_manager.shortest_phrase_length:
                             self.debug(f'Calling self.handle_phrases()')
 
                             (styled_words_and_spaces,
@@ -3599,6 +3604,7 @@ class PrintsCharming:
 
             for i, styled_word_or_space in enumerate(styled_words_and_spaces):
                 if styled_word_or_space is None:
+                    print(f'styled word or space is None')
                     styled_words_and_spaces[i] = f"{style_code}{words_and_spaces[i]}{self.reset}"
                     indexes_used_by_none_styling.add(i)
 
@@ -3608,13 +3614,86 @@ class PrintsCharming:
             # Step 5: Join the styled_words_and_spaces to form the final styled text
             styled_text = ''.join(filter(None, styled_words_and_spaces))
 
+            self.debug(f"styled_text:\n{styled_text}")
+
+            self.debug(f"styled_text_length:\n{len(styled_text)}")
+
+
+            if any((fill_to_end, word_wrap, prepend_fill)):
+                if not tab_width:
+                    tab_width = self.config.get('tab_width', 8)
+
+                if not container_width:
+                    container_width = self.terminal_width
+
+                if word_wrap:
+                    # Use the new wrap_styled_text function
+                    wrapped_styled_lines = self.wrap_styled_text(styled_text, container_width, tab_width)
+                else:
+                    wrapped_styled_lines = styled_text.splitlines(keepends=True)
+
+                final_lines = []
+                for line in wrapped_styled_lines:
+                    # Handle prepend_fill
+                    if prepend_fill:
+                        # Replace leading newlines and tabs in 'line' with prepend_with * (tab_width * n_tabs)
+                        line = self.replace_leading_newlines_tabs(line, prepend_with, tab_width)
+
+                    # Calculate the number of trailing newlines
+                    trailing_newlines = len(line) - len(line.rstrip('\n'))
+
+                    # Check if the line is empty (contains only a newline character)
+                    stripped_line = line.rstrip('\n')
+                    has_newline = line.endswith('\n')
+
+                    if fill_to_end:
+                        # Calculate the visible length of the line
+                        visible_line = PrintsCharming.remove_ansi_codes(stripped_line)
+                        current_length = self.get_visible_length(visible_line.expandtabs(tab_width), tab_width=tab_width)
+                        chars_needed = max(0, container_width - current_length)
+
+                        # If the line ends with the ANSI reset code, remove it temporarily
+                        has_reset = stripped_line.endswith(self.reset)
+                        if has_reset:
+                            stripped_line = stripped_line[:-len(self.reset)]
+
+                        # Add padding characters and then the reset code if it was present
+                        padded_line = stripped_line + fill_with * chars_needed
+                        if has_reset:
+                            padded_line += self.reset
+
+                        # Re-append the newline character if it was present
+                        if trailing_newlines > 0:
+                            padded_line += '\n' * trailing_newlines
+
+                        final_lines.append(padded_line)
+                    else:
+                        final_lines.append(line)
+
+                # Combine the lines into the final styled output
+                if any(line.endswith('\n') for line in final_lines):
+                    # Lines already contain newline characters; avoid adding extra newlines
+                    final_all_styled_text = ''.join(final_lines)
+                else:
+                    # Lines do not contain newlines; join them with '\n'
+                    final_all_styled_text = '\n'.join(final_lines)
+
+            else:
+                final_all_styled_text = styled_text
+
+
+            if return_styled_args_list:
+                return [final_all_styled_text]
+
+
             # Print or write to file
             if filename:
                 with open(filename, 'a') as file:
-                    file.write(start + styled_text + end)
+                    #file.write(start + styled_text + end)
+                    file.write(final_all_styled_text + end)
             else:
-                sys.stdout.write(start + styled_text + end)
-                # print(start + styled_text, end=end)
+                #sys.stdout.write(start + styled_text + end)
+                sys.stdout.write(final_all_styled_text + end)
 
         else:
             num_args = len(converted_args)
@@ -3676,7 +3755,12 @@ class PrintsCharming:
 
 
                 # Convert the text to a list of words and spaces
-                words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(arg)
+                #words_and_spaces = PrintsCharming.words_and_spaces_pattern.findall(arg)
+                if i == 0:
+                    words_and_spaces = self.get_words_and_spaces(start + arg)
+                else:
+                    words_and_spaces = self.get_words_and_spaces(arg)
+
                 words_and_spaces_length = len(words_and_spaces)
                 self.debug(f'words_and_spaces:\n{words_and_spaces}')
 
@@ -3780,23 +3864,103 @@ class PrintsCharming:
                 # Step 5: Join the styled_words_and_spaces to form the final styled text
                 styled_text = ''.join(filter(None, styled_words_and_spaces))
 
+
                 # Step 6: Append styled_text to styled_parts list
                 styled_parts.append(styled_text)
 
                 #styled_arg = f"{style_code}{arg}{self.reset}"
                 #styled_parts.append(styled_arg)
 
+            """
             if return_styled_args_list:
                 return styled_parts
-
+            """
 
             if not prog_sep:
                 styled_parts_with_sep = sep.join(styled_parts)
             else:
                 styled_parts_with_sep = self.format_with_sep(converted_args=styled_parts, sep=sep, prog_sep=prog_sep, prog_step=prog_step, prog_direction=prog_direction)
 
+            self.debug(f"styled_parts_with_sep:\n{styled_parts_with_sep}")
+
+            self.debug(f"styled_parts_with_sep_length:\n{len(styled_parts_with_sep)}")
+
+            final_lines = None
+            if fill_to_end or word_wrap or prepend_fill:
+                if not tab_width:
+                    tab_width = self.config.get('tab_width', 8)
+
+                if not container_width:
+                    container_width = self.terminal_width
+
+                if word_wrap:
+                    # Use the new wrap_styled_text function
+                    wrapped_styled_lines = self.wrap_styled_text(styled_parts_with_sep, container_width, tab_width)
+                else:
+                    wrapped_styled_lines = styled_parts_with_sep.splitlines(keepends=True)
+
+                final_lines = []
+                for line in wrapped_styled_lines:
+                    # Handle prepend_fill
+                    if prepend_fill:
+                        # Replace leading newlines and tabs in 'line' with fill_with * (tab_width * n_tabs)
+                        line = self.replace_leading_newlines_tabs(line, prepend_with, tab_width)
+
+                    # Calculate the number of trailing newlines
+                    trailing_newlines = len(line) - len(line.rstrip('\n'))
+
+                    # Check if the line is empty (contains only a newline character)
+                    stripped_line = line.rstrip('\n')
+                    has_newline = line.endswith('\n')
+
+                    if fill_to_end:
+                        # Calculate the visible length of the line
+                        visible_line = PrintsCharming.remove_ansi_codes(stripped_line)
+                        current_length = self.get_visible_length(visible_line.expandtabs(tab_width), tab_width=tab_width)
+                        chars_needed = max(0, container_width - current_length)
+
+                        # If the line ends with the ANSI reset code, remove it temporarily
+                        has_reset = stripped_line.endswith(self.reset)
+                        if has_reset:
+                            stripped_line = stripped_line[:-len(self.reset)]
+
+                        # Add padding characters and then the reset code if it was present
+                        padded_line = stripped_line + fill_with * chars_needed
+                        if has_reset:
+                            padded_line += self.reset
+
+                        # Re-append the newline character if it was present
+                        if trailing_newlines > 0:
+                            padded_line += '\n' * trailing_newlines
+
+                        final_lines.append(padded_line)
+                    else:
+                        final_lines.append(line)
+
+                # Combine the lines into the final styled output
+                if any(line.endswith('\n') for line in final_lines):
+                    # Lines already contain newline characters; avoid adding extra newlines
+                    final_all_styled_text = ''.join(final_lines)
+                else:
+                    # Lines do not contain newlines; join them with '\n'
+                    final_all_styled_text = '\n'.join(final_lines)
+
+            else:
+                final_all_styled_text = styled_parts_with_sep
+
+            if return_styled_args_list:
+                return final_lines or [styled_parts_with_sep]
 
 
+            # Print or write to file
+            if filename:
+                with open(filename, 'a') as file:
+                    file.write(final_all_styled_text + end)
+            else:
+                sys.stdout.write(final_all_styled_text + end)
+                # print(start + styled_text, end=end)
+
+            """
             # Print or write to file
             if filename:
                 with open(filename, 'a') as file:
@@ -3804,229 +3968,313 @@ class PrintsCharming:
             else:
                 sys.stdout.write(start + styled_parts_with_sep + end)
                 # print(start + styled_text, end=end)
+            """
+
+
+    def segment_with_splitter_and_style(self,
+                                        text: str,
+                                        splitter_match: str,
+                                        splitter_swap: Union[str, bool],
+                                        splitter_show: bool,
+                                        splitter_style: Union[str, List[str]],
+                                        splitter_arms: bool,
+                                        string_style: List[str]
+                                        ) -> str:
+        """
+        Segments a text string using a specified splitter, applies style to
+        each segment and splitter, and returns the styled result.
+
+        This method splits `text` based on `splitter_match`, applies a list of
+        styles to each segment and optionally to the splitter, then reassembles
+        and returns the styled text.
+
+        Parameters:
+            text (str): The text to be segmented and styled.
+            splitter_match (str): The string that identifies where to split `text`.
+            splitter_swap (Union[str, bool]): The string to replace the splitter with;
+                if set to False, `splitter_match` is used as the splitter.
+            splitter_show (bool): Determines if the splitter should be included in
+                the output between segments.
+            splitter_style (Union[str, List[str]]): A single style or list of styles
+                to apply to the splitter; if a list is provided, styles rotate
+                across instances of the splitter.
+            splitter_arms (bool): If True, applies styles to both the splitter
+                and padding around it.
+            string_style (List[str]): List of styles to apply to each segment;
+                styles rotate across segments if the list length is shorter than
+                the number of segments.
+
+        Returns:
+            str: The fully assembled, styled text with segments and splitters
+            styled according to the parameters.
+
+        """
+        return self.segment_styler.segment_with_splitter_and_style(
+            text,
+            splitter_match,
+            splitter_swap,
+            splitter_show,
+            splitter_style,
+            splitter_arms,
+            string_style
+        )
+
+    # breaking changes i need to fix and combine with another one of these methods.
+    def segment_and_style2(self,
+                           text: str,
+                           styles_dict: Dict[str, Union[str, int, List[Union[str, int]]]]
+                           ) -> str:
+        """
+        Segments the input text and applies specified styles to words based on
+        indices or word matches provided in a styles dictionary.
+
+        This method splits the `text` into words, then applies styling to specific
+        words according to `styles_dict`, where each style is associated with either
+        word indices or word content. Optionally, a final style can be applied to
+        any words not styled by previous operations.
+
+        Parameters:
+            text (str): The input text to be segmented and styled.
+            styles_dict (Dict[str, Union[str, int, List[Union[str, int]]]]):
+                A dictionary mapping styles to indices or words. Each key is a style,
+                and each value indicates the words to style with that style.
+                - If the value is an integer, it represents a 1-based index of a word
+                  in `text` to style with the key's style.
+                - If the value is a list, it can contain a mix of integers (1-based
+                  indices) and words, where each item specifies words to style with
+                  the corresponding key.
+                - If the value is an empty string (""), the style will be applied as
+                  the final style to any remaining unstyled words.
+
+        Returns:
+            str: The fully styled text, with each word styled according to the
+            mappings specified in `styles_dict`.
+
+        Example:
+            Given `text = "This is a sample text"` and
+            `styles_dict = {"bold": [1, "sample"], "italic": "", "underline": 3}`,
+            the method will:
+            - Apply "bold" style to the 1st word and the word "sample".
+            - Apply "underline" style to the 3rd word.
+            - Apply "italic" style to any remaining unstyled words.
+
+        """
+        return self.segment_styler.segment_and_style2(text, styles_dict)
+
+
+    def segment_and_style(self,
+                          text: str,
+                          styles_dict: Dict[str, Union[str, int]]
+                          ) -> str:
+        """
+        Segments the input text and applies specified styles to words based on
+        indices or word matches from a dictionary of styles.
+
+        This method divides `text` into individual words, then iterates over
+        `styles_dict` to apply styles to specific words, based on either their
+        index or content. Additionally, a final style can be applied to all
+        remaining words after the last specified index or match.
+
+        Parameters:
+           text (str): The input text to be segmented and styled.
+           styles_dict (Dict[str, Union[str, int]]): A dictionary where each key
+               is a style to apply, and each value specifies either the index
+               or the word in `text` to which the style should be applied.
+               - If the value is an integer, it represents a 1-based index of the
+                 word in `text` to style with the corresponding style.
+               - If the value is a string, it matches the word in `text` to style
+                 with the corresponding style.
+               - If the value is an empty string or `None`, the style will be applied
+                 as the final style to all remaining unstyled words in `text`.
+
+        Returns:
+           str: The fully styled text, with each word styled according to the
+           mappings specified in `styles_dict`.
+
+        Example:
+           Given `text = "This is a sample text"` and
+           `styles_dict = {"bold": 1, "italic": "sample", "underline": ""}`,
+           the method will:
+           - Apply "bold" style to the 1st word ("This").
+           - Apply "italic" style to the word "sample".
+           - Apply "underline" style to any remaining words after "sample".
+
+        """
+        return self.segment_styler.segment_and_style(text, styles_dict)
+
+    # Work in progress made some breaking changes i need to correct.
+    def segment_and_style_update(self, text: str, styles_dict: Dict[str, Union[str, int]]) -> str:
+        """
+        Segments the input text and applies specified styles to words based on
+        indices or word matches from a dictionary of styles.
+
+        This method divides `text` into individual words and spaces, then iterates over
+        `styles_dict` to apply styles to specific words, based on either their
+        index or content. Additionally, a final style can be applied to all
+        remaining words after the last specified index or match.
+
+        Parameters:
+           text (str): The input text to be segmented and styled.
+           styles_dict (Dict[str, Union[str, int]]): A dictionary where each key
+               is a style to apply, and each value specifies either the index
+               or the word in `text` to which the style should be applied.
+               - If the value is an integer, it represents a 1-based index of the
+                 word in `text` to style with the corresponding style.
+               - If the value is a string, it matches the word in `text` to style
+                 with the corresponding style.
+               - If the value is an empty string or `None`, the style will be applied
+                 as the final style to all remaining unstyled words in `text`.
+
+        Returns:
+           str: The fully styled text, with each word and space styled according to the
+           mappings specified in `styles_dict`.
+        """
+        return self.segment_styler.segment_and_style_update(text, styles_dict)
+
+    # Special method called by the print method when style param is a dict
+    # Does not style spaces only words
+    def _style_words_by_index(self,
+                              text: str, style: Dict[Union[int, Tuple[int, int]], str]
+                              ) -> str:
+        """
+        Styles words in the text based on their index or a range of indices.
+
+        :param text: The input text to style.
+        :param style: A dictionary mapping indices or index ranges to style names.
+        :return: The styled text.
+        """
+        return self.segment_styler._style_words_by_index(text, style)
+
+    # Public facing method that accounts for whitespace and styles it and words.
+    def style_words_by_index(self, text: str, style: Dict[Union[int, Tuple[int, int]], str]) -> str:
+        """
+        Styles words and whitespace in the text based on their index or a range of indices.
+
+        :param text: The input text to style.
+        :param style: A dictionary mapping indices or index ranges to style names.
+        :return: The styled text.
+        """
+        return self.segment_styler.style_words_by_index(text, style)
 
 
 
 
-    def apply_custom_python_highlighting(self, code_block):
-        reset_code = PrintsCharming.RESET
-        ansi_sgr_loose_pattern = PrintsCharming.ANSI_SGR_LOOSE_PATTERN
+    # This is for internal logging within this class!!!
+    def setup_internal_logging(self, log_level: str, log_format: str = '%(message)s') -> None:
+        """
+        Sets up internal logging.
 
-        # Simple regex patterns for Python elements
-        builtin_pattern = r'\b(print|input|len|range|map|filter|open|help)\b'
-        keyword_pattern = r'\b(def|return|print|class|if|else|elif|for|while|import|from|as|in|try|except|finally|not|and|or|is|with|lambda|yield)\b'
-        string_pattern = r'(\".*?\"|\'.*?\')'
-        comment_pattern = r'(#.*?$)'
-        variable_pattern = r'(\b\w+)\s*(=)'  # Capture variables being assigned and preserve spaces
-        fstring_pattern = r'\{(\w+)\}'
-        number_pattern = r'(?<!\033\[|\d;)\b\d+(\.\d+)?\b'  # Exclude sequences like 5 in "38;5;248m"
+        :param log_level: Logging level (e.g., 'DEBUG', 'INFO').
+        :param log_format: Logging format.
+        """
+        # Configure the shared logger's level
+        self.logger.setLevel(getattr(logging, log_level.upper(), logging.DEBUG))
 
-        # Pattern for matching function signatures
-        function_pattern = r'(\b\w+)(\()([^\)]*)(\))(\s*:)'
-        function_call_pattern = r'(\b\w+)(\()([^\)]*)(\))'  # Function calls without a trailing colon
-        #param_pattern = r'(\w+)(\s*=\s*)(\w+)?'  # For parameters with default values
-        param_pattern = r'(\w+)(\s*=\s*)([^\),]+)'  # This pattern captures the parameters and their default values
-        cls_param_pattern = r'\bcls\b'   # For detecting 'cls' parameter
-        self_param_pattern = r'\bself\b'  # For detecting 'self' parameter
-
-        # Exclude ANSI escape sequences from number styling
-        code_block = ansi_sgr_loose_pattern.sub(lambda match: match.group(0), code_block)
-
-        # Apply styles to comments, strings, builtins, keywords
-        code_block = re.sub(comment_pattern, f'{self.style_codes.get('python_comment', '')}\\g<0>{reset_code}', code_block, flags=re.MULTILINE)
-        code_block = re.sub(string_pattern, f'{self.style_codes.get('python_string', '')}\\g<0>{reset_code}', code_block)
-        code_block = re.sub(builtin_pattern, f'{self.style_codes.get('python_builtin', '')}\\g<0>{reset_code}', code_block)
-        code_block = re.sub(keyword_pattern, f'{self.style_codes.get('python_keyword', '')}\\g<0>{reset_code}', code_block)
-
-        # Now apply number styling to numbers that are not part of ANSI sequences
-        code_block = re.sub(number_pattern, f'{self.style_codes.get('python_number', '')}\\g<0>{reset_code}', code_block)
-
-        # Apply styles to variables
-        code_block = re.sub(variable_pattern, f'{self.style_codes.get('python_variable', '')}\\1{reset_code} \\2', code_block)
-
-        # Apply f-string variable styling inside curly braces
-        code_block = re.sub(fstring_pattern, f'{self.style_codes.get('python_fstring_variable', '')}{{\\1}}{reset_code}', code_block)
-
-        # Function to style parameters
-        def param_replacer(param_match):
-            param_name = ansi_sgr_loose_pattern.sub('', param_match.group(1))  # Exclude ANSI sequences
-
-            equal_sign = param_match.group(2).strip()
-            default_value = param_match.group(3)
-
-            styled_param_name = f'{self.style_codes["python_param"]}{param_name}{reset_code}'
-            styled_equal_sign = f'{self.style_codes["python_operator"]}{equal_sign}{reset_code}'
-            styled_default_value = f'{self.style_codes["python_default_value"]}{default_value}{reset_code}'
-            params = f'{styled_param_name}{styled_equal_sign}{styled_default_value}'
-
-            return params
-
-        # Match function signatures and apply styles to different parts
-        def function_replacer(match):
-            function_name = ansi_sgr_loose_pattern.sub('', match.group(1))  # Function name
-            parenthesis_open = ansi_sgr_loose_pattern.sub('', match.group(2))
-            params = ansi_sgr_loose_pattern.sub('', match.group(3))  # Parameters
-            parenthesis_close = ansi_sgr_loose_pattern.sub('', match.group(4))
-            colon = match.group(5) if len(match.groups()) == 5 else ''
-
-            # Apply styles and reset codes
-            styled_function_name = f'{self.style_codes["python_function_name"]}{function_name}{reset_code}'
-            styled_parenthesis_open = f'{self.style_codes["python_parenthesis"]}{parenthesis_open}{reset_code}'
-            styled_params = re.sub(cls_param_pattern, f'{self.style_codes["python_self_param"]}cls{reset_code}', params)
-            styled_params = re.sub(self_param_pattern, f'{self.style_codes["python_self_param"]}self{reset_code}', styled_params)
-            styled_params = re.sub(param_pattern, param_replacer, styled_params)
-            styled_parenthesis_close = f'{self.style_codes["python_parenthesis"]}{parenthesis_close}{reset_code}'
-            styled_colon = f'{self.style_codes["python_colon"]}{colon}{reset_code}'
-
-            function_sig = f'{styled_function_name}{styled_parenthesis_open}{styled_params}{styled_parenthesis_close}{styled_colon}'
-
-            self.debug(f'{function_sig}')
-
-            return function_sig
+        # Logging is controlled by the instance, not by disabling the logger itself
+        if self.internal_logging_enabled:
+            self.info("Internal Logging Enabled for this instance.")
+            logging_enabled_init_message = f"Instance config dict:\n{self.format_dict(self.config)}"
+            self.debug(logging_enabled_init_message)
 
 
-        # Apply the function_replacer for function signatures
-        code_block = re.sub(function_pattern, function_replacer, code_block)
-        self.debug(f'\n\n{code_block}\n')
+    def _apply_style_internal(self, style_name: str, text: Any, reset: bool = True) -> str:
+        """
+        Applies a style internally without logging debug messages.
 
-        # Match and style function calls (function calls don't have trailing colons)
-        def function_call_replacer(match):
-            #function_name = f'{function_name_style_code}{match.group(1)}{reset_code}'  # Function name in calls
-            function_name = ansi_sgr_loose_pattern.sub('', match.group(1))  # Function name
-            #parenthesis_open = f'{parenthesis_style_code}{match.group(2)}{reset_code}'
-            parenthesis_open = ansi_sgr_loose_pattern.sub('', match.group(2))
-            #params = match.group(3)
-            params = ansi_sgr_loose_pattern.sub('', match.group(3))  # Exclude ANSI sequences
-            #parenthesis_close = f'{parenthesis_style_code}{match.group(4)}{reset_code}'
-            parenthesis_close = ansi_sgr_loose_pattern.sub('', match.group(4))
-
-            # Apply styles to 'cls' parameter within function calls
-            styled_params = re.sub(cls_param_pattern, f'{self.style_codes.get('python_self_param', '')}cls{reset_code}', params)
-
-            # Apply styles to 'self' parameter within function calls
-            styled_params = re.sub(self_param_pattern, f'{self.style_codes.get('python_self_param', '')}self{reset_code}', params)
-
-            # Apply styles to parameters with default values
-            styled_params = re.sub(param_pattern, param_replacer, styled_params)
-
-            styled_function_call = f'{function_name}{parenthesis_open}{styled_params}{parenthesis_close}'
-
-            return styled_function_call
-
-        # Apply the function_call_replacer for function calls
-        code_block = re.sub(function_call_pattern, function_call_replacer, code_block)
-        self.debug(f'\n\n{code_block}\n')
-
-        return code_block
-
-
-    def apply_markdown_style(self, style_name, text, nested_styles=None, reset=True):
+        :param style_name: The name of the style to apply.
+        :param text: The text to style.
+        :param reset: Whether to reset styles after the text.
+        :return: The styled text.
+        """
         text = str(text)
-
-        # Handle nested styles first, if provided
-        if nested_styles:
-            for nested_style in nested_styles:
-                text = self.apply_markdown_style(nested_style, text, reset=False)
-
-        # Fetch the corresponding style code
-        style_code = self.style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
-
-        # Apply reset code carefully for nested styles
-        reset_code = self.reset if reset else ''
-
-        # Handle code block separately for better readability
-        if style_name == 'code_block':
-            # styled_text = f"{style_code}\n{text}\n{reset_code}"  # Add extra line breaks for code blocks
-            language = text.split("\n", 1)[0]  # Get the first line, which is the language identifier (e.g., 'python')
-            code = text[len(language):]  # The rest is the actual code block content
-            highlighted_code = self.apply_custom_python_highlighting(code.strip())
-            # Combine the language identifier with the highlighted code block
-            styled_text = f"\n\n{style_code}{language}{reset_code}\n\n{highlighted_code}"
+        if isinstance(text, str) and text.isspace():
+            style_code = self.bg_color_map.get(
+                style_name,
+                self.bg_color_map.get(
+                    self.styles.get(style_name, PStyle(bg_color="default_bg")).bg_color
+                )
+            )
         else:
-            # Apply the style and reset code for other markdown types
-            styled_text = f"{style_code}{text}{reset_code}"
+            style_code = self.style_codes.get(style_name, self.color_map.get(style_name, self.color_map.get('default')))
+
+        # Append the style code at the beginning of the text and the reset code at the end
+        styled_text = f"{style_code}{text}{self.reset if reset else ''}"
 
         return styled_text
 
+    def log(self, level: str, message: str, *args: Any, **kwargs: Any) -> None:
+        """
+        Logs a message with styling.
 
+        :param level: The log level (e.g., 'DEBUG', 'INFO').
+        :param message: The message to log.
+        :param args: Positional arguments for message formatting.
+        :param kwargs: Keyword arguments for message formatting.
+        """
+        if not self.config['internal_logging']:
+            return
 
-    def parse_markdown(self, text: str) -> List[Tuple[str, str]]:
-        parsed_segments = []
+        level = getattr(logging, level, None)
 
-        # Match everything in the correct order, including code blocks
-        pattern = re.compile(r"```(\w*)\n([\s\S]*?)```|^(#+)\s+(.+)|\*\*(.+?)\*\*|\*(.+?)\*|-\s+(.+)|\[(.+?)\]\((.+?)\)|`([^`]+)`", re.MULTILINE)
+        if args:
+            try:
+                message = message.format(*args)
+            except (IndexError, KeyError, ValueError) as e:
+                self.logger.error(f"Error formatting log message: {e}")
+                return
 
-        for match in pattern.finditer(text):
-            if match.group(1) is not None:  # Code block
-                language = match.group(1) or 'plain'
-                code_block = match.group(2).rstrip()  # Strip trailing spaces
+        if kwargs:
+            message = message.format(**kwargs)
 
-                # Normalize indentation by detecting the minimum leading spaces
-                lines = code_block.split('\n')
-                min_indent = min((len(line) - len(line.lstrip()) for line in lines if line.strip()), default=0)
-                normalized_code_block = "\n".join(line[min_indent:] for line in lines)
+        timestamp = time.time()
+        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime(self._TIMESTAMP_FORMAT)
 
-                parsed_segments.append(('code_block', f"{language}\n{normalized_code_block}"))
-            elif match.group(3) is not None:  # Headers
-                header_level = len(match.group(3))
-                header_content = match.group(4).strip()
-                parsed_segments.append((f'header{header_level}', header_content))
-            elif match.group(5) is not None:  # Bold
-                parsed_segments.append(('bold', match.group(5).strip()))
-            elif match.group(6) is not None:  # Italic
-                parsed_segments.append(('italic', match.group(6).strip()))
-            elif match.group(7) is not None:  # List item
-                parsed_segments.append(('bullet', match.group(7).strip()))
-            elif match.group(8) is not None:  # Link
-                parsed_segments.append(('link', f"{match.group(8).strip()} ({match.group(9).strip()})"))
-            elif match.group(10) is not None:  # Inline code
-                parsed_segments.append(('inline_code', match.group(10).strip()))
+        timestamp_style = 'timestamp'
 
-        return parsed_segments
+        level_styles = {
+            10: 'debug',
+            20: 'info',
+            30: 'warning',
+            40: 'error',
+            50: 'critical',
+        }
 
+        log_level_style = level_styles.get(level, 'default')
 
-    def print_markdown(self, *args: Any, sep: str = ' ', end: str = '\n', filename: str = None, **kwargs):
-        converted_args = [str(arg) for arg in args] if self.config["args_to_strings"] else args
+        styled_log_level_prefix = self._apply_style_internal(log_level_style, f"LOG[{logging.getLevelName(level)}]")
+        styled_timestamp = self._apply_style_internal(timestamp_style, formatted_timestamp)
+        styled_level = self._apply_style_internal(log_level_style, logging.getLevelName(level))
+        styled_text = self._apply_style_internal(log_level_style, message)
 
-        markdown_segments = []
-        for arg in converted_args:
-            markdown_segments.extend(self.parse_markdown(arg))
+        log_message = f"{styled_log_level_prefix} {styled_timestamp} {styled_level} - {styled_text}"
+        self.logger.log(level, log_message)
 
-        styled_output = []
-        for style_type, content in markdown_segments:
-            if content.strip():  # Skip empty content
-                if style_type == 'header1':
-                    styled_output.append(self.apply_markdown_style('header1', content))
-                elif style_type == 'header2':
-                    styled_output.append(self.apply_markdown_style('header2', content))
-                elif style_type == 'bold':
-                    styled_output.append(self.apply_markdown_style('bold', content))
-                elif style_type == 'italic':
-                    styled_output.append(self.apply_markdown_style('italic', content))
-                elif style_type == 'bullet':
-                    styled_output.append(self.apply_markdown_style('bullet', f"- {content}"))
-                elif style_type == 'link':
-                    styled_output.append(self.apply_markdown_style('link', content))
-                elif style_type == 'inline_code':
-                    styled_output.append(self.apply_markdown_style('inline_code', content))
-                elif style_type == 'code_block':  # Ensure code block is styled and printed
-                    styled_output.append(self.apply_markdown_style('code_block', content))
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
+        # Get the current stack frame
+        current_frame = inspect.currentframe()
+        # Get the caller frame
+        caller_frame = current_frame.f_back
+        # Extract the relevant information
+        class_name = self._apply_style_internal('class_name', self.__class__.__name__)
+        method_name = self._apply_style_internal('method_name', caller_frame.f_code.co_name)
+        line_number = self._apply_style_internal('line_number', caller_frame.f_lineno)
 
-        # Join the styled output and proceed with regular printing
-        output = sep.join(styled_output)
+        # Include the extracted information in the log message
+        message = f"{class_name}.{method_name}:{line_number} - {message}"
 
-        # Print or write to file
-        if filename:
-            with open(filename, 'a') as file:
-                file.write(output + end)
-        else:
-            print(output, end=end)
-        return
+        self.log('DEBUG', message, *args, **kwargs)
 
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+        self.log('INFO', message, *args, **kwargs)
 
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+        self.log('WARNING', message, *args, **kwargs)
 
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+        self.log('ERROR', message, *args, **kwargs)
 
-
+    def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
+        self.log('CRITICAL', message, *args, **kwargs)
 
 
 def get_default_printer() -> Any:

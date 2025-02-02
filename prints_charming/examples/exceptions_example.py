@@ -1,5 +1,5 @@
 from prints_charming import PrintsCharming
-from prints_charming.exceptions import PrintsCharmingException, setup_exceptions
+from prints_charming.exceptions import PrintsCharmingException
 
 
 class ColorNotFoundError(PrintsCharmingException):

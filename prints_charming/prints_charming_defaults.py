@@ -18,7 +18,7 @@ DEFAULT_CONFIG: Dict[str, Union[bool, int, str]] = {
         "style_words_by_index": True,
         "kwargs"              : True,
         "conceal"             : True,
-        "tab_width"           : 8,
+        "tab_width"           : 4,
         "internal_logging"    : False,
         "log_level"           : 'DEBUG',  # Default to DEBUG level
 }
@@ -177,11 +177,19 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "right_arrow": PStyle(color='vgreen', bold=True),
 
 
-        "header1"      : PStyle(color="blue", bold=True, underline=True),
+        "header1"      : PStyle(color="blue", bold=True),
         "header2": PStyle(color="cyan", bold=True),
+        "header3": PStyle(color='vcyan', bold=True),
         "header_main"  : PStyle(color="vcyan", bold=True),
         "header_text"  : PStyle(color="purple", bg_color="gray", bold=True, italic=True),
         "header_text2" : PStyle(color="gray", bg_color="purple", bold=True),
+
+        # Hyperlinks
+        "hyperlink": PStyle(color="blue", underline=True, italic=True),
+        "hyperlink-clicked": PStyle(color="blue", underline=True, italic=True, dim=True),
+
+        "link_text": PStyle(color='vgreen'),
+        "link_url": PStyle(color='orange'),
 
         "task"         : PStyle(color="blue", bold=True),
         "message": PStyle(color='yellow', italic=True, dim=True),
@@ -195,6 +203,7 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "sub_bullet_title": PStyle(color="orange"),
         "sub_bullet_sentence": PStyle(color="dblue"),
         "bullet": PStyle(color='green'),
+        "bullet_title": PStyle(color="green", bold=True),
 
         #"method_name": PStyle(color="lpurple"),
         "inline_code": PStyle(color='vmagenta'),
@@ -231,6 +240,7 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "highlight_arg": PStyle(color="vcyan"),
         "args": PStyle(color="dfff", italic=True),
 
+
         # Python dict styles
         "dict_key": PStyle(color="lblue"),
         "dict_value": PStyle(color="white"),
@@ -239,24 +249,49 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         'none': PStyle(color="lpurple"),
         "int": PStyle(color="cyan"),
         "float": PStyle(color="vcyan"),
+        "string": PStyle(color="dfff"),
         "other": PStyle(color="lav"),
 
         "code"         : PStyle(color="yellow"),
 
-        "python_keyword": PStyle(color="lav", italic=True),
-        "python_string": PStyle(color="dgreen"),
-        "python_comment": PStyle(dim=True),
+        "python_bracket": PStyle(color="vwhite"),
         "python_builtin": PStyle(color="blue"),
-        "python_number": PStyle(color="yellow"),
-        "python_function_name": PStyle(color="cyan"),
-        "python_parenthesis": PStyle(color="vwhite"),
-        "python_param": PStyle(color="orange"),
-        "python_self_param": PStyle(color="red"),
-        "python_operator": PStyle(color="vpink"),
+        "python_colon": PStyle(color="vpink", bold=True),
+        "python_comma": PStyle(color="white"),
+        "python_comment": PStyle(dim=True),
         "python_default_value": PStyle(color="lav", italic=True),
-        "python_colon": PStyle(color="vpink"),
-        "python_variable": PStyle(color="white"),
         "python_fstring_variable": PStyle(color="orange"),
+        "python_function_name": PStyle(color="cyan"),
+        "python_keyword": PStyle(color="lav", italic=True),
+        "python_number": PStyle(color="yellow"),
+        "python_operator": PStyle(color="vpink"),
+        "python_param": PStyle(color="orange"),
+        "python_parenthesis": PStyle(color="vwhite"),
+        "python_self_param": PStyle(color="red"),
+        "python_string": PStyle(color="dgreen"),
+        "python_variable": PStyle(color="white"),
+
+
+        # Markdown specific
+        "md_image_title": PStyle(color="vgreen"),
+        "md_image_path": PStyle(color="orange"),
+
+        'horiz_border': PStyle(color='purple'),
+        'vert_border': PStyle(color='orange'),
+
+        'horiz_border_top': PStyle(color='blue'),
+        'vert_border_left': PStyle(color='blue'),
+        'vert_border_inner': PStyle(color='blue'),
+        'vert_border_right': PStyle(color='blue'),
+        'horiz_border_bottom': PStyle(color='blue'),
+        'col_sep': PStyle(color='blue'),
+
+
+
+        'bottom_segment': PStyle(color='blue'),
+
+        'progress': PStyle(color='cyan', bold=True),
+
 
 
         "bg_color_green": PStyle(color="white", bg_color='green'),
@@ -341,34 +376,6 @@ DEFAULT_ERROR_STYLES: Dict[str, PStyle] = {
 }
 
 
-DEFAULT_LOGGING_STYLES: Dict[str, PStyle] = {
-        "default": PStyle(),
-        "timestamp": PStyle(color="vwhite"),
-        "filename": PStyle(color="cyan", bold=True),
-        'record_name': PStyle(color="orange"),
-        "hostname": PStyle(color="white"),
-        "class_name": PStyle(color="dfff"),
-        "method_name": PStyle(color="vwhite"),
-        "line_number": PStyle(color="vcyan"),
-        "highlight_arg": PStyle(color="vcyan"),
-        "args": PStyle(color="dfff", italic=True),
-        "debug": PStyle(color="blue"),
-        "info": PStyle(color="green"),
-        "warning": PStyle(color="yellow"),
-        "error": PStyle(color="red"),
-        "critical": PStyle(color="vred", bold=True, italic=True),
-        "dict_key": PStyle(color="lblue"),
-        "dict_value": PStyle(color="white"),
-        "true": PStyle(color="vgreen"),
-        "false": PStyle(color="vred"),
-        'none': PStyle(color="lpurple"),
-        "int": PStyle(color="cyan"),
-        "float": PStyle(color="vcyan"),
-        "other": PStyle(color="lav"),
-        "conceal": PStyle(conceal=True)
-}
-
-
 
 DEFAULT_LEVEL_STYLES = {
     logging.DEBUG: 'debug',
@@ -381,131 +388,6 @@ DEFAULT_LEVEL_STYLES = {
 
 
 DEFAULT_UNICODE_MAP = {
-        # Animals
-        "baboon": "𓃷",
-        "barbel": "𓆜",
-        "bird_pecking_at_fish": "𓅻",
-        "bull": "𓃒",
-        "bull_charging": "𓃓",
-        "buzzard": "𓅂",
-        "calf": "𓃔",
-        "cat": "𓃠",
-        "catfish": "𓆢",
-        "cattle_egret": "𓅥",
-        "centipede": "𓆨",
-        "charging_ox_head": "𓄀",
-        "claw": "𓆆",
-        "cobra": "𓆓",
-        "cobra_with_feather": "𓆔",
-        "cormorant": "𓅧",
-        "cow_suckling_calf": "𓃖",
-        "crocodile": "𓆊",
-        "crocodile_with_curved_tail": "𓆌",
-        "dog": "𓃡",
-        "donkey": "𓃘",
-        "duckling": "𓅷",
-        "dung_beetle": "𓆣",
-        "egg": "𓆇",
-        "elephant": "𓃰",
-        "elephant_snout_fish": "𓆞",
-        "erect_cobra": "𓆗",
-        "erect_cobra_on_basket": "𓆘",
-        "falcon": "𓅃",
-        "falcon_in_boat": "𓅇",
-        "falcon_on_basket": "𓅅",
-        "falcon_on_collar_of_beads": "𓅉",
-        "falcon_on_standard": "𓅆",
-        "falcon_with_sun_on_head": "𓅊",
-        "falcon_in_Sokar_barque": "𓅋",
-        "fish_scale": "𓆠",
-        "flamingo": "𓅟",
-        "fly": "𓆦",
-        "forepart_of_hartebeest": "𓄄",
-        "forepart_of_lion": "𓄂",
-        "forepart_of_ram": "𓄆",
-        "frog": "𓆏",
-        "gazelle": "𓃴",
-        "gecko": "𓆈",
-        "glossy_ibis": "𓅠",
-        "goat_with_collar": "𓃶",
-        "goose_picking_up_grain": "𓅼",
-        "guinea_fowl": "𓅘",
-        "hare": "𓃹",
-        "hartebeest_head": "𓄃",
-        "head_of_crested_bird": "𓆀",
-        "head_of_pintail": "𓅿",
-        "head_of_ram": "𓄅",
-        "head_of_spoonbill": "𓆁",
-        "head_of_vulture": "𓆂",
-        "heron": "𓅣",
-        "heron_on_perch": "𓅤",
-        "hippo": "𓃯",
-        "hippo_head": "𓄁",
-        "hoopoe": "𓅙",
-        "horse": "𓃗",
-        "horned_viper": "𓆑",
-        "horned_viper_crawling_out_of_enclosure": "𓆒",
-        "human_headed_bird_with_bowl_with_smoke": "𓅽",
-        "ibex": "𓃵",
-        "image_of_crocodile": "𓆍",
-        "image_of_falcon": "𓅌",
-        "image_of_falcon_on_standard": "𓅍",
-        "image_of_falcon_with_two_plumes": "𓅏",
-        "jackal": "𓃥",
-        "jackal_looking_back": "𓃦",
-        "kid": "𓃙",
-        "kid_jumping": "𓃚",
-        "lapwing": "𓅚",
-        "lapwing_with_twisted_wings": "𓅛",
-        "leopard_head": "𓄇",
-        "lion": "𓃬",
-        "locust": "𓆧",
-        "long_horned_bull": "𓃽",
-        "lying_canine": "𓃢",
-        "lying_lion": "𓃭",
-        "lying_Set_animal": "𓃫",
-        "mature_bovine_lying_down": "𓃜",
-        "monkey": "𓃸",
-        "mullet": "𓆝",
-        "newborn_hartebeest": "𓃛",
-        "northern_bald_ibis": "𓅜",
-        "oryx": "𓃲",
-        "ostrich": "𓅦",
-        "owl": "𓅓",
-        "panther": "𓃮",
-        "Petrocephalus_bane": "𓆟",
-        "pintail": "𓅭",
-        "pintail_alighting": "𓅯",
-        "pintail_flying": "𓅮",
-        "plucked_bird": "𓅾",
-        "quail_chick": "𓅱",
-        "ram": "𓃝",
-        "sacred_cow": "𓃕",
-        "sacred_Ibis": "𓅞",
-        "sacred_Ibis_on_standard": "𓅝",
-        "saddle_billed_stork": "𓅡",
-        "Set_animal": "𓃩",
-        "snake": "𓆙",
-        "sparrow": "𓅪",
-        "sparrow_low": "𓅫",
-        "swallow": "𓅨",
-        "swallow_low": "𓅩",
-        "tadpole": "𓆐",
-        "three_ducklings_in_nest": "𓅸",
-        "three_ducklings_in_pool": "𓅹",
-        "three_saddle_billed_storks": "𓅢",
-        "tilapia": "𓆛",
-        "turtle": "𓆉",
-        "two_cobras": "𓆕",
-        "two_Egyptian_vultures": "𓅀",
-        "two_owls": "𓅔",
-        "two_plovers": "𓅺",
-        "two_quail_chicks": "𓅳",
-        "vulture": "𓅐",
-        "vulture_and_cobra_each_on_a_basket": "𓅒",
-        "white_fronted_goose": "𓅬",
-        "widgeon": "𓅰",
-        "wing": "𓆃",
 
         # Arrows
         "arrow_up": "⭡",
@@ -687,6 +569,133 @@ DEFAULT_UNICODE_MAP = {
         "right_line": "⟞",
 
 
+        # Animals
+        "baboon": "𓃷",
+        "barbel": "𓆜",
+        "bird_pecking_at_fish": "𓅻",
+        "bull": "𓃒",
+        "bull_charging": "𓃓",
+        "buzzard": "𓅂",
+        "calf": "𓃔",
+        "cat": "𓃠",
+        "catfish": "𓆢",
+        "cattle_egret": "𓅥",
+        "centipede": "𓆨",
+        "charging_ox_head": "𓄀",
+        "claw": "𓆆",
+        "cobra": "𓆓",
+        "cobra_with_feather": "𓆔",
+        "cormorant": "𓅧",
+        "cow_suckling_calf": "𓃖",
+        "crocodile": "𓆊",
+        "crocodile_with_curved_tail": "𓆌",
+        "dog": "𓃡",
+        "donkey": "𓃘",
+        "duckling": "𓅷",
+        "dung_beetle": "𓆣",
+        "egg": "𓆇",
+        "elephant": "𓃰",
+        "elephant_snout_fish": "𓆞",
+        "erect_cobra": "𓆗",
+        "erect_cobra_on_basket": "𓆘",
+        "falcon": "𓅃",
+        "falcon_in_boat": "𓅇",
+        "falcon_on_basket": "𓅅",
+        "falcon_on_collar_of_beads": "𓅉",
+        "falcon_on_standard": "𓅆",
+        "falcon_with_sun_on_head": "𓅊",
+        "falcon_in_Sokar_barque": "𓅋",
+        "fish_scale": "𓆠",
+        "flamingo": "𓅟",
+        "fly": "𓆦",
+        "forepart_of_hartebeest": "𓄄",
+        "forepart_of_lion": "𓄂",
+        "forepart_of_ram": "𓄆",
+        "frog": "𓆏",
+        "gazelle": "𓃴",
+        "gecko": "𓆈",
+        "glossy_ibis": "𓅠",
+        "goat_with_collar": "𓃶",
+        "goose_picking_up_grain": "𓅼",
+        "guinea_fowl": "𓅘",
+        "hare": "𓃹",
+        "hartebeest_head": "𓄃",
+        "head_of_crested_bird": "𓆀",
+        "head_of_pintail": "𓅿",
+        "head_of_ram": "𓄅",
+        "head_of_spoonbill": "𓆁",
+        "head_of_vulture": "𓆂",
+        "heron": "𓅣",
+        "heron_on_perch": "𓅤",
+        "hippo": "𓃯",
+        "hippo_head": "𓄁",
+        "hoopoe": "𓅙",
+        "horse": "𓃗",
+        "horned_viper": "𓆑",
+        "horned_viper_crawling_out_of_enclosure": "𓆒",
+        "human_headed_bird_with_bowl_with_smoke": "𓅽",
+        "ibex": "𓃵",
+        "image_of_crocodile": "𓆍",
+        "image_of_falcon": "𓅌",
+        "image_of_falcon_on_standard": "𓅍",
+        "image_of_falcon_with_two_plumes": "𓅏",
+        "jackal": "𓃥",
+        "jackal_looking_back": "𓃦",
+        "kid": "𓃙",
+        "kid_jumping": "𓃚",
+        "lapwing": "𓅚",
+        "lapwing_with_twisted_wings": "𓅛",
+        "leopard_head": "𓄇",
+        "lion": "𓃬",
+        "locust": "𓆧",
+        "long_horned_bull": "𓃽",
+        "lying_canine": "𓃢",
+        "lying_lion": "𓃭",
+        "lying_Set_animal": "𓃫",
+        "mature_bovine_lying_down": "𓃜",
+        "monkey": "𓃸",
+        "mullet": "𓆝",
+        "newborn_hartebeest": "𓃛",
+        "northern_bald_ibis": "𓅜",
+        "oryx": "𓃲",
+        "ostrich": "𓅦",
+        "owl": "𓅓",
+        "panther": "𓃮",
+        "Petrocephalus_bane": "𓆟",
+        "pintail": "𓅭",
+        "pintail_alighting": "𓅯",
+        "pintail_flying": "𓅮",
+        "plucked_bird": "𓅾",
+        "quail_chick": "𓅱",
+        "ram": "𓃝",
+        "sacred_cow": "𓃕",
+        "sacred_Ibis": "𓅞",
+        "sacred_Ibis_on_standard": "𓅝",
+        "saddle_billed_stork": "𓅡",
+        "Set_animal": "𓃩",
+        "snake": "𓆙",
+        "sparrow": "𓅪",
+        "sparrow_low": "𓅫",
+        "swallow": "𓅨",
+        "swallow_low": "𓅩",
+        "tadpole": "𓆐",
+        "three_ducklings_in_nest": "𓅸",
+        "three_ducklings_in_pool": "𓅹",
+        "three_saddle_billed_storks": "𓅢",
+        "tilapia": "𓆛",
+        "turtle": "𓆉",
+        "two_cobras": "𓆕",
+        "two_Egyptian_vultures": "𓅀",
+        "two_owls": "𓅔",
+        "two_plovers": "𓅺",
+        "two_quail_chicks": "𓅳",
+        "vulture": "𓅐",
+        "vulture_and_cobra_each_on_a_basket": "𓅒",
+        "white_fronted_goose": "𓅬",
+        "widgeon": "𓅰",
+        "wing": "𓆃",
+
+
         # Currency and Finance
         "alarm_clock": "⏰",
         "atm": "🏧",
@@ -834,6 +843,32 @@ DEFAULT_UNICODE_MAP = {
 
 DEFAULT_CONTROL_MAP: Dict[str, str] = {
 
+        # Terminal Window Title and Icon
+        "set_window_title_and_icon": "\x1b]0;{title}\x07",  # Set terminal window title and icon name (OSC 0)
+        "set_icon_name": "\x1b]1;{icon}\x07",      # Set terminal icon name (OSC 1)
+        "set_window_title": "\x1b]2;{title}\x07",  # Set only the window title of the terminal window (OSC 2)
+
+        # Insert clickable hyperlink
+        "insert_hyperlink": "\x1b]8;;{url}\x07{text}\x1b]8;;\x07",
+
+        # Terminal Current Working Directory
+        "set_current_directory": "\x1b]7;file://{hostname}/{path}\x07",  # Set terminal current working directory (OSC 2)
+
+        # Terminal Colors
+        "set_palette_color": "\x1b]4;{color_code};rgb:{r}/{g}/{b}\x07",  # Set palette color (OSC 4)
+
+        # Terminal Font
+        "set_font": "\x1b]10;{font}\x07",  # Set terminal font (OSC 10)
+
+        # Terminal Background Image
+        "set_background_image": "\x1b]11;{image_path}\x07",  # Set terminal background image (OSC 11)
+
+        # Clipboard Operations
+        "copy_to_clipboard": "\x1b]52;;{content}\x07",  # Copy content to clipboard (OSC 52)
+
+        # X11 Window Class and Instance
+        "set_x11_window_class": "\x1b]3;{instance};{class}\x07",  # Set X11 window class and instance (OSC 3)
+
         # 256 Color Mode (Foreground)
         "fg_color_256": "\x1b[38;5;{n}m",  # Set 256 color mode foreground (0-255)
 
@@ -873,6 +908,7 @@ DEFAULT_CONTROL_MAP: Dict[str, str] = {
         "restore_cursor_position": "\x1b[u",  # Restore saved cursor position
         "hide_cursor": "\x1b[?25l",  # Hide the cursor
         "show_cursor": "\x1b[?25h",  # Show the cursor
+
 
         # Line and Text Manipulation
         "insert_line": "\x1b[L",  # Insert a blank line at the current cursor position
@@ -924,8 +960,9 @@ DEFAULT_CONTROL_MAP: Dict[str, str] = {
         # Escape Key
         "escape": "\x1b",            # Escape key
 
-        # Tab Key
+        # Tab Keys
         "tab": "\t",                 # Tab key
+        "vtab": "\v",                # Vertical Tab key
 
         # Backspace Key
         "backspace": "\x7f",         # Backspace key (sometimes "\x08" in some terminals)
