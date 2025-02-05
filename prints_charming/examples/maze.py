@@ -84,13 +84,6 @@ class BasePattern:
         print(horiz_border)
 
     def display_bottom_menu(self):
-        """
-        Example method to reuse your existing bottom-of-screen menu logic,
-        if you want each pattern to show a little menu or let the user quit.
-        For brevity, this just returns if user hits 'q'.
-        You can integrate your actual InteractiveMenu logic here or call
-        self.menu.display_bottom_maze_menu() if that’s suitable.
-        """
         if not self.menu:
             return None
 
@@ -361,8 +354,7 @@ class MultiRuleCellularAutomata(BasePattern):
         """
         Silly synergy: each generation, we randomly pick some cells near
         the "middle row" and birth them if they are dead, or kill them
-        if they're old, etc. Could also combine fractal or wave logic.
-        This is just a placeholder for truly weird synergy.
+        if they're old, etc.
         """
         mid = self.ca_height // 2
         for x in range(self.ca_width):
@@ -464,9 +456,7 @@ class MultiRuleCellularAutomata(BasePattern):
          2) HighLife
          3) Seeds
          4) Custom (and possibly tweak B/S sets?)
-        For brevity, let's do a mini interactive approach inside the console.
         """
-        # If you want to do a fancy InteractiveMenu approach, you can.
         # We'll do a quick prompt approach for demonstration.
         self.pc.print("Available Rules:", style='vcyan')
         rules = list(self.rules_map.keys())  # ["Classic", "HighLife", "Seeds", "Custom"]
@@ -487,7 +477,6 @@ class MultiRuleCellularAutomata(BasePattern):
         """
         Interprets alive cells as '.' (floor) and dead cells as '#' (wall).
         Prints to console as a basic ASCII “dungeon.”
-        In practice, you might write this to a file or feed into a game engine.
         """
 
         try:
@@ -1083,7 +1072,6 @@ class Maze(BasePattern):
         """
         Creates a simple interactive menu stored in self.menu.
         Items: Pause/Resume, Step, Faster, Slower, Quit
-        We'll position it near the bottom, above the bottom border line.
         """
         if not self.menu:
             return

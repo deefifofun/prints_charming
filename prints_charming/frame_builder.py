@@ -5,6 +5,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from .prints_charming import PrintsCharming
 
 
+class BoundCell:
+    def __init__(self, data_source: Callable[[], Any]):
+        self.data_source = data_source
+
+    def get_value(self) -> Any:
+        return self.data_source()
+
+
 
 class FrameBuilder:
 
@@ -146,7 +154,8 @@ class FrameBuilder:
             for table_str, table_align in zip(table_strs, table_strs_alignments):
                 table_lines = table_str.split("\n")
                 for line in table_lines:
-                    stripped_line = self.strip_ansi_escape_sequences(line)
+                    #stripped_line = self.strip_ansi_escape_sequences(line)
+                    stripped_line = self.pc.__class__.remove_ansi_codes(line)
                     padding_needed = self.get_available_width() - len(stripped_line)
                     if table_align == 'center':
                         leading_spaces = padding_needed // 2
@@ -367,6 +376,7 @@ class FrameBuilder:
         return split_lines
 
 
+
     def get_available_width(self, num_inner_borders=0):
         if self.available_width is None:
             self.available_width = (
@@ -380,6 +390,8 @@ class FrameBuilder:
         #print(f'additional_border_space: {additional_border_space}')
 
         return self.available_width - additional_border_space
+
+
 
 
     def get_available_nested_width(self, level, num_inner_borders=0):
@@ -861,6 +873,9 @@ class FrameBuilder:
                 print(f'{left_border}{blank_text}{right_border}')
             print(horiz_border_bottom)
 
+
+
+
     def print_border_boxed_text1(self, texts, text_styles=None, alignments=None,
                                 style=None, horiz_style=None, vert_style=None,
                                 blank_top_line=False, blank_bottom_line=False,
@@ -1231,7 +1246,8 @@ class FrameBuilder:
             print(f'{vert_border_left}{blank_line}{vert_border_right}')
 
         for line in table_lines:
-            stripped_line = self.strip_ansi_escape_sequences(line)
+            #stripped_line = self.strip_ansi_escape_sequences(line)
+            stripped_line = self.pc.__class__.remove_ansi_codes(line)
             padding_needed = available_width - len(stripped_line)
             if text_align == 'center':
                 leading_spaces = padding_needed // 2
@@ -1253,6 +1269,7 @@ class FrameBuilder:
 
         if horiz_border_bottom:
             print(horiz_border_bottom)
+
 
 
 
@@ -1290,7 +1307,8 @@ class FrameBuilder:
             row_length = 0
             for table_index, table_lines in enumerate(table_lines_list):
                 line = table_lines[line_index]
-                stripped_line = self.strip_ansi_escape_sequences(line)
+                #stripped_line = self.strip_ansi_escape_sequences(line)
+                stripped_line = self.pc.__class__.remove_ansi_codes(line)
                 line_length = len(stripped_line)
                 if current_width + line_length > available_width:
                     row_buffer.append(row.rstrip())
@@ -1309,7 +1327,8 @@ class FrameBuilder:
 
         for row in row_buffer:
 
-            row_length = len(self.strip_ansi_escape_sequences(row))
+            #row_length = len(self.strip_ansi_escape_sequences(row))
+            row_length = len(self.pc.__class__.remove_ansi_codes(row))
             leading_spaces = (available_width - row_length) // 2
             if (available_width - row_length) % 2 != 0:
                 leading_spaces += 1  # Adjust if the remaining space is odd
@@ -1317,7 +1336,8 @@ class FrameBuilder:
             #padding_needed = available_width - len(self.strip_ansi_escape_sequences(row))
             #aligned_text = row + ' ' * padding_needed
             aligned_text = ' ' * leading_spaces + row
-            padding_needed = available_width - len(self.strip_ansi_escape_sequences(aligned_text))
+            #padding_needed = available_width - len(self.strip_ansi_escape_sequences(aligned_text))
+            padding_needed = available_width - len(self.pc.__class__.remove_ansi_codes(aligned_text))
 
             print(f"{vert_border_left}{aligned_text + ' ' * padding_needed}{vert_border_right}")
 
@@ -1359,7 +1379,8 @@ class FrameBuilder:
             row = ""
             for table_index, table_lines in enumerate(table_lines_list):
                 line = table_lines[line_index]
-                stripped_line = self.strip_ansi_escape_sequences(line)
+                #stripped_line = self.strip_ansi_escape_sequences(line)
+                stripped_line = self.pc.__class__.remove_ansi_codes(line)
                 padding_needed = section_width - len(stripped_line)
                 if table_alignments and table_index < len(table_alignments):
                     text_align = table_alignments[table_index]
@@ -1376,7 +1397,8 @@ class FrameBuilder:
                 if table_index > 0:
                     row += " "  # Padding between tables
                 row += aligned_line
-            row_length = len(self.strip_ansi_escape_sequences(row))
+            #row_length = len(self.strip_ansi_escape_sequences(row))
+            row_length = len(self.pc.__class__.remove_ansi_codes(row))
             padding_needed = available_width - row_length
             print(f"{vert_border_left}{row + ' ' * padding_needed}{vert_border_right}")
 
@@ -1407,7 +1429,8 @@ class FrameBuilder:
             row_parts = []
             for table_index, table_lines in enumerate(table_lines_list):
                 line = table_lines[line_index]
-                stripped_line = self.strip_ansi_escape_sequences(line)
+                #stripped_line = self.strip_ansi_escape_sequences(line)
+                stripped_line = self.pc.__class__.remove_ansi_codes(line)
                 if table_alignments and table_index < len(table_alignments):
                     text_align = table_alignments[table_index]
                 else:
@@ -1417,7 +1440,8 @@ class FrameBuilder:
                 row_parts.append(aligned_line)
 
             row = (' ' * table_padding).join(row_parts)
-            row_length = len(self.strip_ansi_escape_sequences(row))
+            #row_length = len(self.strip_ansi_escape_sequences(row))
+            row_length = len(self.pc.__class__.remove_ansi_codes(row))
             padding_needed = available_width - row_length
             print(f"{vert_border_left}{row.ljust(available_width)}{vert_border_right}")
 
@@ -2034,6 +2058,73 @@ class FrameBuilder:
             print(border_bottom)
 
 
+    def print_button_grid(self, button_labels, button_width=10, button_height=3,
+                          col_styles=None, horiz_col_alignments=None, vert_col_alignments=None,
+                          horiz_border_top=True, horiz_border_bottom=True, vert_border_left=True,
+                          vert_border_right=True, col_sep="|", col_sep_style='col_sep', pressed_buttons=None):
+        """
+        Renders a grid of buttons with optional pressed state.
+
+        :param button_labels: 2D list of button labels (grid format)
+        :param button_width: Width of each button
+        :param button_height: Height of each button
+        :param col_styles: List of column styles for each button
+        :param horiz_col_alignments: List of horizontal alignments per column
+        :param vert_col_alignments: List of vertical alignments per column
+        :param horiz_border_top: Whether to include a top border
+        :param horiz_border_bottom: Whether to include a bottom border
+        :param vert_border_left: Whether to include a left border
+        :param vert_border_right: Whether to include a right border
+        :param col_sep: Column separator character
+        :param col_sep_style: Style for column separators
+        :param pressed_buttons: Set of buttons that are currently pressed
+        """
+        pressed_buttons = pressed_buttons or set()
+
+        if col_styles is None:
+            col_styles = ["white"] * 4
+
+        if horiz_col_alignments is None:
+            horiz_col_alignments = ["center"] * len(button_labels[0])
+
+        if vert_col_alignments is None:
+            vert_col_alignments = ["center"] * len(button_labels[0])
+
+        for row in button_labels:
+            num_columns = len(row)  # Get the actual number of buttons in the row
+
+            # Ensure styles match the exact number of buttons in the row
+            row_col_styles = col_styles if col_styles else ["white"] * num_columns
+            row_horiz_col_alignments = horiz_col_alignments if horiz_col_alignments else ["center"] * num_columns
+            row_vert_col_alignments = vert_col_alignments if vert_col_alignments else ["center"] * num_columns
+
+            padded_buttons = []
+            for label in row:
+                is_pressed = label in pressed_buttons
+                button_content = f"\n{' ' * button_width}\n{label.center(button_width)}\n{' ' * button_width}\n"
+
+                if is_pressed:
+                    # Change button appearance when pressed (e.g., brackets or color)
+                    button_content = f"\n{' ' * (button_width - 1)}\n[{label.center(button_width - 2)}]\n{' ' * (button_width - 1)}\n"
+
+                padded_buttons.append(button_content)
+
+            self.print_multi_column_box2B(
+                columns=padded_buttons,
+                col_widths=[button_width] * num_columns,
+                col_styles=col_styles,
+                horiz_col_alignments=horiz_col_alignments,
+                vert_col_alignments=vert_col_alignments,
+                row_height=button_height,
+                horiz_border_top=horiz_border_top,
+                horiz_border_bottom=horiz_border_bottom,
+                vert_border_left=vert_border_left,
+                vert_border_right=vert_border_right,
+                col_sep=col_sep,
+                col_sep_style=col_sep_style,
+            )
+
+
 
 
     def print_multi_column_box2C(self, columns, col_widths, col_styles=None, horiz_col_alignments=None, vert_col_alignments=None,
@@ -2488,7 +2579,8 @@ class FrameBuilder:
         if single_table_mode:
             # Single table mode similar to print_border_boxed_table
             for line in table_lines_list[0]:
-                stripped_line = self.strip_ansi_escape_sequences(line)
+                #stripped_line = self.strip_ansi_escape_sequences(line)
+                stripped_line = self.pc.__class__.remove_ansi_codes(line)
                 padding_needed = available_width - len(stripped_line)
                 current_align = alignments[0]  # main_text_align
                 if current_align == 'center':
@@ -2539,7 +2631,8 @@ class FrameBuilder:
                 row_parts = []
                 for table_index, table_lines in enumerate(table_lines_list):
                     line = table_lines[line_index]
-                    stripped_line = self.strip_ansi_escape_sequences(line)
+                    #stripped_line = self.strip_ansi_escape_sequences(line)
+                    stripped_line = self.pc.__class__.remove_ansi_codes(line)
                     current_align = alignments[table_index]
 
                     # Align text within section_width
@@ -2550,7 +2643,8 @@ class FrameBuilder:
                 row = (' ' * table_padding).join(row_parts)
 
                 # Ensure we do not exceed available width. If it does, it will just truncate visually.
-                stripped_row = self.strip_ansi_escape_sequences(row)
+                #stripped_row = self.strip_ansi_escape_sequences(row)
+                stripped_row = self.pc.__class__.remove_ansi_codes(row)
                 row_length = len(stripped_row)
                 padding_needed = max(0, available_width - row_length)
 
@@ -2587,7 +2681,8 @@ class FrameBuilder:
                     row = ""
                     for table_index, table_lines in enumerate(table_lines_list):
                         line = table_lines[line_index]
-                        stripped_line = self.strip_ansi_escape_sequences(line)
+                        #stripped_line = self.strip_ansi_escape_sequences(line)
+                        stripped_line = self.pc.__class__.remove_ansi_codes(line)
                         line_length = len(stripped_line)
 
                         # Check if adding this table line plus padding would exceed width
@@ -2611,7 +2706,8 @@ class FrameBuilder:
                 # Now we have row_buffer with each row. Let's center them.
                 # In the original print_border_boxed_tables, final alignment was center.
                 for row in row_buffer:
-                    stripped_row = self.strip_ansi_escape_sequences(row)
+                    #stripped_row = self.strip_ansi_escape_sequences(row)
+                    stripped_row = self.pc.__class__.remove_ansi_codes(row)
                     row_length = len(stripped_row)
                     # Center align the entire row
                     leading_spaces = (available_width - row_length) // 2
@@ -2619,7 +2715,8 @@ class FrameBuilder:
                         leading_spaces += 1
                     aligned_text = ' ' * leading_spaces + row
                     # Add borders
-                    padding_needed = available_width - len(self.strip_ansi_escape_sequences(aligned_text))
+                    #padding_needed = available_width - len(self.strip_ansi_escape_sequences(aligned_text))
+                    padding_needed = available_width - len(self.pc.__class__.remove_ansi_codes(aligned_text))
                     left_border = vert_border_left if vert_border_left else ''
                     right_border = vert_border_right if vert_border_right else ''
                     print(f"{left_border}{aligned_text + ' ' * padding_needed}{right_border}")
@@ -2652,13 +2749,14 @@ class FrameBuilder:
                 # Compute max line length per table to better handle center/right align
                 max_widths = []
                 for t_lines in table_lines_list:
-                    max_widths.append(max(len(self.strip_ansi_escape_sequences(l)) for l in t_lines))
+                    max_widths.append(max(len(self.pc.__class__.remove_ansi_codes(l)) for l in t_lines))
 
                 for line_index in range(max_lines):
                     row_parts = []
                     for table_index, table_lines in enumerate(table_lines_list):
                         line = table_lines[line_index]
-                        stripped_line = self.strip_ansi_escape_sequences(line)
+                        #stripped_line = self.strip_ansi_escape_sequences(line)
+                        stripped_line = self.pc.__class__.remove_ansi_codes(line)
                         current_align = alignments[table_index]
                         col_width = max_widths[table_index]
                         padding_needed = col_width - len(stripped_line)
@@ -2677,7 +2775,8 @@ class FrameBuilder:
                     # Join with table_padding spaces
                     row = (' ' * table_padding).join(row_parts)
                     # Add borders and print
-                    stripped_row = self.strip_ansi_escape_sequences(row)
+                    #stripped_row = self.strip_ansi_escape_sequences(row)
+                    stripped_row = self.pc.__class__.remove_ansi_codes(row)
                     row_length = len(stripped_row)
                     padding_needed = max(0, available_width - row_length)
                     left_border = vert_border_left if vert_border_left else ''

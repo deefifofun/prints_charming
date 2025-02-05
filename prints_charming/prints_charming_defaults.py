@@ -292,6 +292,9 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
 
         'progress': PStyle(color='cyan', bold=True),
 
+        'button_normal': PStyle(color='white'),
+        'button_pressed': PStyle(color='black', bg_color='green', bold=True),
+
 
 
         "bg_color_green": PStyle(color="white", bg_color='green'),

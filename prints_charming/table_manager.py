@@ -1,6 +1,7 @@
 # table_manager.py
 
 import os
+import sys
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -164,6 +165,7 @@ class TableManager:
                        double_space: bool = False,
                        use_styles: bool = True,
                        ephemeral: bool = False,
+                       single_line: bool = False,
                        append_newline: bool = False,
                        ) -> str:
 
@@ -293,8 +295,11 @@ class TableManager:
             table_lines.append(border_line)
             line_number += 1
 
-        # Combine lines into a single string
-        table_str = "\n".join(table_lines)
+        if not single_line:
+            # Combine lines into a single string
+            table_str = "\n".join(table_lines)
+        else:
+            table_str = "".join(table_lines)
 
         # Append newline if parameter is True
         if append_newline:
@@ -394,10 +399,12 @@ class TableManager:
                     cursor_position = self.get_cursor_position(row_idx, col_idx, max_col_lengths, col_sep, data_start_line, target_text_box)
 
                     # Move cursor to position
-                    print(cursor_position, end='')
+                    #print(cursor_position, end='')
+                    self.pc.write(cursor_position)
 
                     # **Clear the cell area**
-                    print(' ' * max_col_lengths[col_idx], end='', flush=True)
+                    #print(' ' * max_col_lengths[col_idx], end='', flush=True)
+                    self.pc.write(' ' * max_col_lengths[col_idx])
 
                     # Calculate the visible length of the styled cell
                     #cell_visible_length = self.visible_length(aligned_cell)
@@ -406,10 +413,12 @@ class TableManager:
                     #print(' ' * cell_visible_length, end='', flush=True)
 
                     # Move cursor back to start of cell
-                    print(cursor_position, end='')
+                    #print(cursor_position, end='')
+                    self.pc.write(cursor_position)
 
                     # Print updated cell content
-                    print(aligned_cell, end='')
+                    #print(aligned_cell, end='')
+                    self.pc.write(aligned_cell)
 
                     # Update previous data
                     previous_data[row_idx][col_idx] = new_value
@@ -422,13 +431,35 @@ class TableManager:
                     previous_data[row_idx][col_idx] = new_value
                     """
 
-        print(flush=True)
+        sys.stdout.flush()
 
 
     def add_bound_table(self, **kwargs) -> str:
         """
         Store a table with bound cells in self.tables, allowing real-time updates.
+
+        :param table_data: A list of lists representing the rows of the table.
+        :param table_name: The name of the table (used for storage and reference).
+        :param show_table_name: Whether to display the table name as a title.
+        :param table_style: The style to apply to the entire table.
+        :param border_char: Character used for table borders.
+        :param col_sep: Column separator string.
+        :param border_style: Style name for the table borders.
+        :param col_sep_style: Style name for the column separators.
+        :param header_style: Style name for the header row.
+        :param header_column_styles: A dictionary mapping column indices to style names for the header row.
+        :param col_alignments: A list of strings ('left', 'center', 'right') for column alignments.
+        :param default_column_styles: A dictionary mapping column indices to style names for data cells.
+        :param cell_style: Style name or list of styles for the table cells.
+        :param target_text_box: Whether to target a specific text box (used in some rendering contexts).
+        :param conditional_style_functions: A dictionary defining conditional styles based on cell values.
+        :param double_space: Whether to double-space the table rows.
+        :param use_styles: Whether to use styles (True) or plain text (False).
+        :param ephemeral: If True, the table is not stored for future updates.
+        :param append_newline: If True, adds a newline character at the end of the table string.
+        :return: A string representing the formatted table.
         """
+
         # Extract table_data from kwargs
         table_data = kwargs.pop('table_data', None)
         original_table_data = table_data  # Keep the original data with BoundCell instances

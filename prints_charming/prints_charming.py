@@ -4,6 +4,7 @@ import time
 import os
 import pty
 import sys
+import shutil
 import subprocess
 import threading
 import asyncio
@@ -823,6 +824,7 @@ class PrintsCharming:
                  styled_subwords: Optional[Dict[str, List[str]]] = None,
                  enable_markdown: bool = False,
                  terminal_mode: str = "single",
+                 terminal_title: str = "PrintsCharming Terminal",
                  style_conditions: Optional[Any] = None,
                  formatter: Optional['Formatter'] = None,
                  ) -> None:
@@ -945,7 +947,7 @@ class PrintsCharming:
         self.terminal_mode = terminal_mode
 
         self.terminals = {}  # For managing multiple terminals
-        self.single_terminal_config = {"title": "PrintsCharming Terminal"}
+        self.single_terminal_config = {"title": terminal_title}
 
         self.term_size_watcher = TerminalSizeWatcher(self)
 
@@ -1002,42 +1004,130 @@ class PrintsCharming:
         self.write("set_window_title", title=self.single_terminal_config["title"])
 
 
-    def launch_terminal(self, name, terminal_emulator="gnome-terminal", width=80, height=24, title="New Terminal", task=None):
+    def find_terminal_emulator(self):
+        """Find an available terminal emulator."""
+        terminals = [
+            "gnome-terminal", "konsole", "xfce4-terminal", "urxvt", "xterm",
+            "alacritty", "kitty", "st", "terminator", "lxterminal"
+        ]
+        for terminal in terminals:
+            if shutil.which(terminal):
+                return terminal
+        return None
+
+
+    def launch_terminal(
+        self,
+        name,
+        script,
+        terminal_emulator="gnome-terminal",
+        width=80,
+        height=24,
+        title="PrintsCharming Terminal",
+        keep_terminal_open=True,
+        manage_pty=False,
+        env_vars=None,
+        venv_activate_script='activate',
+        run_as_module=False,
+    ):
         """
-        Launch a new terminal with a given task.
+        Launch a new terminal with optional PTY management and environment variable support.
+
+        :param name: Name of the terminal instance.
+        :param script: The script path or module name to run.
+        :param terminal_emulator: Terminal emulator to use.
+        :param width: Width of the terminal window.
+        :param height: Height of the terminal window.
+        :param title: Title of the terminal window.
+        :param keep_terminal_open: Whether to keep the terminal open after execution.
+        :param manage_pty: If True, redirects stdin/stdout for parent control.
+        :param env_vars: Dictionary of environment variables to pass.
+        :param venv_activate_script: Name of activate script.
+        :param run_as_module: If True, runs the script as a module (using `-m`).
         """
+
         if self.terminal_mode != "multi":
             raise RuntimeError("Multi-terminal mode is not enabled.")
 
-        master_fd, slave_fd = pty.openpty()
-        terminal_cmd = [
-            terminal_emulator,
-            "--geometry", f"{width}x{height}",
-            "--", "bash", "-c", "cat",
-        ]
-        subprocess.Popen(
-            terminal_cmd,
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            close_fds=True,
-        )
-        os.close(slave_fd)
+        terminal_emulator = terminal_emulator or self.find_terminal_emulator()
+        if not terminal_emulator:
+            print("No supported terminal emulator found. Please install one.")
+            return
 
-        time.sleep(0.5)  # Allow terminal to initialize
+        # Prepare environment variables BEFORE creating the pseudo-terminal
+        default_env = os.environ.copy()
+        if env_vars:
+            default_env.update(env_vars)  # Merge existing env with new values
+        else:
+            env_vars = default_env
 
-        # Store the terminal instance
-        self.terminals[name] = master_fd
+        env_vars["RUNNING_IN_NEW_TERMINAL"] = "1"  # Set the flag automatically
 
-        # Redirect sys.stdout to the new terminal for the task
-        sys.stdout = os.fdopen(master_fd, "w")
-        sys.stdin = os.fdopen(master_fd, "r")
-        self.write("alt_buffer")
-        self.write("set_window_title", title=title)
+        # Get the virtual environment path if active
+        venv_path = os.getenv("VIRTUAL_ENV")
+        shell_type = os.getenv("SHELL", "/bin/bash").split("/")[-1]  # Get the shell name
+        if venv_path:
+            if shell_type in ["bash", "zsh"]:
+                activate_venv_cmd = f"source {venv_path}/bin/{venv_activate_script} && "
+            elif shell_type == "fish":
+                activate_venv_cmd = f"source {venv_path}/bin/{venv_activate_script}.fish && "
+            else:
+                activate_venv_cmd = f". {venv_path}/bin/{venv_activate_script} && "  # POSIX-compatible fallback
+        else:
+            activate_venv_cmd = ""
 
-        # Run the task in a separate thread
-        if task:
-            threading.Thread(target=task, args=(master_fd,)).start()
+        # Define terminal command
+        command_suffix = "; exec bash" if keep_terminal_open else ""
+
+        # Determine execution command
+        script_cmd = f"python -m {script}" if run_as_module else f"python {script}"
+
+        # Include virtual environment activation if venv is active
+        #full_cmd = f"{activate_venv_cmd}{script_cmd}{sys.argv[0]}{command_suffix}"
+        full_command = f"{activate_venv_cmd}{script_cmd}{command_suffix}"
+
+        # Define terminal command dynamically
+        if terminal_emulator in ["gnome-terminal", "xfce4-terminal", "lxterminal", "terminator"]:
+            terminal_cmd = [terminal_emulator, "--geometry", f"{width}x{height}", "--title", title, "--", "bash", "-i", "-c", full_command]
+        elif terminal_emulator == "konsole":
+            terminal_cmd = [terminal_emulator, "--geometry", f"{width}x{height}", "--hold", "--title", title, "-e", full_command]
+        elif terminal_emulator == "urxvt":
+            terminal_cmd = [terminal_emulator, "--geometry", f"{width}x{height}", "-hold", "-T", title, "-e", full_command]
+        elif terminal_emulator == "xterm":
+            terminal_cmd = [terminal_emulator, "--geometry", f"{width}x{height}", "-hold", "-T", title, "-e", full_command]
+        elif terminal_emulator in ["alacritty", "kitty", "st"]:
+            terminal_cmd = [terminal_emulator, "--title", title, "-e", "bash", "-i", "-c",
+                            f"{full_command} && sleep 0.2 && wmctrl -r ':ACTIVE:' -e 0,100,100,800,600"
+                            ]
+
+        else:
+            print(f"Unsupported terminal: {terminal_emulator}")
+            return
+
+
+        if manage_pty:
+            # Create a PTY pair if managing the terminal
+            master_fd, slave_fd = pty.openpty()
+
+            # Start subprocess with PTY redirection
+            subprocess.Popen(terminal_cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, env=env_vars, close_fds=True)
+
+            os.close(slave_fd)  # Close slave FD to avoid leaks
+
+            time.sleep(0.5)  # Allow terminal to initialize
+
+            # Store terminal instance
+            self.terminals[name] = master_fd
+
+            # Redirect sys.stdin and sys.stdout to the new terminal
+            sys.stdout = os.fdopen(master_fd, "w")
+            sys.stdin = os.fdopen(master_fd, "r")
+
+        else:
+            #terminal_cmd = [terminal_emulator, "--geometry", f"{width}x{height}", "--", "bash", "-c", "cat",]
+
+            subprocess.Popen(terminal_cmd, env=env_vars)
+
 
 
     def restore_terminal(self, name=None):
