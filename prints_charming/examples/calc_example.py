@@ -80,7 +80,6 @@ class CalculatorUI:
             pass
 
 
-
     def update_button_label(self, label: str, style: str):
         """
         Updates only the label portion of the specified button.
@@ -122,12 +121,10 @@ class CalculatorUI:
         self.update_button_label(label, 'button_normal')
 
 
-
     def build_calculator_ui(self):
 
         # Clear screen
         self.write("clear_screen", "cursor_home")
-
 
         # Build the display area using TableManager with BoundCell
         display_data = [[BoundCell(lambda: self.get_display_text())]]
@@ -204,90 +201,6 @@ class CalculatorUI:
         text = self.expression if self.expression else "0"
         return text[-max_length:]  # Get the last part that fits
 
-    def update_button_row(self, row_index: int, pressed_buttons: set = None):
-        """
-        Redraws only a single row of buttons. If pressed_buttons contains one or more labels,
-        those buttons are rendered with the 'button_pressed' style.
-        """
-        if pressed_buttons is None:
-            pressed_buttons = set()
-
-        # Settings for button layout
-        start_row = self.display_height + 1  # Base starting row for the grid (below display)
-        button_width = 10  # Width of each button
-        button_border_top = True
-        button_border_bottom = True
-        # Total height includes extra rows for borders if present.
-        button_height = 3 + int(button_border_top) + int(button_border_bottom)
-        row_height = button_height - (int(button_border_top) + int(button_border_bottom))
-
-        # Retrieve the specified row from the buttons layout.
-        row = self.buttons_layout[row_index]
-
-        # Set cursor position to the top of the affected row.
-        self.write('cursor_position', row=start_row + row_index * button_height, col=1)
-
-        padded_buttons = []
-        for label in row:
-            # If this button is in the pressed_buttons set, apply the pressed style.
-            if label in pressed_buttons:
-                styled_label = self.pc.apply_style('button_pressed', label.center(button_width))
-            else:
-                styled_label = label.center(button_width)
-            # Create a multi-line block for the button (including top/bottom padding).
-            padded_button = (
-                f"\n{' ' * button_width}\n"  # Top padding
-                f"{styled_label}\n"  # Centered label
-                f"{' ' * button_width}\n"  # Bottom padding
-            )
-            padded_buttons.append(padded_button)
-
-        # Redraw the row using your FrameBuilder's multi-column method.
-        self.fb.print_multi_column_box2B(
-            columns=padded_buttons,
-            col_widths=[button_width] * len(row),
-            col_styles=["white"] * len(row),
-            horiz_col_alignments=["center"] * len(row),
-            vert_col_alignments='center',
-            row_height=row_height,
-            horiz_border_top=button_border_top,
-            horiz_border_bottom=button_border_bottom,
-            vert_border_left=True,
-            vert_border_right=True,
-            col_sep="|",
-        )
-
-        # Recompute and update the on-screen positions for each button in this row.
-        for col_index, label in enumerate(row):
-            x_start = (col_index * (button_width + 1)) + 1  # +1 for the column separator
-            x_end = x_start + button_width - 1
-            y_start = start_row + row_index * button_height
-            y_end = y_start + button_height - 1
-            self.button_positions[label] = {
-                'x_range': (x_start, x_end),
-                'y_range': (y_start, y_end),
-            }
-
-    def show_button_pressed(self, label: str):
-        """
-        Determines the row for the pressed button, updates only that row to show the button
-        in a pressed state, waits briefly, then reverts the row back to its normal display.
-        """
-        # Determine which row the button belongs to by searching your buttons layout.
-        row_index = None
-        for idx, row in enumerate(self.buttons_layout):
-            if label in row:
-                row_index = idx
-                break
-        if row_index is None:
-            return  # Button not found
-
-        # Update only the affected row with the pressed button.
-        self.update_button_row(row_index, pressed_buttons={label})
-        sys.stdout.flush()  # Ensure immediate output
-        time.sleep(0.15)  # Short delay for visual feedback
-        # Revert the row to its normal appearance.
-        self.update_button_row(row_index, pressed_buttons=set())
 
     def handle_click(self, x: int, y: int):
         """
@@ -304,20 +217,6 @@ class CalculatorUI:
                 self.flash_button_label(label)
                 self.process_input(label)
                 break
-
-
-    def handle_click2(self, x, y):
-
-        x_term = x  # Column (starts from 1)
-        y_term = y  # Row (starts from 1)
-
-        for label, pos in self.button_positions.items():
-            x_start, x_end = pos['x_range']
-            y_start, y_end = pos['y_range']
-            if x_start <= x_term <= x_end and y_start <= y_term <= y_end:
-                self.process_input(label)
-                break
-
 
 
     def update_display(self):
@@ -348,7 +247,6 @@ class CalculatorUI:
         elif label == 'C':
             self.expression = ""
         self.update_display()
-
 
 
     def event_loop(self):
