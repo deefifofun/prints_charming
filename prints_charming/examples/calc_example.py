@@ -265,7 +265,7 @@ class CalculatorUI:
                 elif event_type == 'keystroke' and event_data:
                     self.handle_keystroke(event_data)
                 else:
-                    # No input; sleep briefly to prevent high CPU usage
+                    # No input
                     time.sleep(0.01)
         except KeyboardInterrupt:
             pass
@@ -306,7 +306,7 @@ def get_script_path():
         return module_path
     else:
         #return sys.argv[0]  # Use normal script execution
-        return os.path.dirname(sys.argv[0])  # ✅ Return one directory higher
+        return os.path.dirname(sys.argv[0])  # Return one directory higher
 
 
 
