@@ -346,7 +346,7 @@ if __name__ == "__main__" or __package__ == "prints_charming.examples":
                     width=45,
                     height=24,
                     env_vars=env_vars,
-                    venv_activate_script='activate-colored',
+                    venv_activate_script='activate',
                     run_as_module=run_as_module,
                 )
         else:
