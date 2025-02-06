@@ -115,7 +115,6 @@ class CalculatorUI:
         """
         # Update with pressed style.
         self.update_button_label(label, 'button_pressed')
-        sys.stdout.flush()
         time.sleep(0.15)  # Adjust delay as desired
         # Revert to normal style.
         self.update_button_label(label, 'button_normal')
