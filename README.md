@@ -97,7 +97,7 @@ This will install the package from the source code.
 ### Calculator UI example supports keypresses too
 ![Project Illustration](./images/examples/calculator-ui.gif)
 
-### Responsive UI....no constraints...everything is customizable!
+### Responsive UI....no constraints...everything is customizable! Of course it scales vertically too.
 ![Project Illustration](./images/examples/prints_ui.gif)
 
 ### Interactive Menu
