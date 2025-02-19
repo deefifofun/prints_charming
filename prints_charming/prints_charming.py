@@ -1626,13 +1626,34 @@ class PrintsCharming:
         return concealed_text
 
 
-    def format_structure(self, structure: Any, indent: int = 4, prepend_fill: bool = True, pad_left_style: str = 'green', fill_to_end: bool = True, fill_bg_only: bool = False, include_var_name: bool = True, f_back_num: int = 1) -> str:
+    def format_structure(
+            self,
+            structure: Any,
+            indent: int = 4,
+            prepend_fill: bool = False,
+            pad_left_style: str = 'jupyter',
+            fill_to_end: bool = False,
+            fill_to_offset: bool = False,
+            offset_value: int = 0,
+            start_fill_offset: int = 0,
+            fill_bg_only: bool = False,
+            include_var_name: bool = True,
+            f_back_num: int = 1,
+            fill_first_last: bool = False,
+    ) -> str:
         """
         Formats and styles a structure (list, tuple, set, dict, or other nested data types) as a styled string.
 
         :param structure: The structure to format and style.
         :param indent: The number of spaces to use for indentation.
         :param include_var_name: If True, attempts to include the variable name.
+        :param fill_to_end:       If True, pad each line to the terminal width.
+        :param fill_to_offset:    If True, pad each line to (longest visible line + offset_value).
+        :param offset_value:      The number of columns beyond the longest line to fill (only if fill_to_offset is True).
+        :param start_fill_offset: If > 0, don't color-fill until after this column index.
+        :param prepend_fill:      If True, apply left padding with a background fill style.
+        :param pad_left_style:    Style name of the left padding.
+        :param fill_bg_only:      If True, only fill background color (no foreground color).
         :param f_back_num: How many frames back to look for the variable name.
         :return: A string representing the formatted and styled structure.
         """
@@ -1647,7 +1668,7 @@ class PrintsCharming:
                 for i, (key, value) in enumerate(items):
                     styled_colon = self.apply_style('python_colon', ":")
                     result += (
-                            " " * ((level + 1) * indent) if not prepend_fill else self.apply_style(pad_left_style, " " * ((level + 1) * indent), fill_bg_only=fill_bg_only)
+                        (" " * ((level + 1) * indent) if not prepend_fill else self.apply_style(pad_left_style, " " * ((level + 1) * indent), fill_bg_only=fill_bg_only))
                             + self.apply_style('dict_key', f'"{key}"')
                             + styled_colon
                             + self.apply_style('default', " ", fill_bg_only=False)
@@ -1701,8 +1722,74 @@ class PrintsCharming:
             var_name = get_variable_name_from_stack(structure, f_back_num)
             if var_name:
                 styled_equal = self.apply_style('python_operator', ' = ')
-                return f"{self.apply_style('python_variable', var_name)}{styled_equal}{formatted_structure}"
-        return formatted_structure
+                formatted_structure = f"{self.apply_style('python_variable', var_name)}{styled_equal}{formatted_structure}"
+
+        # If no fill is requested, return as-is
+        if not fill_to_end and not fill_to_offset:
+            return formatted_structure
+
+        # Split lines for further processing
+        lines = formatted_structure.splitlines()
+
+        # Determine target width based on fill_to_end vs fill_to_offset
+        if fill_to_offset:
+            # Pad lines to (longest_line + offset_value)
+            max_visible = max(self.get_visible_length(line) for line in lines)
+            target_width = max_visible + offset_value
+        else:
+            # fill_to_end is True: pad to terminal width
+            target_width = self.terminal_width
+
+        # Process each line for fill.
+        filled_lines = []
+        for idx, line in enumerate(lines):
+            # If fill_first_last is False and this is the first or last line, skip filling.
+            if not fill_first_last and (idx == 0 or idx == len(lines) - 1):
+                filled_lines.append(line)
+                continue
+
+            vis_len = self.get_visible_length(line)
+            if vis_len >= target_width:
+                filled_lines.append(line)
+                continue
+
+            if start_fill_offset <= 0:
+                # Normal fill: everything from vis_len to target_width is color-filled
+                fill_len = target_width - vis_len
+                fill_str = self.apply_style(pad_left_style, " " * fill_len, fill_bg_only=fill_bg_only)
+                new_line = line + fill_str
+
+            else:
+                # "Start fill offset" is in effect
+                if vis_len < start_fill_offset:
+                    # 1) unstyled spaces from vis_len up to start_fill_offset
+                    unstyled_len = start_fill_offset - vis_len
+                    unstyled_str = " " * unstyled_len
+
+                    # 2) color fill from start_fill_offset up to target_width
+                    color_fill_len = max(0, target_width - start_fill_offset)
+                    color_fill_str = self.apply_style(
+                        pad_left_style,
+                        " " * color_fill_len,
+                        fill_bg_only=fill_bg_only
+                    )
+                    new_line = line + unstyled_str + color_fill_str
+
+                else:
+                    # The line is already at or beyond start_fill_offset,
+                    # so color fill from current length to target_width
+                    fill_len = target_width - vis_len
+                    fill_str = self.apply_style(
+                        pad_left_style,
+                        " " * fill_len,
+                        fill_bg_only=fill_bg_only
+                    )
+                    new_line = line + fill_str
+
+            filled_lines.append(new_line)
+
+        # Reconstruct the final string
+        return "\n".join(filled_lines) + "\n"
 
 
     def format_dict(self, d: Dict[Any, Any], indent: int = 4) -> str:
@@ -1902,8 +1989,7 @@ class PrintsCharming:
             prepend_fill: Union[bool, int] = False,
             fill_to_end: Union[bool, int] = False,
             pattern_key: str = None,
-            markdown: bool = False,
-            preserve_newlines: bool = False  # <-- Our new toggle
+            preserve_newlines: bool = False
     ) -> List[str]:
         """
         If preserve_newlines=True, do a line-by-line approach:
@@ -2225,6 +2311,466 @@ class PrintsCharming:
         if index < len(text):
             words_and_spaces.append(text[index:])
         return words_and_spaces
+
+    def print3(self,
+              *args: Any,
+              style: Union[None, str, Dict[Union[int, Tuple[int, int]], str]] = None,
+              color: str = None,
+              bg_color: str = None,
+              reverse: bool = None,
+              bold: bool = None,
+              dim: bool = None,
+              italic: bool = None,
+              underline: bool = None,
+              overline: bool = None,
+              strikethru: bool = None,
+              conceal: bool = None,
+              blink: bool = None,
+              sep: str = ' ',
+              prog_sep: str = '',
+              prog_step: int = 1,
+              prog_direction: str = 'forward',
+              share_alike_sep_bg: bool = True,
+              share_alike_sep_ul: bool = False,
+              share_alike_sep_ol: bool = False,
+              share_alike_sep_st: bool = False,
+              share_alike_sep_bl: bool = False,
+              start: str = '',
+              end: str = '\n',
+              tab_width: int = None,
+              container_width: int = None,
+              ansi_pattern_key: str = None,
+              prepend_fill: bool = False,
+              fill_to_end: bool = False,
+              fill_with: str = ' ',
+              word_wrap: bool = True,
+              filename: str = None,
+              skip_ansi_check: bool = False,
+              phrase_search: bool = True,
+              phrase_norm: bool = False,
+              phrase_norm_sep: str = ' ',
+              word_search: bool = True,
+              subword_search: bool = True,
+              subword_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
+              return_styled_text: bool = False,
+              **kwargs: Any) -> None:
+        """
+        Prints a styled string to stdout (or writes to a file), processing each argument
+        by tokenizing it and annotating tokens that already contain ANSI escape sequences.
+        These “pre–styled” tokens bypass any further styling.
+        """
+
+        # === STEP 1: Build an annotated token stream from *args ===
+        # For each argument, we either treat it as a single pre–styled token (if it already has ANSI codes)
+        # or we tokenize it (using self.get_words_and_spaces) and mark all resulting tokens as not pre–styled.
+        final_tokens: List[str] = []
+        token_flags: List[bool] = []  # True if the token is already ANSI-rich
+
+        for i, arg in enumerate(args):
+            # Insert the separator between arguments (marked as not pre–styled)
+            if i > 0:
+                final_tokens.append(sep)
+                token_flags.append(False)
+            if isinstance(arg, (dict, list, tuple, set)):
+                converted = self.format_structure(arg, fill_bg_only=kwargs.get("struct_fill_bg_only", True))
+            elif self.config.get("args_to_strings", False):
+                converted = str(arg)
+            else:
+                converted = arg
+
+            if isinstance(converted, str) and self.contains_ansi_codes(converted):
+                # Entire argument is pre–styled; add as one token.
+                final_tokens.append(converted)
+                token_flags.append(True)
+            else:
+                # Tokenize the argument into words and spaces.
+                tokens = self.get_words_and_spaces(converted)
+                final_tokens.extend(tokens)
+                token_flags.extend([False] * len(tokens))
+
+        self.debug(f"Final tokens: {final_tokens}\nToken flags: {token_flags}")
+
+        # === STEP 2: (Optional) Handle progress–separator logic ===
+        # If a progress separator is provided, we reassemble the tokens,
+        # process via self.format_with_sep, and re–tokenize the result.
+        if prog_sep:
+            joined_text = ''.join(final_tokens)
+            text = self.format_with_sep(converted_args=joined_text,
+                                        sep=sep,
+                                        prog_sep=prog_sep,
+                                        prog_step=prog_step,
+                                        prog_direction=prog_direction)
+            text = start + text
+            # Re–tokenize the processed text and update token flags.
+            final_tokens = self.get_words_and_spaces(text)
+            token_flags = [self.contains_ansi_codes(token) for token in final_tokens]
+        else:
+            text = start + ''.join(final_tokens)
+
+        self.debug(f"Text defined:\n{text}")
+
+        # === STEP 3: Early exit if overall text already has ANSI codes ===
+        if self.contains_ansi_codes(text):
+            text_without_ansi = PrintsCharming.remove_ansi_codes(text)
+            if not self.config["color_text"]:
+                if filename:
+                    self.write_file(text_without_ansi, filename, end)
+                else:
+                    print(text_without_ansi, end=end)
+                return
+            if not skip_ansi_check:
+                if filename:
+                    self.write_file(text, filename, end)
+                else:
+                    print(text, end=end)
+                return
+        else:
+            text_without_ansi = text
+
+        # === STEP 4: Set default tab and container widths ===
+        if not tab_width:
+            tab_width = self.config.get('tab_width', 4)
+        if not container_width:
+            container_width = self.terminal_width
+
+        # === STEP 5: If style is a dict, use specialized segmentation/styling ===
+        if isinstance(style, dict):
+            dict_type = self.check_dict_structure(style)
+            if dict_type == "indexed_style":
+                text = self.style_words_by_index(text, style)
+            elif dict_type == 'splits':
+                text = self.segment_and_style(text, style)
+            elif dict_type == 'splits_with_lists':
+                text = self.segment_and_style2(text, style)
+
+            if not skip_ansi_check:
+                if filename:
+                    self.write_file(text, filename, end)
+                else:
+                    print(text, end=end)
+                return
+
+        # === STEP 6: Process kwargs-based placeholders, if any ===
+        if self.config["kwargs"] and kwargs:
+            text = self.replace_and_style_placeholders(text, kwargs)
+            if filename:
+                self.write_file(text, filename, end)
+            else:
+                print(text, end=end)
+            return
+
+        # === STEP 7: Determine the style code to use ===
+        style_instance, style_code = (
+            (self.styles.get(style, self.styles['default']),
+             self.style_codes.get(style, self.style_codes['default']))
+            if style and isinstance(style, str)
+            else (self.styles.get('default'), self.style_codes.get('default'))
+        )
+
+        if any(param is not None for param in (color, bg_color, reverse, bold, dim,
+                                               italic, underline, overline, strikethru,
+                                               conceal, blink)):
+            style_instance = copy.copy(style_instance)
+            updated_style = {k: v for k, v in {
+                'color': color,
+                'bg_color': bg_color,
+                'reverse': reverse,
+                'bold': bold,
+                'dim': dim,
+                'italic': italic,
+                'underline': underline,
+                'overline': overline,
+                'strikethru': strikethru,
+                'conceal': conceal,
+                'blink': blink,
+            }.items() if v is not None}
+            style_instance.update(updated_style)
+            style_key = (
+                style_instance.color,
+                style_instance.bg_color,
+                style_instance.reverse,
+                style_instance.bold,
+                style_instance.dim,
+                style_instance.italic,
+                style_instance.underline,
+                style_instance.overline,
+                style_instance.strikethru,
+                style_instance.conceal,
+                style_instance.blink,
+            )
+            cached_style_code = self.style_cache.get(style_key)
+            if cached_style_code:
+                style_code = cached_style_code
+            else:
+                style_code = self.create_style_code(style_instance)
+                self.style_cache[style_key] = style_code
+
+        # === STEP 8: Token-level styling using the annotated token stream ===
+        # Here we now use our final_tokens list (which we alias as words_and_spaces)
+        # and its parallel token_flags array. All of the following processing (phrases,
+        # individual words/substrings, and other text) will skip tokens that are pre–styled.
+        words_and_spaces = final_tokens
+        self.debug(f'words_and_spaces:\n{words_and_spaces}')
+        styled_words_and_spaces = [None] * len(words_and_spaces)
+
+        # Initialize index sets and a boundary dictionary as before.
+        indexes_used_by_phrases = set()
+        indexes_used_by_words = set()
+        indexes_used_by_substrings = set()
+        indexes_used_by_default_styling = set()
+        indexes_used_by_spaces = set()
+        indexes_used_by_none_styling = set()
+        boundary_indices_dict = {}
+
+        # Define sentence-ending characters.
+        sentence_ending_characters = ".,!?:;"
+
+        # === STEP 9: Handle phrase-level styling via trie_manager ===
+        trie_manager = self.trie_manager
+        if trie_manager:
+            if trie_manager.enable_styled_phrases:
+                if phrase_search and len(words_and_spaces) >= trie_manager.shortest_phrase_length:
+                    i = 0
+                    while i < len(words_and_spaces):
+                        # Skip if this token was pre–styled.
+                        if token_flags[i]:
+                            i += 1
+                            continue
+
+                        # Build the text segment from position i.
+                        text_segment = ''.join(words_and_spaces[i:])
+                        phrase_match = trie_manager.phrase_trie.search_longest_prefix(text_segment, phrase_norm, phrase_norm_sep)
+                        self.debug(f'phrase_match: {phrase_match}')
+                        if phrase_match:
+                            phrase, details = phrase_match
+                            self.debug(f'phrase_match True:\nphrase: {phrase}\n\ndetails: {details}')
+                            if not phrase_norm:
+                                styled_phrase = details.get('styled', phrase)
+                            else:
+                                phrase_style_code = details.get('style_code')
+                                styled_phrase = f'{phrase_style_code}{phrase}{self.reset}'
+                            self.debug(f'styled_phrase: {styled_phrase}')
+                            styled_phrase_tokens = self.get_words_and_spaces(styled_phrase)
+                            self.debug(f'styled_phrase_tokens:\n{styled_phrase_tokens}')
+                            # Ensure alignment between tokens.
+                            if words_and_spaces[i:i + len(styled_phrase_tokens)] == self.get_words_and_spaces(phrase):
+                                indexes_used_by_phrases.update(range(i, i + len(styled_phrase_tokens)))
+                                if i > 0 and (i - 1) not in boundary_indices_dict:
+                                    boundary_indices_dict[i - 1] = details.get('attribs')
+                                if i + len(styled_phrase_tokens) < len(words_and_spaces) and (i + len(styled_phrase_tokens)) not in boundary_indices_dict:
+                                    boundary_indices_dict[i + len(styled_phrase_tokens)] = details.get('attribs')
+                                for j, styled_token in enumerate(styled_phrase_tokens):
+                                    styled_words_and_spaces[i + j] = styled_token
+                                i += len(styled_phrase_tokens)
+                                continue
+                        i += 1
+
+        self.debug(f'After phrases:\nindexes_used_by_phrases:\n{indexes_used_by_phrases}\n'
+                   f'boundary_indices_dict:\n{boundary_indices_dict}\nstyled_words_and_spaces:\n{styled_words_and_spaces}')
+
+        # === STEP 10: Handle individual words and substrings ===
+        if trie_manager and trie_manager.enable_styled_words and word_search:
+            for i, word_or_space in enumerate(words_and_spaces):
+                if token_flags[i]:
+                    continue  # Skip pre–styled tokens.
+                if i in indexes_used_by_phrases:
+                    continue
+                if not word_or_space.isspace():
+                    word = word_or_space.strip()
+                    self.debug(f'word[{i}]: {word}')
+                    stripped_word = word.rstrip(sentence_ending_characters)
+                    self.debug(f'stripped_word[{i}]: {stripped_word}')
+                    trailing_chars = word[len(stripped_word):]
+                    word_details = None
+
+                    if trie_manager.enable_word_trie:
+                        word_match = trie_manager.word_trie.search_longest_prefix(stripped_word)
+                        self.debug(f'word_match: {word_match}')
+                        if word_match:
+                            matched_word, word_details = word_match
+                            self.debug(f'word_match True:\nmatched_word: {matched_word}\nword_details: {word_details}')
+                    elif trie_manager.enable_word_map:
+                        word_details = trie_manager.word_map.get(stripped_word)
+
+                    if word_details:
+                        self.debug(f'word_details: {word_details}')
+                        style_start = word_details.get('style_code', '')
+                        self.debug(f'style_start: {style_start}')
+                        if trailing_chars:
+                            styled_word_or_space = f'{style_start}{word}{self.reset}'
+                        else:
+                            styled_word_or_space = word_details.get('styled', stripped_word)
+                        self.debug(f'styled_word_or_space: {styled_word_or_space}')
+                        styled_words_and_spaces[i] = styled_word_or_space
+                        if i > 0 and (i - 1) not in boundary_indices_dict:
+                            boundary_indices_dict[i - 1] = word_details.get('attribs')
+                        if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                            boundary_indices_dict[i + 1] = word_details.get('attribs')
+                        indexes_used_by_words.add(i)
+                    else:
+                        if trie_manager.enable_styled_subwords and subword_search:
+                            subword_match = False
+                            if isinstance(subword_style_option, int) and subword_style_option in range(1, 6):
+                                if subword_style_option == 1:
+                                    prefix_match = trie_manager.subword_trie.search_prefix(stripped_word)
+                                    if prefix_match:
+                                        matched_substring, substring_details = prefix_match
+                                        subword_match = True
+                                elif subword_style_option == 2:
+                                    suffix_match = trie_manager.subword_trie.search_suffix(stripped_word)
+                                    if suffix_match:
+                                        matched_substring, substring_details = suffix_match
+                                        subword_match = True
+                                elif subword_style_option == 3:
+                                    substring_matches = trie_manager.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                    if substring_matches:
+                                        matched_substring, substring_details, _ = substring_matches[0]
+                                        subword_match = True
+                                elif subword_style_option == 4:
+                                    substring_matches = trie_manager.subword_trie.search_any_substring_by_insertion_order(stripped_word)
+                                    if substring_matches:
+                                        matched_substring, substring_details, _ = substring_matches[-1]
+                                        subword_match = True
+                                elif subword_style_option == 5:
+                                    substring_matches = trie_manager.subword_trie.search_any_substring(stripped_word)
+                                    if substring_matches:
+                                        sorted_matches = sorted(substring_matches, key=lambda match: stripped_word.find(match[0]))
+                                        current_position = 0
+                                        styled_word_parts = []
+                                        for matched_substring, substring_details in sorted_matches:
+                                            style_start = substring_details.get('style_code', '')
+                                            substring_start = stripped_word.find(matched_substring, current_position)
+                                            substring_end = substring_start + len(matched_substring)
+                                            if substring_start > current_position:
+                                                unstyled_part = stripped_word[current_position:substring_start]
+                                                styled_word_parts.append(f"{style_code}{unstyled_part}{self.reset}")
+                                            styled_word_parts.append(f"{style_start}{matched_substring}{self.reset}")
+                                            current_position = substring_end
+                                        if current_position < len(stripped_word):
+                                            remaining_part = stripped_word[current_position:]
+                                            styled_word_parts.append(f"{style_code}{remaining_part}{self.reset}")
+                                        styled_word_or_space = ''.join(styled_word_parts)
+                                        styled_words_and_spaces[i] = styled_word_or_space
+                                        if i > 0 and (i - 1) not in boundary_indices_dict:
+                                            boundary_indices_dict[i - 1] = sorted_matches[0][1].get('attribs', {})
+                                        if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                            boundary_indices_dict[i + 1] = sorted_matches[-1][1].get('attribs', {})
+                                        indexes_used_by_substrings.add(i)
+                                        continue
+                            if subword_match and subword_style_option != 5:
+                                style_start = substring_details.get('style_code', '')
+                                styled_word_or_space = f'{style_start}{word_or_space}{self.reset}'
+                                styled_words_and_spaces[i] = styled_word_or_space
+                                if i > 0 and (i - 1) not in boundary_indices_dict:
+                                    boundary_indices_dict[i - 1] = substring_details.get('attribs', {})
+                                if i + 1 < len(words_and_spaces) and (i + 1) not in boundary_indices_dict:
+                                    boundary_indices_dict[i + 1] = substring_details.get('attribs', {})
+                                indexes_used_by_substrings.add(i)
+                                continue
+
+        self.debug(f'After words and substrings:\nindexes_used_by_words:\n{indexes_used_by_words}\n'
+                   f'indexes_used_by_substrings:\n{indexes_used_by_substrings}\n'
+                   f'boundary_indices_dict:\n{boundary_indices_dict}\n'
+                   f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+        # === STEP 11: Handle remaining text (spaces and other tokens) ===
+        for i, word_or_space in enumerate(words_and_spaces):
+            if token_flags[i]:
+                # If this token was pre–styled, leave it intact.
+                styled_words_and_spaces[i] = word_or_space
+                continue
+            if i in indexes_used_by_phrases or i in indexes_used_by_words or i in indexes_used_by_substrings:
+                continue
+            if word_or_space.isspace():
+                indexes_used_by_spaces.add(i)
+                if i not in boundary_indices_dict:
+                    styled_word_or_space = f"{style_code}{word_or_space}{self.reset}"
+                else:
+                    style_instance_dict = asdict(style_instance)
+                    keys_to_compare = ['color', 'bg_color']
+                    if share_alike_sep_ul:
+                        keys_to_compare.append('underline')
+                    if share_alike_sep_ol:
+                        keys_to_compare.append('overline')
+                    if share_alike_sep_st:
+                        keys_to_compare.append('strikethru')
+                    if share_alike_sep_bl:
+                        keys_to_compare.append('blink')
+                    comparison_results = self.compare_dicts(boundary_indices_dict[i], style_instance_dict, keys_to_compare)
+                    space_style_codes = []
+                    if share_alike_sep_bg and comparison_results.get('bg_color'):
+                        space_style_codes.append(self.bg_color_map.get(style_instance_dict.get('bg_color')))
+                    if len(keys_to_compare) > 2:
+                        if comparison_results.get('color'):
+                            space_style_codes.append(self.color_map.get(style_instance_dict.get('color'),
+                                                                        self.color_map.get(boundary_indices_dict[i].get('color', ''))))
+                            for key in keys_to_compare[2:]:
+                                if comparison_results.get(key):
+                                    space_style_codes.append(self.effect_map.get(key, ''))
+                    new_style_code = ''.join(space_style_codes)
+                    styled_word_or_space = f'{new_style_code}{word_or_space}{self.reset}'
+                styled_words_and_spaces[i] = styled_word_or_space
+            else:
+                indexes_used_by_default_styling.add(i)
+                styled_words_and_spaces[i] = f"{style_code}{word_or_space}{self.reset}"
+
+        self.debug(f'After handling other styled text and spaces:\nindexes_used_by_spaces:\n{indexes_used_by_spaces}')
+        self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+        # === STEP 12: Default styling for any tokens not yet styled ===
+        for i, token in enumerate(styled_words_and_spaces):
+            if token is None and not token_flags[i]:
+                styled_words_and_spaces[i] = f"{style_code}{words_and_spaces[i]}{self.reset}"
+                indexes_used_by_none_styling.add(i)
+
+        self.debug(f'After default styling:\nindexes_used_by_none_styling:\n{indexes_used_by_none_styling}')
+        self.debug(f'styled_words_and_spaces:\n{styled_words_and_spaces}')
+
+        # === STEP 13: Assemble the final styled text ===
+        styled_text = ''.join(filter(None, styled_words_and_spaces))
+        self.debug(f"styled_text:\n{styled_text}")
+        self.debug(f"styled_text_length:\n{len(styled_text)}")
+
+        # === STEP 14: Wrap text and fill lines as needed ===
+        if fill_to_end or word_wrap or prepend_fill:
+            if word_wrap:
+                wrapped_lines = self.wrap_text_ansi_aware(styled_text, container_width, tab_width=tab_width)
+            else:
+                wrapped_lines = styled_text.splitlines(keepends=True)
+            final_lines = []
+            for line in wrapped_lines:
+                if prepend_fill:
+                    line = self.replace_leading_newlines_tabs(line, fill_with, tab_width)
+                trailing_newlines = len(line) - len(line.rstrip('\n'))
+                stripped_line = line.rstrip('\n')
+                current_length = self.get_visible_length(stripped_line, tab_width=tab_width)
+                chars_needed = max(0, container_width - current_length)
+                has_reset = stripped_line.endswith(self.reset)
+                if has_reset:
+                    stripped_line = stripped_line[:-len(self.reset)]
+                padded_line = stripped_line + fill_with * chars_needed
+                if has_reset:
+                    padded_line += self.reset
+                if trailing_newlines > 0:
+                    padded_line += '\n' * trailing_newlines
+                final_lines.append(padded_line)
+            if any(line.endswith('\n') for line in final_lines):
+                final_all_styled_text = ''.join(final_lines)
+            else:
+                final_all_styled_text = '\n'.join(final_lines)
+        else:
+            final_all_styled_text = styled_text
+
+        # === STEP 15: Output or return the final styled text ===
+        if return_styled_text:
+            return final_all_styled_text + end
+
+        if filename:
+            with open(filename, 'a') as file:
+                file.write(final_all_styled_text + end)
+        else:
+            sys.stdout.write(final_all_styled_text + end)
+
 
 
 
@@ -3518,7 +4064,6 @@ class PrintsCharming:
                subword_style_option: int = 1,  # 1, 2, 3, 4, or 5 (see below)
                style_args_as_one: bool = True,
                return_styled_args_list: bool = False,
-               rtl: bool = False,
                **kwargs: Any
                ) -> Union[None, List[str]]:
 

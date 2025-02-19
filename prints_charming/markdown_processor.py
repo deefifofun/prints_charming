@@ -461,6 +461,7 @@ class MarkdownProcessor:
                 f.write(final_output + end)
         else:
             sys.stdout.write(final_output + end)
+            #self.pc.print(final_output, end=end, skip_ansi_check=True)
             #print(final_output, end=end)
 
 

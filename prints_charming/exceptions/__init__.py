@@ -9,14 +9,14 @@ from .internal_exceptions import (
 )
 
 
-def setup_exceptions(pc: 'PrintsCharming') -> None:
+def setup_exceptions(pc: 'PrintsCharming', **kwargs) -> None:
     """
     Set up PrintsCharming to be used for all exceptions, including unhandled exceptions.
 
     Args:
         pc (PrintsCharming): Instance of PrintsCharming to be used for exception styling.
     """
-    set_excepthook(pc)
+    set_excepthook(pc, **kwargs)
 
 
 __all__ = [

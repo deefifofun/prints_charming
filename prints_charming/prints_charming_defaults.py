@@ -296,6 +296,36 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         'button_pressed': PStyle(color='black', bg_color='green', bold=True),
 
 
+        # Boxes
+
+        # Unselected
+        'box_top_unselected': PStyle(color='purple', bold=True, underline=True),
+        'box_left_unselected': PStyle(color='purple', bg_color='dgray'),
+        'box_content_unselected': PStyle(color='orange', bg_color='dgray'),
+        'box_right_unselected': PStyle(color='purple', bg_color='dgray'),
+        'box_bottom_unselected': PStyle(color='purple', overline=True),
+
+        # Selected
+        'box_top_selected': PStyle(color='purple', bold=True, underline=True),
+        'box_left_selected': PStyle(color='purple', bg_color='dgray'),
+        'box_content_selected': PStyle(color='orange', bg_color='dgray'),
+        'box_right_selected': PStyle(color='purple', bg_color='dgray'),
+        'box_bottom_selected': PStyle(color='purple', overline=True),
+
+        # Partial Unselected
+        'box_top_unselected_partial': PStyle(color='purple', bold=True, underline=False),
+        'box_left_unselected_partial': PStyle(color='purple', bg_color='dgray'),
+        'box_content_unselected_partial': PStyle(color='orange', bg_color='dgray'),
+        'box_right_unselected_partial': PStyle(color='purple', bg_color='dgray'),
+        'box_bottom_unselected_partial': PStyle(color='purple', overline=False),
+
+        # Partial Selected
+        'box_top_selected_partial': PStyle(color='purple', bold=True, underline=False),
+        'box_left_selected_partial': PStyle(color='purple', bg_color='dgray'),
+        'box_content_selected_partial': PStyle(color='orange', bg_color='dgray'),
+        'box_right_selected_partial': PStyle(color='purple', bg_color='dgray'),
+        'box_bottom_selected_partial': PStyle(color='purple', overline=False),
+
 
         "bg_color_green": PStyle(color="white", bg_color='green'),
         "black"        : PStyle(color="black"),
@@ -319,6 +349,8 @@ DEFAULT_STYLES: Dict[str, PStyle] = {
         "gray"         : PStyle(color="gray"),
         "green"        : PStyle(color="green", bold=True),
         "vgreen"       : PStyle(color="vgreen", bold=True),
+
+        "jupyter" : PStyle(color="jupyter"),
 
         "lav"          : PStyle(color="lav"),
 

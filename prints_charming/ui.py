@@ -1,14 +1,24 @@
-import sys
-import termios
-import tty
-import time
 import shutil
 import signal
 import os
+import time
 import textwrap
 from typing import NamedTuple
 
+from prints_charming import PrintsCharming
 
+
+
+def init_ui(pc):
+    """Handles common UI setup logic."""
+    #pc.__class__.write("alt_buffer", "enable_mouse", "enable_sgr_mouse", "hide_cursor")
+    pc.__class__.write("alt_buffer", "hide_cursor")
+
+
+def cleanup_ui(pc):
+    """Handles common UI cleanup logic."""
+    #pc.__class__.write("disable_mouse", "disable_sgr_mouse", "show_cursor", "normal_buffer")
+    pc.__class__.write("show_cursor", "normal_buffer")
 
 ########################################
 # Global MasterLayout with dynamic scaling
@@ -601,22 +611,18 @@ class Button(UIElement):
 
 
 
-
-
-
-
-
-
-
 class PrintsUI:
-    def __init__(self, pc, master_layout):
+    def __init__(self, pc):
         """
         A high-level UI helper class that builds upon PrintsCharming.
 
         :param pc: An instance of PrintsCharming
         """
         self.pc = pc
-        self.master_layout = master_layout
+        self.master_layout = MasterLayout
+        self.layout = Layout
+        self.box = Box
+        self.button = Button
         self.write = self.pc.write
         self.shared_byte_map = self.pc.__class__.shared_byte_map
         self.button_positions = {}
@@ -702,5 +708,99 @@ class PrintsUI:
 
 
 
+########################################
+# Functions to refresh and handle resize
+########################################
+
+def refresh_layout(master_layout):
+    os.system('clear')
+    print(master_layout.render())
+
+def sigwinch_handler(signum, frame):
+    master_layout.update_terminal_size()
+    refresh_layout(master_layout)
+
+# Set up the SIGWINCH handler for terminal resize events.
+signal.signal(signal.SIGWINCH, sigwinch_handler)
+
+########################################
+# Main demo configuration
+########################################
+
+
+def main():
+    init_ui()
+    # Create a main layout that occupies 80% of the width and 90% of the height,
+    # and is offset by 10% from the left and 5% from the top.
+    main_layout = Layout(
+        relative_width=0.8,
+        relative_height=0.90,
+        relative_offset_x=0.10,
+        relative_offset_y=0.05,
+        border=True,
+    )
+    master_layout.add_sublayout(main_layout)
+
+
+    # Add three nested layouts (e.g., header, content, footer) inside the main layout.
+    header = Layout(relative_width=0.7, relative_height=0.2,
+                    relative_offset_x=0, relative_offset_y=0, border=True)
+    header_right = Layout(relative_width=0.30, relative_height=0.2,
+                          relative_offset_x=0.70, relative_offset_y=0, border=True)
+
+    content = Layout(relative_width=1.0, relative_height=0.6,
+                     relative_offset_x=0, relative_offset_y=0.2, border=True)
+    footer = Layout(relative_width=1.0, relative_height=0.2,
+                    relative_offset_x=0, relative_offset_y=0.8, border=True)
+
+    main_layout.add_sublayout(header)
+    main_layout.add_sublayout(header_right)
+
+    main_layout.add_sublayout(content)
+    main_layout.add_sublayout(footer)
+
+
+    # Place a Box into each of the nested layouts.
+    header_box = Box(0.95, 1, content="Header Box", offset_x=0.05, offset_y=0, relative=True)
+    header.add_box(header_box)
+
+    header_right_box = Box(1, 1, content="Header Right Box", relative=True)
+    header_right.add_box(header_right_box)
+
+    content_box = Box(1, 1, content="Main Content Box", relative=True)
+    content.add_box(content_box)
+
+    footer_button = Button(0.25, 1, content="Footer Button1", offset_y=0.25, relative=True)
+    footer.add_box(footer_button)
+
+    footer_button2 = Button(0.25, 1, content="Footer Button2", offset_x=0.25, offset_y=0.25, wide_borders=True, relative=True)
+    footer.add_box(footer_button2)
+
+    footer_button3 = Button(0.25, 1, content="Footer Button3", offset_x=0.5, size='large', relative=True)
+    footer.add_box(footer_button3)
+
+    footer_button4 = Button(0.25, 1, content="Footer Button4", offset_x=0.75, size='large', wide_borders=True, relative=True)
+    footer.add_box(footer_button4)
+
+    # Initial render.
+    refresh_layout(master_layout)
+
+    # Keep the program running to handle dynamic resizing.
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting.")
+        cleanup_ui()
+
+
+
+
+
+if __name__ == "__main__":
+    # Create a global MasterLayout instance.
+    master_layout = MasterLayout()
+    pc = PrintsCharming()
+    main()
 
 

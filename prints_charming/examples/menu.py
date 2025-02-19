@@ -1319,7 +1319,7 @@ async def main():
             return
 
         if choice == 1:
-            maze_menu =
+            #maze_menu =
             pattern = Maze(
                 pc_instance=pc,
                 fb_instance=fb,

@@ -234,6 +234,7 @@ def divide_term_width(divisor):
 if __name__ == "__main__":
     pc = PrintsCharming(enable_markdown=True)
     pc.trie_manager.add_string("===", 'vcyan')
+    pc.trie_manager.add_string("PrintsCharming", 'bold')
     term_width = pc.terminal_width
 
     mini_border = '!' * divide_term_width(6)

@@ -1,5 +1,5 @@
 from prints_charming import PrintsCharming
-from prints_charming.exceptions import PrintsCharmingException
+from prints_charming.exceptions import PrintsCharmingException, setup_exceptions
 
 
 class ColorNotFoundError(PrintsCharmingException):
@@ -23,6 +23,7 @@ def raise_custom_error(pc, color_name='tree_color', length=10):
 def except_custom_error(pc):
     pc.print(f'This will purposely cause an error that is styled\n\n', color='vgreen')
 
+
     try:
         bg_bar_strip = raise_custom_error(pc)
         print(bg_bar_strip)
@@ -32,9 +33,12 @@ def except_custom_error(pc):
 
 
 
+
 def main():
     pc = PrintsCharming()
+    setup_exceptions(pc)
     except_custom_error(pc)
+
 
 
 if __name__ == '__main__':

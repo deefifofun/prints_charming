@@ -22,17 +22,9 @@ def get_terminal_height() -> int:
 
 class AsyncKeyReader:
     """
-    Sets up an asyncio-based, truly non-blocking way to capture
+    Sets up an asyncio-based, non-blocking way to capture
     single keystrokes from stdin on a POSIX system in raw mode.
     """
-
-    # Minimal mapping from escape sequences to tokens
-    ARROW_SEQS = {
-        '\x1b[A': 'arrow_up',
-        '\x1b[B': 'arrow_down',
-        '\x1b[C': 'arrow_right',
-        '\x1b[D': 'arrow_left',
-    }
 
     def __init__(self):
         self.loop = asyncio.get_event_loop()
@@ -48,28 +40,39 @@ class AsyncKeyReader:
         # Tell the event loop to call our _on_stdin_ready() whenever stdin has data
         self.loop.add_reader(sys.stdin, self._on_stdin_ready)
 
+
     def _on_stdin_ready(self):
         """
-        Callback invoked by the event loop whenever stdin has data available.
-        We read exactly 1 character to keep it simple, but you could read more if desired.
+        Callback invoked by the event loop when stdin has data.
+        It reads the key data as bytes and uses PrintsCharming's
+        reverse mapping to interpret escape sequences.
         """
-        ch = sys.stdin.read(1)
+        # Read the first byte in binary mode.
+        first_byte = sys.stdin.buffer.read(1)
+        if not first_byte:
+            return
 
-        if ch == '\x1b':
-            # Potential arrow key or other escape sequence
-            # We'll attempt to read the next 2 chars right now (non-blocking).
-            seq = ch + sys.stdin.read(2)  # e.g. "\x1b[A"
-            if seq in self.ARROW_SEQS:
-                # recognized arrow
-                token = self.ARROW_SEQS[seq]
-                self.queue.put_nowait(token)
-            else:
-                # Not recognized as a known arrow; push partial chars individually
-                # or you could do more advanced partial logic here
-                self.queue.put_nowait(seq)  # fallback
+        # Check if the input begins with the escape character.
+        if first_byte == PrintsCharming.shared_byte_map["escape_key"]:
+            # Start building the escape sequence.
+            # Attempt to read an initial set of 2 additional bytes.
+            seq = first_byte + sys.stdin.buffer.read(2)
+
+            # If the sequence does not yet appear complete (i.e. does not end with an alpha or '~'),
+            # then read the remaining bytes (this call is blocking, but acceptable in this callback).
+            if not (seq[-1:].isalpha() or seq.endswith(b"~")):
+                seq += PrintsCharming.read_remaining_escape_sequence()
+
+            # Delegate to PrintsCharming to resolve the sequence.
+            token = PrintsCharming.parse_escape_sequence(seq)
+            self.queue.put_nowait(token)
         else:
-            # Single char
-            self.queue.put_nowait(ch)
+            # For non-escape input, decode the byte to a UTF-8 character.
+            try:
+                key = first_byte.decode("utf-8", errors="ignore")
+            except Exception:
+                key = ""
+            self.queue.put_nowait(key)
 
 
     async def get_key(self):
@@ -93,6 +96,203 @@ class AsyncKeyReader:
         """
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
         # Also remove the reader so we don't keep reading from stdin
+        self.loop.remove_reader(sys.stdin)
+
+
+class AsyncMouseReader:
+    """
+    Sets up an asyncio-based, non-blocking mechanism to capture
+    mouse events from stdin, leveraging Xterm's basic mouse reporting.
+    """
+
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.queue = asyncio.Queue()
+
+        # Save original tty settings to restore later.
+        self.fd = sys.stdin.fileno()
+        self.original_settings = termios.tcgetattr(self.fd)
+
+        # Switch stdin to raw mode.
+        tty.setraw(self.fd)
+
+        # Enable Xterm mouse tracking (basic mode).
+        sys.stdout.write("\033[?1000h")
+        sys.stdout.flush()
+
+        # Register our reader callback for stdin.
+        self.loop.add_reader(sys.stdin, self._on_stdin_ready)
+
+    def _on_stdin_ready(self):
+        """
+        Callback invoked by the event loop when stdin has data.
+        It checks for the Xterm mouse event escape sequence and decodes it.
+        """
+        # Read the first byte.
+        first_byte = sys.stdin.buffer.read(1)
+        if not first_byte:
+            return
+
+        # Check if it is an escape sequence.
+        if first_byte == b'\x1b':
+            # Attempt to read the next two bytes.
+            seq = first_byte + sys.stdin.buffer.read(2)
+            if seq[1:] == b'[M':
+                # Basic mouse event detected; read the following three bytes.
+                data = sys.stdin.buffer.read(3)
+                if len(data) < 3:
+                    return  # Incomplete sequence, so exit early.
+
+                # The three data bytes are encoded by adding 32.
+                # Subtract 32 to retrieve the original values.
+                button_code = data[0] - 32
+                x = data[1] - 32
+                y = data[2] - 32
+
+                # Construct an event dictionary.
+                event = {
+                    'button': button_code,
+                    'x': x,
+                    'y': y
+                }
+                self.queue.put_nowait(event)
+            else:
+                # If it isn't a mouse event, you might choose to handle
+                # it differently or simply ignore it.
+                pass
+        else:
+            # Non-escape data can be ignored or processed as needed.
+            pass
+
+    async def get_mouse_event(self):
+        """
+        Asynchronously waits for and returns the next mouse event.
+        """
+        return await self.queue.get()
+
+    def get_mouse_event_nowait(self):
+        """
+        Attempts to return a mouse event immediately if available,
+        otherwise raises asyncio.QueueEmpty.
+        """
+        return self.queue.get_nowait()
+
+    def restore_tty(self):
+        """
+        Restores the original terminal settings and disables mouse reporting.
+        Should be called upon exit.
+        """
+        # Restore original tty settings.
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+        # Disable mouse tracking.
+        sys.stdout.write("\033[?1000l")
+        sys.stdout.flush()
+        # Remove the reader callback.
+        self.loop.remove_reader(sys.stdin)
+
+
+class InputHandler:
+    """
+    A unified asynchronous input handler that reads both keyboard
+    and mouse events from stdin and dispatches them via a single coroutine.
+    """
+    def __init__(self, enable_keyboard=True, enable_mouse=True):
+        self.enable_keyboard = enable_keyboard
+        self.enable_mouse = enable_mouse
+        self.loop = asyncio.get_event_loop()
+        self.queue = asyncio.Queue()
+        self.fd = sys.stdin.fileno()
+        # Save original terminal settings.
+        self.original_settings = termios.tcgetattr(self.fd)
+        # Switch stdin to raw mode.
+        tty.setraw(self.fd)
+        # Enable basic mouse tracking.
+        sys.stdout.write("\033[?1000h")
+        sys.stdout.flush()
+        # Register a single reader callback for stdin.
+        self.loop.add_reader(sys.stdin, self._on_stdin_ready)
+
+    def _on_stdin_ready(self):
+        """
+        Callback that reads from stdin and distinguishes between
+        key and mouse events before enqueuing a tagged event.
+        """
+        # Read the first byte from stdin.
+        first_byte = sys.stdin.buffer.read(1)
+        if not first_byte:
+            return
+
+        # Check for the escape character indicating a special sequence.
+        if first_byte == b'\x1b':
+            # Peek at the next two bytes.
+            seq = first_byte + sys.stdin.buffer.read(2)
+            # Determine if this is a mouse event (Xterm mouse reporting).
+            if seq[1:] == b'[M':
+                # Read the three additional bytes encoding the mouse event.
+                data = sys.stdin.buffer.read(3)
+                if len(data) < 3:
+                    return  # Incomplete mouse event sequence.
+                event = {
+                    'type': 'mouse',
+                    'button': data[0] - 32,  # Decode per Xterm specification.
+                    'x': data[1] - 32,
+                    'y': data[2] - 32,
+                }
+                self.queue.put_nowait(event)
+            else:
+                # Otherwise, treat as a keyboard escape sequence.
+                # (In a real application, you might delegate to a helper
+                # to parse more complex sequences.)
+                try:
+                    key = seq.decode("utf-8", errors="ignore")
+                except Exception:
+                    key = ''
+                event = {'type': 'key', 'key': key}
+                self.queue.put_nowait(event)
+        else:
+            # For non-escape input, decode as a normal key event.
+            try:
+                key = first_byte.decode("utf-8", errors="ignore")
+            except Exception:
+                key = ''
+            event = {'type': 'key', 'key': key}
+            self.queue.put_nowait(event)
+
+    async def process_events(self):
+        """
+        Continuously process incoming events by dispatching them to
+        the appropriate handlers.
+        """
+        while True:
+            event = await self.queue.get()
+            if event.get('type') == 'key':
+                self.handle_key_event(event['key'])
+            elif event.get('type') == 'mouse':
+                self.handle_mouse_event(event)
+            self.queue.task_done()
+
+    def handle_key_event(self, key):
+        """
+        Process a keyboard event.
+        Override or extend this method to suit application logic.
+        """
+        # Example: print the key event.
+        print(f"Key event received: {key}")
+
+    def handle_mouse_event(self, event):
+        """
+        Process a mouse event.
+        Override or extend this method to suit application logic.
+        """
+        print(f"Mouse event received: Button {event['button']} at ({event['x']}, {event['y']})")
+
+    def restore_tty(self):
+        """
+        Restore original terminal settings and disable mouse tracking.
+        """
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+        sys.stdout.write("\033[?1000l")
+        sys.stdout.flush()
         self.loop.remove_reader(sys.stdin)
 
 

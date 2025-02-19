@@ -2075,7 +2075,7 @@ def play_around_with_logging():
     init_message = f"logger initialized with pc configuration:\n{pc.format_dict(pc.config)}"
     logger.debug(init_message)
 
-    init_message2 = f"logger initialized with pc configuration:\n{pc.format_structure(logger_pc_config, fill_bg_only=True)}"
+    init_message2 = f"logger initialized with pc configuration:\n{pc.format_structure(logger_pc_config, prepend_fill=True, fill_bg_only=True)}"
     logger.debug(init_message2)
 
     logger.debug("arg 1: {} and arg 2: {}", 'arg1 is a phrase!', 'arg2 is a phrase too!')
